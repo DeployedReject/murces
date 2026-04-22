@@ -8,6 +8,6 @@ public class ErrorHelper {
     JsonObject response = new JsonObject();
     response.addProperty("status", 1);
     response.addProperty("error", error);
-    System.out.println(response.toString());
+    Communicator.printer(response);
   }
 }

@@ -87,7 +87,7 @@ public class Modrinth {
                 downloadedFile.write(buffer, 0, bytesRead);
                 readSize += bytesRead;
                 response.addProperty("progress", (readSize * 100.0) / filesize);
-                System.out.println(response);
+                Communicator.printer(response);
               }
 
               downloadedFile.close();
@@ -144,7 +144,7 @@ public class Modrinth {
       if (result.statusCode() == 200) {
 
         JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
-        System.out.println(response);
+        Communicator.printer(response;
       } else {
 
         ErrorHelper.errorJson("Website returned status code" + result.statusCode());
