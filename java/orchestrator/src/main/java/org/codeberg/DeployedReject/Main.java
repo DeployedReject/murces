@@ -61,7 +61,7 @@ public class Main {
         } else if (type.equals("modding")) {
 
           if (!(request.has("modBrowser") && request.has("modName") && request.has("version")
-              && request.has("modLoader"))) {
+              && request.has("modLoader") && request.has("modId"))) {
             ErrorHelper.errorJson("Missing One or More Necessary Parameters.");
             return;
           }
@@ -84,6 +84,7 @@ public class Main {
             cf.version = request.get("version").getAsString();
             cf.loader = request.get("modLoader").getAsString();
             cf.API = curseAPI;
+            cf.modId = request.get("modId").getAsString();
             cf.curseForgeHandler();
 
           }
