@@ -29,8 +29,8 @@ public class CurseForge {
       search();
     else if (type.equals("download")) {
       // To Do
-    } else if (type.equals("Home Page")) {
-      // TO Do
+    } else if (type.equals("home")) {
+      home();
     }
 
   }
@@ -65,11 +65,46 @@ public class CurseForge {
       HttpResponse<String> result = device.send(searching, BodyHandlers.ofString());
 
       if (result.statusCode() != 200) {
-        ErrorHelper.errorJson("Website returned status code" + result.statusCode());
+        ErrorHelper.errorJson("Website returned status code: " + result.statusCode());
         return;
       }
       JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
       Communicator.printer(response);
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+    }
+
+  }
+
+  public void home() {
+
+    String url = baseURL + "/v1/mods/featured";
+
+    JsonObject request = new JsonObject();
+    request.addProperty("gameId", id);
+
+    HttpRequest homeing = HttpRequest
+        .newBuilder()
+        .uri(URI.create(url))
+        .header("x-api-key", API)
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(request.toString()))
+        .build();
+
+    HttpClient device = HttpClient.newHttpClient();
+
+    try {
+      HttpResponse<String> home = device.send(homeing, BodyHandlers.ofString());
+
+      if (home.statusCode() != 200) {
+        ErrorHelper.errorJson("Website returned status code: " + home.statusCode());
+        return;
+      }
+
+      JsonObject response = JsonParser.parseString(home.body()).getAsJsonObject();
+      Communicator.printer(response);
+
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
