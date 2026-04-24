@@ -4,12 +4,17 @@ import java.util.Properties;
 import java.util.Scanner;
 import com.google.gson.JsonObject;
 import java.lang.System;
+import java.net.http.HttpClient;
+
 import com.google.gson.JsonParser;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Main {
+
+  public static HttpClient device = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+
   public static void main(String[] args) {
 
     Properties env = new Properties();
@@ -45,19 +50,20 @@ public class Main {
 
         if (type.equals("server")) {
 
-          if (!(request.has("gameVersion") && request.has("serverVersion") && request.has("serverType")
-              && request.has("subType"))) {
+          if (!(request.has("gameVersion") && request.has("loaderVersion") && request.has("serverType")
+              && request.has("ram"))) {
             ErrorHelper.errorJson("Missing One Or More Necessary Parameters.");
             return;
           }
 
-          ServerDownloader sd = new ServerDownloader();
+          ServerHandler sh = new ServerHandler();
 
-          sd.gameVersion = request.get("gameVersion").getAsString();
-          sd.serverVersion = request.get("serverVersion").getAsString();
-          sd.serverType = request.get("serverType").getAsString(); // Can be Fabric, Forge, Spigot and PaperMC
-          sd.type = request.get("subType").getAsString();
-          sd.serverHandler();
+          sh.loader = request.get("serverType").getAsString();
+          sh.gVersion = request.get("gameVersion").getAsString();
+          sh.lVersion = request.get("loaderVersion").getAsString();
+          sh.ram = request.get("ram").getAsInt();
+          sh.serverHandler();
+
         } else if (type.equals("modding")) {
 
           if (!(request.has("modBrowser") && request.has("modName") && request.has("version")

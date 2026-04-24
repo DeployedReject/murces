@@ -49,9 +49,8 @@ public class Modrinth {
         .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
         .GET()
         .build();
-    HttpClient device = HttpClient.newHttpClient();
     try {
-      HttpResponse<String> result = device.send(downloading, BodyHandlers.ofString());
+      HttpResponse<String> result = Main.device.send(downloading, BodyHandlers.ofString());
 
       if (result.statusCode() == 200) {
 
@@ -67,12 +66,13 @@ public class Modrinth {
               .build();
           try {
             // Getting it as a InputStream to monitor download progress.
-            HttpResponse<InputStream> downloadRequest = device.send(downloading,
+            HttpResponse<InputStream> downloadRequest = Main.device.send(downloading,
                 HttpResponse.BodyHandlers.ofInputStream());
 
             if (downloadRequest.statusCode() == 200) {
               FileOutputStream downloadedFile = new FileOutputStream(
-                  downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("filename").getAsString());
+                  "mods/" + downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("filename")
+                      .getAsString());
               byte[] buffer = new byte[4096];
               long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
               int readSize = 0;
@@ -136,10 +136,8 @@ public class Modrinth {
         .GET()
         .build();
 
-    HttpClient device = HttpClient.newHttpClient();
-
     try {
-      HttpResponse<String> result = device.send(searching, BodyHandlers.ofString());
+      HttpResponse<String> result = Main.device.send(searching, BodyHandlers.ofString());
 
       if (result.statusCode() == 200) {
 

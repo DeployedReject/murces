@@ -67,10 +67,8 @@ public class CurseForge {
         .GET()
         .build();
 
-    HttpClient device = HttpClient.newHttpClient();
-
     try {
-      HttpResponse<String> result = device.send(searching, BodyHandlers.ofString());
+      HttpResponse<String> result = Main.device.send(searching, BodyHandlers.ofString());
 
       if (result.statusCode() != 200) {
         ErrorHelper.errorJson("Website returned status code: " + result.statusCode());
@@ -100,10 +98,8 @@ public class CurseForge {
         .POST(HttpRequest.BodyPublishers.ofString(request.toString()))
         .build();
 
-    HttpClient device = HttpClient.newHttpClient();
-
     try {
-      HttpResponse<String> home = device.send(homeing, BodyHandlers.ofString());
+      HttpResponse<String> home = Main.device.send(homeing, BodyHandlers.ofString());
 
       if (home.statusCode() != 200) {
         ErrorHelper.errorJson("Website returned status code: " + home.statusCode());
@@ -131,12 +127,9 @@ public class CurseForge {
         .GET()
         .build();
 
-    HttpClient device = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
     HttpResponse<String> temp;
     try {
-      temp = device.send(downloading, BodyHandlers.ofString());
+      temp = Main.device.send(downloading, BodyHandlers.ofString());
 
       if (temp.statusCode() != 200) {
         ErrorHelper.errorJson("Website returned: " + temp.statusCode() + "\nI think you sent a bad id");
@@ -176,7 +169,7 @@ public class CurseForge {
     HttpResponse<InputStream> downloadRequest;
 
     try {
-      downloadRequest = device.send(downloaded, BodyHandlers.ofInputStream());
+      downloadRequest = Main.device.send(downloaded, BodyHandlers.ofInputStream());
 
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
@@ -189,7 +182,7 @@ public class CurseForge {
     }
 
     try {
-      FileOutputStream downloadedFile = new FileOutputStream(filename);
+      FileOutputStream downloadedFile = new FileOutputStream("mods/" + filename);
 
       byte[] buffer = new byte[4096];
       long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
