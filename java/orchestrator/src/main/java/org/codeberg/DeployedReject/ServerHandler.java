@@ -5,6 +5,11 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.stream.Stream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -23,6 +28,7 @@ public class ServerHandler {
     if (loader.equals("fabric")) {
       fabric();
     } else if (loader.equals("spigot")) {
+      spigot();
     } else if (loader.equals("paper")) {
     } else if (loader.equals("forge")) {
     } else if (loader.equals("vanilla")) {
@@ -140,12 +146,74 @@ public class ServerHandler {
     }
 
     if (downloading.statusCode() != 200) {
-      ErrorHelper.errorJson("Website Returned status code: " + downloading.statusCode());
+      ErrorHelper.errorJson("Website Returned Status Code: " + downloading.statusCode());
       return;
     }
 
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
     Progress.prog(downloading.body(), "server.jar", filesize);
+
+    spawnServer();
+  }
+
+  public void spigot() {
+
+    HttpResponse<InputStream> build;
+    try {
+      build = Main.device.send(HttpRequest.newBuilder()
+          .uri(URI.create(
+              "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"))
+          .GET().build(), BodyHandlers.ofInputStream());
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+      return;
+    }
+    if (build.statusCode() != 200) {
+      ErrorHelper.errorJson("Website Returned Status Code: " + build.statusCode());
+      return;
+    }
+
+    long filesize = build.headers().firstValueAsLong("content-length").orElse(-1L);
+    Progress.prog(build.body(), "BuildTools.jar", filesize);
+
+    String[] command = new String[] {
+        "java",
+        "-Xmx" + Integer.toString(ram) + "G",
+        "-Xms" + Integer.toString(ram) + "G",
+        "-jar",
+        "BuildTools.jar",
+        "--rev",
+        gVersion
+    };
+
+    try {
+      JsonObject response = new JsonObject();
+      response.addProperty("status", 2);
+      Communicator.printer(response);
+      if (Shell.execute(command).waitFor() != 0) {
+        ErrorHelper.errorJson("Build failed");
+        return;
+      }
+      response.addProperty("status", 3);
+      Communicator.printer(response);
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+    }
+
+    try (Stream<Path> jars = Files.list(Paths.get("."))) {
+      jars.forEach((Path jar) -> {
+        try {
+          if (jar.getFileName().toString().startsWith("spigot-" + gVersion)) {
+            Files.move(jar, Paths.get("server.jar"), StandardCopyOption.REPLACE_EXISTING);
+          }
+        } catch (Exception e) {
+          ErrorHelper.errorJson("Could not rename spigot.");
+        }
+      });
+
+    } catch (Exception e) {
+      ErrorHelper.errorJson("Ignore this most of the time.");
+    }
 
     spawnServer();
   }
@@ -172,12 +240,16 @@ public class ServerHandler {
         ErrorHelper.errorJson(e.toString());
         return;
       }
+
+      JsonObject response = new JsonObject();
+      response.addProperty("status", 2);
+      Communicator.printer(response);
+
       if (Shell.execute(command).waitFor() != 0) {
         ErrorHelper.errorJson("Server Not Started");
 
       } else {
-        JsonObject response = new JsonObject();
-        response.addProperty("status", 0);
+        response.addProperty("status", 3);
         response.addProperty("type", "server");
         Communicator.printer(response);
       }

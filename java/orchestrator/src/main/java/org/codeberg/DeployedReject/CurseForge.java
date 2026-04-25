@@ -8,6 +8,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -55,6 +56,7 @@ public class CurseForge {
     queries += "&gameVersion=" + version;
     queries += "&searchFilter=" + URLEncoder.encode(modName, StandardCharsets.UTF_8);
     queries += "&modLoaderType=" + mLT.get(loader);
+    queries += "&pageSize=10";
     url += queries;
 
     HttpRequest searching = HttpRequest
@@ -73,7 +75,7 @@ public class CurseForge {
         return;
       }
       JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
-      Communicator.printer(response);
+      Communicator.printer(sTranslator(response, true));
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
@@ -105,11 +107,29 @@ public class CurseForge {
       }
 
       JsonObject response = JsonParser.parseString(home.body()).getAsJsonObject();
-      Communicator.printer(response);
+      Communicator.printer(sTranslator(response, false));
 
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
+
+  }
+
+  private JsonObject sTranslator(JsonObject x, boolean mode) {
+
+    JsonObject response = new JsonObject();
+    response.addProperty("status", 0);
+    response.addProperty("type", "query");
+    JsonArray mods = new JsonArray();
+
+    for (int i = 0; i < x.get((mode) ? "data" : "featured").getAsJsonArray().size(); i++) {
+      JsonArray mod = new JsonArray();
+      mod.add(x.get((mode) ? "data" : "featured").getAsJsonArray().get(i).getAsJsonObject().get("id"));
+      mod.add(x.get((mode) ? "data" : "featured").getAsJsonArray().get(i).getAsJsonObject().get("name"));
+      mods.add(mod);
+    }
+    response.add("mods", mods);
+    return response;
 
   }
 

@@ -3,15 +3,15 @@ package org.codeberg.DeployedReject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+
 import java.io.InputStream;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.net.URLEncoder;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.io.FileOutputStream;
 
 public class Modrinth {
   String type;
@@ -111,7 +111,7 @@ public class Modrinth {
     }
     query = URLEncoder.encode(query, StandardCharsets.UTF_8);
     facets = URLEncoder.encode(facets, StandardCharsets.UTF_8);
-    url = url + "?query=" + query + "&facets=" + facets;
+    url = url + "?query=" + query + "&facets=" + facets + "&limit=10";
 
     HttpRequest searching = HttpRequest
         .newBuilder()
@@ -126,7 +126,7 @@ public class Modrinth {
       if (result.statusCode() == 200) {
 
         JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
-        Communicator.printer(response);
+        Communicator.printer(sTranslator(response));
       } else {
 
         ErrorHelper.errorJson("Website returned status code" + result.statusCode());
@@ -134,6 +134,28 @@ public class Modrinth {
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
+
+  }
+
+  private JsonObject sTranslator(JsonObject x) {
+
+    JsonObject response = new JsonObject();
+    response.addProperty("status", 0);
+    response.addProperty("type", "query");
+
+    JsonArray mods = new JsonArray();
+
+    for (int i = 0; i < x.get("hits").getAsJsonArray().size(); i++) {
+      JsonArray mod = new JsonArray();
+      mod.add(x.get("hits").getAsJsonArray().get(i).getAsJsonObject().get("slug").getAsString());
+      mod.add(x.get("hits").getAsJsonArray().get(i).getAsJsonObject().get("title").getAsString());
+      mods.add(mod);
+
+    }
+
+    response.add("mods", mods);
+
+    return response;
 
   }
 }

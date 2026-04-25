@@ -5,7 +5,8 @@ import java.util.Scanner;
 import com.google.gson.JsonObject;
 import java.lang.System;
 import java.net.http.HttpClient;
-
+import java.nio.file.Paths;
+import java.nio.file.Files;
 import com.google.gson.JsonParser;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -16,6 +17,13 @@ public class Main {
   public static HttpClient device = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
   public static void main(String[] args) {
+
+    try {
+      if (!Files.isDirectory(Paths.get("mods")))
+        Files.createDirectory(Paths.get("mods"));
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+    }
 
     Properties env = new Properties();
     try (InputStream envStream = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
