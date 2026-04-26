@@ -335,6 +335,10 @@ public class ServerHandler {
     String[] command = new String[] { "java", "-jar", "forge-" + gVersion + "-" + iVersion + "-installer.jar",
         "--installServer" };
 
+    JsonObject response = new JsonObject();
+    response.addProperty("status", 2);
+    Communicator.printer(response);
+
     try {
       if (Shell.execute(command).waitFor() != 0) {
         ErrorHelper.errorJson("Error on my side probably");
@@ -343,6 +347,9 @@ public class ServerHandler {
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
+
+    response.addProperty("status", 3);
+    Communicator.printer(response);
 
   }
 
@@ -403,6 +410,9 @@ public class ServerHandler {
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
+
+    response.addProperty("status", 3);
+    Communicator.printer(response);
 
   }
 }

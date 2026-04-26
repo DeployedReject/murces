@@ -7,7 +7,8 @@ public class Shell {
     executor.command(command);
 
     try {
-
+      executor.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+      executor.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process running = executor.start();
 
       return running;

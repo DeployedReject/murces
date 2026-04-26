@@ -6,6 +6,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 
 import com.google.gson.JsonObject;
+
 import java.io.FileOutputStream;
 
 public class NetworkUtils {
@@ -34,8 +35,9 @@ public class NetworkUtils {
           Communicator.printer(response);
         }
 
-        response.addProperty("status", 3);
-        Communicator.printer(response);
+        JsonObject responseEnd = new JsonObject();
+        responseEnd.addProperty("status", 3);
+        Communicator.printer(responseEnd);
       } catch (Exception e) {
         ErrorHelper.errorJson(e.toString());
       }
