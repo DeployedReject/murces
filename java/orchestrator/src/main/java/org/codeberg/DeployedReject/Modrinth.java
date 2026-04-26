@@ -3,12 +3,9 @@ package org.codeberg.DeployedReject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-
 import java.io.InputStream;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.http.HttpResponse.BodyHandlers;
 import java.net.URLEncoder;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -49,52 +46,33 @@ public class Modrinth {
         .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
         .GET()
         .build();
-    try {
-      HttpResponse<String> result = Main.device.send(downloading, BodyHandlers.ofString());
+    HttpResponse<String> result = NetworkUtils.attemptS(downloading);
 
-      if (result.statusCode() == 200) {
+    if (result.statusCode() == 200) {
 
-        JsonArray temp = JsonParser.parseString(result.body()).getAsJsonArray();
+      JsonArray temp = JsonParser.parseString(result.body()).getAsJsonArray();
 
-        if (!temp.isEmpty()) {
-          JsonObject downloadLink = temp.get(0).getAsJsonObject();
-          downloading = HttpRequest
-              .newBuilder()
-              .uri(URI
-                  .create(downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("url").getAsString()))
-              .GET()
-              .build();
-          try {
-            // Getting it as a InputStream to monitor download progress.
-            HttpResponse<InputStream> downloadRequest = Main.device.send(downloading,
-                HttpResponse.BodyHandlers.ofInputStream());
+      if (!temp.isEmpty()) {
+        JsonObject downloadLink = temp.get(0).getAsJsonObject();
+        downloading = HttpRequest
+            .newBuilder()
+            .uri(URI
+                .create(downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("url").getAsString()))
+            .GET()
+            .build();
+        // Getting it as a InputStream to monitor download progress.
+        HttpResponse<InputStream> downloadRequest = NetworkUtils.attemptI(downloading);
 
-            if (downloadRequest.statusCode() == 200) {
-
-              long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
-              Progress.prog(downloadRequest.body(), "mods/"
-                  + downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("filename").getAsString(),
-                  filesize);
-            } else {
-
-              ErrorHelper.errorJson("Website returned status code" + result.statusCode());
-            }
-          } catch (Exception e) {
-            ErrorHelper.errorJson(e.toString());
-          }
-
-        } else {
-          ErrorHelper.errorJson("No valid Link");
-        }
+        long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
+        NetworkUtils.prog(downloadRequest.body(), "mods/"
+            + downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("filename").getAsString(),
+            filesize);
 
       } else {
-
-        ErrorHelper.errorJson("Website returned status code" + result.statusCode());
+        ErrorHelper.errorJson("No valid Link");
       }
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-    }
 
+    }
   }
 
   private void search(boolean mode) {
@@ -120,20 +98,9 @@ public class Modrinth {
         .GET()
         .build();
 
-    try {
-      HttpResponse<String> result = Main.device.send(searching, BodyHandlers.ofString());
-
-      if (result.statusCode() == 200) {
-
-        JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
-        Communicator.printer(sTranslator(response));
-      } else {
-
-        ErrorHelper.errorJson("Website returned status code" + result.statusCode());
-      }
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-    }
+    HttpResponse<String> result = NetworkUtils.attemptS(searching);
+    JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
+    Communicator.printer(sTranslator(response));
 
   }
 

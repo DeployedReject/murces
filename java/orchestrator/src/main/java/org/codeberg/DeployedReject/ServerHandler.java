@@ -147,7 +147,7 @@ public class ServerHandler {
 
     }
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-    Progress.prog(downloading.body(), "server.jar", filesize);
+    NetworkUtils.prog(downloading.body(), "server.jar", filesize);
 
   }
 
@@ -163,50 +163,32 @@ public class ServerHandler {
 
     HttpResponse<InputStream> downloading;
 
-    try {
+    downloading = NetworkUtils.attemptI(downloadRequest);
 
-      downloading = Main.device.send(downloadRequest, BodyHandlers.ofInputStream());
-
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-      return;
-    }
-
-    if (downloading.statusCode() != 200) {
-      ErrorHelper.errorJson("Website Returned Status Code: " + downloading.statusCode());
-      return;
-    } else if (job == 3) {
+    if (job == 3) {
       list.add("fabric");
       return;
     }
 
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-    Progress.prog(downloading.body(), "server.jar", filesize);
+    NetworkUtils.prog(downloading.body(), "server.jar", filesize);
 
   }
 
   public void spigot() {
 
     HttpResponse<InputStream> build;
-    try {
-      build = Main.device.send(HttpRequest.newBuilder()
-          .uri(URI.create(
-              "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"))
-          .GET().build(), BodyHandlers.ofInputStream());
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-      return;
-    }
-    if (build.statusCode() != 200) {
-      ErrorHelper.errorJson("Website Returned Status Code: " + build.statusCode());
-      return;
-    } else if (job == 3) {
+    build = NetworkUtils.attemptI(HttpRequest.newBuilder()
+        .uri(URI.create(
+            "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"))
+        .GET().build());
+    if (job == 3) {
       list.add("spigot");
       return;
     }
 
     long filesize = build.headers().firstValueAsLong("content-length").orElse(-1L);
-    Progress.prog(build.body(), "BuildTools.jar", filesize);
+    NetworkUtils.prog(build.body(), "BuildTools.jar", filesize);
 
     String[] command = new String[] {
         "java",
@@ -252,37 +234,25 @@ public class ServerHandler {
   public void paper() {
     String url = "https://api.papermc.io/v2/projects/paper/versions/" + gVersion;
 
-    try {
-      HttpResponse<String> findingURL = Main.device.send(HttpRequest.newBuilder().uri(URI.create(url)).GET().build(),
-          BodyHandlers.ofString());
-      if (findingURL.statusCode() != 200) {
-        ErrorHelper.errorJson("Website Returned Status Code: " + findingURL.statusCode());
-        return;
-      }
-      int build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().size() - 1;
+    HttpResponse<String> findingURL = NetworkUtils
+        .attemptS(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
+    int build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().size() - 1;
 
-      build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().get(build)
-          .getAsInt();
+    build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().get(build)
+        .getAsInt();
 
-      url += "/builds/" + build + "/downloads/paper-" + gVersion + "-" + build + ".jar";
+    url += "/builds/" + build + "/downloads/paper-" + gVersion + "-" + build + ".jar";
 
-      HttpResponse<InputStream> downloading = Main.device
-          .send(HttpRequest.newBuilder().uri(URI.create(url)).GET().build(), BodyHandlers.ofInputStream());
+    HttpResponse<InputStream> downloading = NetworkUtils
+        .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
 
-      if (downloading.statusCode() != 200) {
-        ErrorHelper.errorJson("Website Returned Status Code: " + downloading.statusCode());
-        return;
-      } else if (job == 3) {
-        list.add("paper");
-        return;
-      }
-      long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-
-      Progress.prog(downloading.body(), "server.jar", filesize);
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+    if (job == 3) {
+      list.add("paper");
       return;
     }
+    long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
+
+    NetworkUtils.prog(downloading.body(), "server.jar", filesize);
 
   }
 
@@ -372,50 +342,38 @@ public class ServerHandler {
 
   public void forge() {
     String url = " https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json ";
+    HttpResponse<String> findingURl = NetworkUtils.attemptS(HttpRequest.newBuilder()
+        .uri(URI.create(
+            url))
+        .GET().build());
+
+    JsonObject result = JsonParser.parseString(findingURl.body()).getAsJsonObject();
+
+    String iVersion = result.get(gVersion + "-recommended").getAsString();
+
+    url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + gVersion + "-" + iVersion + "/forge-"
+        + gVersion + "-" + iVersion + "-installer.jar";
+
+    HttpResponse<InputStream> downloading = NetworkUtils
+        .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
+
+    if (job == 3) {
+      list.add("forge");
+      return;
+    }
+
+    long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
+
+    NetworkUtils.prog(downloading.body(), "forge-" + gVersion + "-" + iVersion + "-installer.jar", filesize);
+
+    String[] command = new String[] { "java", "-jar", "forge-" + gVersion + "-" + iVersion + "-installer.jar",
+        "--installServer" };
+
     try {
-      HttpResponse<String> findingURl = Main.device.send(HttpRequest.newBuilder()
-          .uri(URI.create(
-              url))
-          .GET().build(), BodyHandlers.ofString());
-
-      if (findingURl.statusCode() != 200) {
-        ErrorHelper.errorJson("Something went wrong.");
+      if (Shell.execute(command).waitFor() != 0) {
+        ErrorHelper.errorJson("Error on my side probably");
         return;
       }
-      JsonObject result = JsonParser.parseString(findingURl.body()).getAsJsonObject();
-
-      String iVersion = result.get(gVersion + "-recommended").getAsString();
-
-      url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + gVersion + "-" + iVersion + "/forge-"
-          + gVersion + "-" + iVersion + "-installer.jar";
-
-      HttpResponse<InputStream> downloading = Main.device
-          .send(HttpRequest.newBuilder().uri(URI.create(url)).GET().build(), BodyHandlers.ofInputStream());
-
-      if (downloading.statusCode() != 200) {
-        ErrorHelper.errorJson("Website Returned Status Code: " + downloading.statusCode());
-        return;
-      } else if (job == 3) {
-        list.add("forge");
-        return;
-      }
-
-      long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-
-      Progress.prog(downloading.body(), "forge-" + gVersion + "-" + iVersion + "-installer.jar", filesize);
-
-      String[] command = new String[] { "java", "-jar", "forge-" + gVersion + "-" + iVersion + "-installer.jar",
-          "--installServer" };
-
-      try {
-        if (Shell.execute(command).waitFor() != 0) {
-          ErrorHelper.errorJson("Error on my side probably");
-          return;
-        }
-      } catch (Exception e) {
-        ErrorHelper.errorJson(e.toString());
-      }
-
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }

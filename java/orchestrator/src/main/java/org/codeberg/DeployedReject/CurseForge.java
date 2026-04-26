@@ -4,7 +4,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
@@ -67,18 +66,8 @@ public class CurseForge {
         .GET()
         .build();
 
-    try {
-      HttpResponse<String> result = Main.device.send(searching, BodyHandlers.ofString());
-
-      if (result.statusCode() != 200) {
-        ErrorHelper.errorJson("Website returned status code: " + result.statusCode());
-        return;
-      }
-      JsonObject response = JsonParser.parseString(result.body()).getAsJsonObject();
-      Communicator.printer(sTranslator(response, true));
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-    }
+    JsonObject response = JsonParser.parseString(NetworkUtils.attemptS(searching).body()).getAsJsonObject();
+    Communicator.printer(sTranslator(response, true));
 
   }
 
@@ -98,20 +87,8 @@ public class CurseForge {
         .POST(HttpRequest.BodyPublishers.ofString(request.toString()))
         .build();
 
-    try {
-      HttpResponse<String> home = Main.device.send(homeing, BodyHandlers.ofString());
-
-      if (home.statusCode() != 200) {
-        ErrorHelper.errorJson("Website returned status code: " + home.statusCode());
-        return;
-      }
-
-      JsonObject response = JsonParser.parseString(home.body()).getAsJsonObject();
-      Communicator.printer(sTranslator(response, false));
-
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-    }
+    JsonObject response = JsonParser.parseString(NetworkUtils.attemptS(homeing).body()).getAsJsonObject();
+    Communicator.printer(sTranslator(response, false));
 
   }
 
@@ -145,23 +122,10 @@ public class CurseForge {
         .GET()
         .build();
 
-    HttpResponse<String> temp;
-    try {
-      temp = Main.device.send(downloading, BodyHandlers.ofString());
-
-      if (temp.statusCode() != 200) {
-        ErrorHelper.errorJson("Website returned: " + temp.statusCode() + "\nI think you sent a bad id");
-        return;
-      }
-
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-      return;
-    }
-
     String downloadURL, filename;
     try {
-      JsonObject data = JsonParser.parseString(temp.body()).getAsJsonObject().get("data").getAsJsonArray().get(0)
+      JsonObject data = JsonParser.parseString(NetworkUtils.attemptS(downloading).body()).getAsJsonObject().get("data")
+          .getAsJsonArray().get(0)
           .getAsJsonObject();
 
       if (data.get("downloadUrl").isJsonNull()) {
@@ -184,15 +148,7 @@ public class CurseForge {
         .GET()
         .build();
 
-    HttpResponse<InputStream> downloadRequest;
-
-    try {
-      downloadRequest = Main.device.send(downloaded, BodyHandlers.ofInputStream());
-
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-      return;
-    }
+    HttpResponse<InputStream> downloadRequest = NetworkUtils.attemptI(downloaded);
 
     if (downloadRequest.statusCode() != 200) {
       ErrorHelper.errorJson("Website returned status code: " + downloadRequest.statusCode());
@@ -201,7 +157,7 @@ public class CurseForge {
 
     long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
 
-    Progress.prog(downloadRequest.body(), "mods/" + filename, filesize);
+    NetworkUtils.prog(downloadRequest.body(), "mods/" + filename, filesize);
 
   }
 }

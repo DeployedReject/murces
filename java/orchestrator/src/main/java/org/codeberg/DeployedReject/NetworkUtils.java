@@ -1,10 +1,14 @@
 package org.codeberg.DeployedReject;
 
 import java.io.InputStream;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+
 import com.google.gson.JsonObject;
 import java.io.FileOutputStream;
 
-public class Progress {
+public class NetworkUtils {
 
   public static void prog(InputStream x, String filename, long filesize) {
 
@@ -41,4 +45,43 @@ public class Progress {
     }
 
   }
+
+  public static HttpResponse<String> attemptS(HttpRequest x) {
+
+    HttpResponse<String> y;
+    try {
+      y = Main.device.send(x, BodyHandlers.ofString());
+
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+      return null;
+    }
+
+    if (y.statusCode() != 200) {
+      ErrorHelper.errorJson("Website Returned Status Code: " + y.statusCode());
+      return null;
+    }
+
+    return y;
+
+  }
+
+  public static HttpResponse<InputStream> attemptI(HttpRequest x) {
+    HttpResponse<InputStream> y;
+
+    try {
+      y = Main.device.send(x, BodyHandlers.ofInputStream());
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+      return null;
+    }
+
+    if (y.statusCode() != 200) {
+      ErrorHelper.errorJson("Website Returned Status Code: " + y.statusCode());
+      return null;
+    }
+
+    return y;
+  }
+
 }
