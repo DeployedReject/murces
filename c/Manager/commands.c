@@ -52,9 +52,11 @@ int sv_Console(char *command) {
 
 int sv_Migrate(char *oldID, char *newID) {
   char args[80];
-  strcpy(args, "--migrate ");
-  strcat(args, oldID);
-  strcat(args, " ");
-  strcat(args, newID);
+
+  int r = snprintf(args, sizeof args, "--migrate %s %s",
+    oldID, newID);
+  if (r < 0 || r >= sizeof args)
+    return 1;
+
   return svctrl(args);
 }
