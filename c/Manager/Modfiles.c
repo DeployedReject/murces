@@ -30,7 +30,7 @@ int getMods(char ***modfiles) {
           return 1;
         }
 
-        if (memcpy(cl, sbuf, mcnt * sizeof(char *)) == NULL) {
+        if (memcpy(cl, mdfls, mcnt * sizeof(char *)) == NULL) {
           closedir(mods);
           return 1;
         }
