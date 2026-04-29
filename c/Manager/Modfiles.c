@@ -1,30 +1,92 @@
 #include <dirent.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-char **getMods() {
-  struct dirent *file;
-  DIR *mods = opendir("./mods");
-  if (mods == NULL) {
-    perror("Mods folder not found:");
-    return NULL;
-  }
+#define MAX_STATIC_MOD_COUNT (256U)
 
-  char **files = malloc(256 * sizeof(char *));
-  if (!files)
-    return NULL;
-  int multi = 1;
-  int total = 1;
-  while ((file = readdir(mods))) {
+int getMods(char ***modfiles)
+{
+	if (mods == NULL)
+		return 1;
 
-    if (total > multi * 256)
-      files = realloc(files, 256 * (multi++) * sizeof(char *));
-    if (!files)
-      return NULL;
+	struct dirent *file;
+	DIR *mods = opendir("./mods");
+	if (mods == NULL)
+		return 1;
 
-    files[(total++ - 1)] = strdup(file->d_name);
-  }
+	char *mdfls[MAX_STATIC_MOD_COUNT];
+	char **sbuf = NULL
 
-  return files;
+	char **cl = mdfls;
+
+	int mcnt = 0;
+	char onheap = 0;
+
+	while ((file = readdir(mods)))
+	{
+		if (mcnt >= MAX_STATIC_MOD_COUNT)
+		{
+			if (!onheap)
+			{
+				cl = (char **) malloc((mcnt + 5) * sizeof(char *));
+				if (sbuf == NULL)
+				{
+					closedir(mods);
+					return 1;
+				}
+
+				if (memcpy(cl, sbuf, mcnt * sizeof(char *)) == NULL)
+				{
+					closedir(mods);
+					return 1;
+				}
+				onheap = 1;
+			}
+			else
+			{
+				if (realloc(cl, (mcnt + 5) * sizeof(char *)) == NULL)
+				{
+					if (cl != NULL)
+						free(cl);
+					closedir(mods);
+					return 1;
+				}
+			}
+		}
+		cl[mcnt] = strdup(mods->d_name);
+		if (cl[mcnt++] == NULL)
+		{
+			if (cl != NULL)
+				free(cl);
+			closedir(mods);
+			return 1;
+		}
+	}
+
+	if (onheap)
+		*modfiles = cl;
+	else
+	{
+		char **fheap = (char **) malloc(mcnt * sizeof(char *));
+		if (fheap == NULL)
+		{
+			if (cl != NULL)
+				free(cl);
+			closedir(mods);
+			return 1;
+		}
+
+		if (memcpy(fheap, mdfls, mcnt * sizeof(char *)) == NULL)
+		{
+			if (cl != NULL)
+				free(cl);
+			closedir(mods);
+			return 1;
+		}
+		*modfiles = fheap;
+	}
+
+	closedir(mods);
+
+	return mcnt;
 }
