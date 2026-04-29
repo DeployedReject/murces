@@ -9,14 +9,22 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 import com.google.gson.JsonParser;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.codeberg.DeployedReject.utils.Communicator;
+import org.codeberg.DeployedReject.utils.ErrorHelper;
+import org.codeberg.DeployedReject.device.ServerHandler;
+import org.codeberg.DeployedReject.mods.Modrinth;
+import org.codeberg.DeployedReject.mods.CurseForge;
 
 public class Main {
-
   public static HttpClient device = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
   public static void main(String[] args) {
+
+    System.setErr(new PrintStream(OutputStream.nullOutputStream()));
 
     try {
       if (!Files.isDirectory(Paths.get("mods")))

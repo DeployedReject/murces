@@ -1,4 +1,4 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.utils;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;

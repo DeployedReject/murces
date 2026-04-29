@@ -1,4 +1,5 @@
-package org.codeberg.DeployedReject;
+
+package org.codeberg.DeployedReject.device;
 
 import java.io.FileWriter;
 import java.io.InputStream;
@@ -10,10 +11,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.codeberg.DeployedReject.utils.ErrorHelper;
+import org.codeberg.DeployedReject.utils.Communicator;
+import org.codeberg.DeployedReject.utils.NetworkUtils;
+import org.codeberg.DeployedReject.utils.Shell;
 
 public class ServerHandler {
 

@@ -1,12 +1,11 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.utils;
 
 import java.io.InputStream;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-
 import com.google.gson.JsonObject;
-
+import org.codeberg.DeployedReject.Main;
 import java.io.FileOutputStream;
 
 public class NetworkUtils {

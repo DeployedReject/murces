@@ -1,4 +1,4 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.mods;
 
 import com.google.gson.JsonParser;
 import com.google.gson.JsonObject;
@@ -9,13 +9,16 @@ import java.net.http.HttpResponse;
 import java.net.URLEncoder;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import org.codeberg.DeployedReject.utils.ErrorHelper;
+import org.codeberg.DeployedReject.utils.NetworkUtils;
+import org.codeberg.DeployedReject.utils.Communicator;
 
 public class Modrinth {
-  String type;
-  String query = "mods";
-  String version;
-  String loader;
-  String email;
+  public String type;
+  public String query = "mods";
+  public String version;
+  public String loader;
+  public String email;
 
   public void modrinthHandler() {
 

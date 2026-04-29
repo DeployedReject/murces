@@ -1,4 +1,4 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.utils;
 
 public class Shell {
   public static Process execute(String[] command) {

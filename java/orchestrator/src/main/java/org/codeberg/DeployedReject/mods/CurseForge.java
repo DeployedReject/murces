@@ -1,4 +1,4 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.mods;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -6,12 +6,13 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import java.net.http.HttpResponse;
+import org.codeberg.DeployedReject.utils.ErrorHelper;
+import org.codeberg.DeployedReject.utils.Communicator;
+import org.codeberg.DeployedReject.utils.NetworkUtils;
 
 public class CurseForge {
 

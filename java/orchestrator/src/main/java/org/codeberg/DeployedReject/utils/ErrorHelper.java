@@ -1,4 +1,4 @@
-package org.codeberg.DeployedReject;
+package org.codeberg.DeployedReject.utils;
 
 import com.google.gson.JsonObject;
 

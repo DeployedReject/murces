@@ -1,8 +1,8 @@
 CC := gcc
 CFLAGS := -Wall -Wextra -Wpedantic -std=c11 -MMD -MP
 LFLAGS := -lncurses
-INC_FLAGS := -I../precursor -I../precursor/include
-SRC_FILES = main.c $(wildcard src/*.c)
+INC_FLAGS := -I../precursor -I../precursor/include/
+SRC_FILES = main.c $(wildcard ../precursor/src/*.c) 
 BUILD_DIR := build
 TARGET := $(BUILD_DIR)/main
 
