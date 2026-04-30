@@ -14,7 +14,7 @@ public class Communicator implements Runnable {
 
     while (true) {
       try {
-        System.out.println(printBuffer.take());
+        System.out.println(printBuffer.take().toString());
       } catch (Exception e) {
         e.printStackTrace();
       }

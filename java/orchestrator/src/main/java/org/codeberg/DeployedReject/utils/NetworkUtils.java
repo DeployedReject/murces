@@ -43,6 +43,12 @@ public class NetworkUtils {
 
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
+    } finally {
+      try {
+        x.close();
+      } catch (Exception e) {
+        ErrorHelper.errorJson("Could Not close connection");
+      }
     }
 
   }
