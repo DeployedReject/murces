@@ -13,7 +13,7 @@ Every request sent to the backend **must** contain a `type` parameter. This repr
 Valid `type` values:
 
 - `"kill"`: Ends the background service gracefully and terminates the Java process.
-- `"server"`: Manages server instance installation and deployment.
+- `"server"`: Manages server instance installation, lifecycle (start/stop), and deployment.
 - `"modding"`: Manages mod querying and downloading.
 
 _(Note: If a required parameter for a specific type is missing, the backend will immediately return a `status: 1` error.)_
@@ -82,21 +82,29 @@ Downloads the exact mod matching the query and places it in the `mods/` director
 
 ## Type: `server`
 
-The server module downloads the required server executable, automatically bypasses the EULA, and launches the server in a detached OS background process (`tmux`).
+The server module manages the download, installation, and background process execution (`tmux`) of Minecraft servers. It automatically bypasses the EULA.
 
 **Required Parameters:**
-`type`, `gameVersion`, `loaderVersion`, `serverType`, `ram`
+`type`, `gameVersion`, `loaderVersion`, `serverType`, `ram`, `job`
 
-- `serverType`: The backend engine ("fabric", "spigot", "vanilla"). _(forge and paper are placeholders)_
+- `serverType`: The backend engine ("fabric", "spigot", "paper", "forge", "vanilla").
 - `gameVersion`: The Minecraft version (e.g., "1.20.4").
-- `loaderVersion`: The specific build of the server type (e.g., "0.15.7"). If using vanilla or spigot, put "none" here.
+- `loaderVersion`: The specific build of the server type (e.g., "0.15.7"). Used primarily for Fabric. If using other engines, pass "none".
 - `ram`: Total RAM in Gigabytes to allocate to the server JVM (e.g., `4`).
+- `job`: An integer defining the lifecycle action.
+  - `0` : **Install Only** (Downloads/compiles the server but does not start it).
+  - `1` : **Install & Start** (Downloads/compiles and immediately spawns the `tmux` session).
+  - `2` : **Stop** (Kills the active `mcServer` tmux session).
+  - `3` : **Check Supported Engines** (Returns a list of currently implemented server types).
 
-**Example (Fabric Launch):**
-`{"type": "server", "serverType": "fabric", "gameVersion": "1.20.4", "loaderVersion": "0.15.7", "ram": 4}`
+**Example (Install & Launch Paper):**
+`{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}`
 
-**Example (Spigot Compile & Launch):**
-`{"type": "server", "serverType": "spigot", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4}`
+**Example (Stop Server):**
+`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 2}`
+
+**Example (Query Supported Engines):**
+`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}`
 
 ---
 
@@ -106,7 +114,7 @@ The backend communicates back to the UI via stdout using standardized JSON objec
 
 ### Valid `status` Codes
 
-- `0` : **Success / Continuous Update.** Used for returning search queries or updating progress bars.
+- `0` : **Success / Continuous Update.** Used for returning search queries, acknowledging a server stop, generic check queries, or updating progress bars.
 - `1` : **Fatal Error.** The job failed and was aborted.
 - `2` : **Long Job Started.** Used to tell the UI to render a loading animation.
 - `3` : **Long Job Finished.** Used to tell the UI to clear the loading animation.
@@ -122,24 +130,25 @@ Returned when `subType` is `search` or `home`. Contains a `mods` key, which hold
 _Example:_ `{"status": 0, "type": "query", "mods": [["roughly-enough-items", "Roughly Enough Items (REI)"], ["sodium", "Sodium"]]}`
 
 **3. Download Progress (`type: "download"`)**
-Emits a rapid stream of JSON objects. The frontend should update its progress bar using the `progress` float (0 to 100). Sometimes it will be negative, that means a valid progress bar is not possible.
+Emits a rapid stream of JSON objects. The frontend should update its progress bar using the `progress` float (0 to 100). Sometimes it will be negative; that means a valid `content-length` header was missing and a definitive progress bar is not possible.
 _Flow:_
 
-1. `{"status": 2, "type": "download", "progress": 0}` 
-2. `{"status": 0, "type": "download", "progress": 14.5}` 
-3. `{"status": 0, "type": "download", "progress": 89.2}` 
-4. `{"status": 3, "type": "download", "progress": 100.0}` 
+1. `{"status": 2, "type": "download", "progress": 0}`
+2. `{"status": 0, "type": "download", "progress": 14.5}`
+3. `{"status": 0, "type": "download", "progress": 89.2}`
+4. `{"status": 3, "type": "download", "progress": 100.0}`
 
 **4. Server Deployment (`type: "server"`)**
-Servers take time to compile (Spigot) or launch (`tmux`). They utilize the start/stop status codes.
-_Flow (Vanilla/Fabric):_
+Servers take time to download (Paper, Fabric, Forge, Vanilla), compile (Spigot), and launch (`tmux`). They utilize the start/stop status codes.
+_Flow (Install & Launch - `job: 1`):_
 
-1. `{"status": 2}` _(Executing tmux command)_
+1. `{"status": 2}` _(Downloading/compiling assets or executing tmux command)_
 2. `{"status": 3, "type": "server"}` _(Server successfully handed off to background session)_
 
-_Flow (Spigot):_
+_Flow (Stop Server - `job: 2`):_
 
-1. `{"status": 2}` _(Spigot BuildTools compilation started. Expect a 5-10 minute wait)_
-2. `{"status": 3}` _(BuildTools compiled successfully)_
-3. `{"status": 2}` _(Executing tmux command)_
-4. `{"status": 3, "type": "server"}` _(Server successfully handed off to background session)_
+1. `{"status": 0, "type": "server"}` _(Emitted immediately upon successfully killing the tmux session)_
+
+**5. Supported Engine List (`job: 3`)**
+Returned when the frontend asks for supported loaders. Includes a `serverList` array alongside the `status: 0` confirmation.
+_Example:_ `{"serverList": ["fabric", "spigot", "paper", "vanilla", "forge"], "status": 0}`

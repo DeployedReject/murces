@@ -60,6 +60,7 @@ public class ServerHandler {
       vanilla();
       forge();
       response.add("serverList", list);
+      response.addProperty("status", 0);
       Communicator.printer(response);
     }
 
