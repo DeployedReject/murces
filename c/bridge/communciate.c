@@ -1,11 +1,5 @@
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#include <complex.h>
-#include <curses.h>
-#endif /* _GNU_SOURCE */
-
-#include "cJSON.h"
 #include "communciate.h"
+#include "cJSON.h"
 #include "router.h"
 #include <iso646.h>
 #include <log.h>
