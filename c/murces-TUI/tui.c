@@ -249,6 +249,48 @@ int mm_insert_menu_text(struct prc_window *win,
 	return 0;
 }
 
+int mm_draw_layout0(void)
+{
+	int ret = 0;
+
+	ret = prc_draw_window_border(mtstdbigwin);
+	if (ret != FN_SUCCESS)
+	{
+		eputs("Error: Failed to draw window border.");
+		return ret;
+	}
+
+	ret = prc_window_title(mtstdbigwin, 0, 0, tui_layout0__.ctx);
+	if (ret != FN_SUCCESS)
+	{
+		eputs("Error: Failed to write window title.");
+		return ret;
+	}
+
+	ret = prc_draw_window_border(tui_layout0__.content_win);
+	if (ret != FN_SUCCESS)
+	{
+		eputs("Error: Failed to draw window border.");
+		return ret;
+	}
+
+	ret = prc_draw_window_border(mtstdlogwin);
+	if (ret != FN_SUCCESS)
+	{
+		eputs("Error: Failed to draw window border.");
+		return ret;
+	}
+
+	mm_restore_text0(mtstdbigwin, tui_layout0__.content_win);
+
+	wnoutrefresh(tui_layout0__.content_win->win);
+	wnoutrefresh(mtstdbigwin->win);
+	wnoutrefresh(mtstdlogwin->win);
+	doupdate();
+
+	return 0;
+}
+
 int mtui_rmhl_menu_item(struct menu_items *items, int idx)
 {
 	if (items == NULL || idx < 0)
@@ -537,23 +579,24 @@ int main_menu(struct tui_info *info)
 				case '\n':
 				case '\r':
 					OPEN_MENU(item_selected);
+					werase(mtstdbigwin->win);
+					mm_draw_layout0();
 					break;
 
 				case 'i':
 				case 'I':
 					OPEN_MENU(2);
+					werase(mtstdbigwin->win);
+					mm_draw_layout0();
 					break;
 
 				case 'w':
 				case 'W':
 					OPEN_MENU(5);
+					werase(mtstdbigwin->win);
+					mm_draw_layout0();
 					break;
 
-				case 'k':
-				case 'K':
-					kick_the_buddy();
-					break;
-				
 				default:
 					break;
 			}
@@ -585,8 +628,6 @@ int main_menu(struct tui_info *info)
 
 	return ret;
 }
-
-void kick_the_buddy(void) {}
 
 int threadStarter(void) {
   ready = 0;

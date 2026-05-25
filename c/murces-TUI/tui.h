@@ -147,10 +147,6 @@ int main_menu(struct tui_info *info);
 
 void mm_destroy_layout0(void);
 
-
-/* Remove the attribute if using. */
-void kick_the_buddy(void) __attribute__((__unused__));
-
 /* MENU 1 */
 int menu1(struct tui_info *info);
 int m1_init_windows(struct tui_info *info);
