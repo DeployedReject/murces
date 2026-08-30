@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <prc/prc_context.h>
+#include <prc/prc_event.h>
 #include <stdio.h>
 
 _Static_assert(CHAR_BIT <= 8, "Incompatible device.");

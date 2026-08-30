@@ -70,7 +70,7 @@
 	doupdate(); \
 	menus__[n](info)
 
-#define MAX_MENU_ITEM_COUNT (20)
+#define MAX_MENU_ITEM_COUNT (128)
 #define MAX_MENU_ITEM_CHAR_COUNT (256)
 #define MAX_STR_MENU_ITEMS (256)
 
@@ -133,6 +133,8 @@ int mm_insert_menu_text(struct prc_window *win,
 	struct menu_items *items, 
 	int left, int right, int top);
 
+int mtui_rmhl_menu_item(struct menu_items *items, int idx);
+
 int mtui_highlight_menu_item(struct menu_items *items, int idx);
 
 int mm_insert_text(struct prc_window *win, short pair,
@@ -164,6 +166,7 @@ int menu3(struct tui_info *info);
 int m3_init_windows(struct tui_info *info);
 void m3_destroy_layout3(void);
 int m3_draw_layout3(void);
+int m3_restore_text(void);
 
 /* MENU 4 */
 int menu4(struct tui_info *info);

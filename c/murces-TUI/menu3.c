@@ -1,7 +1,9 @@
+#include <prc/prc_event.h>
 #include <prc/prc_winpool.h>
 #include <prc/prc_window.h>
 
 #include "tui.h"
+#include "utlprc/types.h"
 
 #include <string.h>
 
@@ -12,6 +14,185 @@ static struct tui_layout3__
 	struct prc_window *version_win;
 	unsigned char init;
 } tui_layout3__ = {0};
+
+static struct menu_items ver_menu_items__ = {
+	.items = {
+		'1', '.', '7', '.', '1', '0',
+		0,
+		'1', '.', '8',
+		0,
+		'1', '.', '8', '.', '1',
+		0,
+		'1', '.', '8', '.', '2',
+		0,
+		'1', '.', '8', '.', '3',
+		0,
+		'1', '.', '8', '.', '4',
+		0,
+		'1', '.', '8', '.', '5',
+		0,
+		'1', '.', '8', '.', '6',
+		0,
+		'1', '.', '8', '.', '7',
+		0,
+		'1', '.', '8', '.', '8',
+		0,
+		'1', '.', '8', '.', '9',
+		0,
+		'1', '.', '9',
+		0,
+		'1', '.', '9', '.', '1',
+		0,
+		'1', '.', '9', '.', '2',
+		0,
+		'1', '.', '9', '.', '3',
+		0,
+		'1', '.', '9', '.', '4',
+		0,
+		'1', '.', '1', '0',
+		0,
+		'1', '.', '1', '0', '.', '1',
+		0,
+		'1', '.', '1', '0', '.', '2',
+		0,
+		'1', '.', '1', '1',
+		0,
+		'1', '.', '1', '1', '.', '1',
+		0,
+		'1', '.', '1', '1', '.', '2',
+		0,
+		'1', '.', '1', '2',
+		0,
+		'1', '.', '1', '2', '.', '1',
+		0,
+		'1', '.', '1', '2', '.', '2',
+		0,
+		'1', '.', '1', '3',
+		0,
+		'1', '.', '1', '3', '.', '1',
+		0,
+		'1', '.', '1', '3', '.', '2',
+		0,
+		'1', '.', '1', '4',
+		0,
+		'1', '.', '1', '4', '.', '1',
+		0,
+		'1', '.', '1', '4', '.', '2',
+		0,
+		'1', '.', '1', '4', '.', '3',
+		0,
+		'1', '.', '1', '4', '.', '4',
+		0,
+		'1', '.', '1', '5',
+		0,
+		'1', '.', '1', '5', '.', '1',
+		0,
+		'1', '.', '1', '5', '.', '2',
+		0,
+		'1', '.', '1', '6',
+		0,
+		'1', '.', '1', '6', '.', '1',
+		0,
+		'1', '.', '1', '6', '.', '2',
+		0,
+		'1', '.', '1', '6', '.', '3',
+		0,
+		'1', '.', '1', '6', '.', '4',
+		0,
+		'1', '.', '1', '6', '.', '5',
+		0,
+		'1', '.', '1', '7',
+		0,
+		'1', '.', '1', '7', '.', '1',
+		0,
+		'1', '.', '1', '8',
+		0,
+		'1', '.', '1', '8', '.', '1',
+		0,
+		'1', '.', '1', '8', '.', '2',
+		0,
+		'1', '.', '1', '9',
+		0,
+		'1', '.', '1', '9', '.', '1',
+		0,
+		'1', '.', '1', '9', '.', '2',
+		0,
+		'1', '.', '1', '9', '.', '3',
+		0,
+		'1', '.', '1', '9', '.', '4',
+		0,
+		'1', '.', '2', '0',
+		0,
+		'1', '.', '2', '0', '.', '1',
+		0,
+		'1', '.', '2', '0', '.', '2',
+		0,
+		'1', '.', '2', '0', '.', '3',
+		0,
+		'1', '.', '2', '0', '.', '4',
+		0,
+		'1', '.', '2', '0', '.', '5',
+		0,
+		'1', '.', '2', '0', '.', '6',
+		0,
+		'1', '.', '2', '1',
+		0,
+		'1', '.', '2', '1', '.', '1',
+		0,
+		'1', '.', '2', '1', '.', '2',
+		0,
+		'1', '.', '2', '1', '.', '3',
+		0,
+		'1', '.', '2', '1', '.', '4',
+		0,
+		'1', '.', '2', '1', '.', '5',
+		0,
+		'1', '.', '2', '1', '.', '6',
+		0,
+		'1', '.', '2', '1', '.', '7',
+		0,
+		'1', '.', '2', '1', '.', '8',
+		0,
+		'1', '.', '2', '1', '.', '9',
+		0,
+		'1', '.', '2', '1', '.', '1', '0',
+		0,
+		'1', '.', '2', '1', '.', '1', '1',
+		0,
+		'2', '6', '.', '1',
+		0,
+		'2', '6', '.', '1', '.', '1',
+		0,
+		'2', '6', '.', '1', '.', '2',
+		0,
+		'2', '6', '.', '2',
+		0,
+		'2', '6', '.', '3',
+		0
+	},
+	.strterms = {
+		6, 10, 16, 22, 28, 34, 40, 46, 52, 58, 64, 68, 74, 80, 86, 92,
+		97, 104, 111, 116, 123, 130, 135, 142, 149, 154, 161, 168, 173,
+		180, 187, 194, 201, 206, 213, 220, 225, 232, 239, 246, 253, 260,
+		265, 272, 277, 284, 291, 296, 303, 310, 317, 324, 329, 336, 343,
+		350, 357, 364, 371, 376, 383, 390, 397, 404, 411, 418, 425, 432,
+		439, 447, 455, 460, 467, 474, 479, 484
+	},
+	.nitems = 76,
+	.selected = 1
+};
+
+static struct menu_items modld_menu_items__ = {
+	.items = {
+		'C', 'u', 'r', 's', 'e', 'F', 'o', 'r', 'g', 'e',
+		0,
+		'M', 'o', 'd', 'r', 'i', 'n', 't', 'h',
+		0
+	},
+	.strterms = {10, 19},
+	.nitems = 2,
+	.selected = 1
+};
 
 int m3_init_windows(struct tui_info *info)
 {
@@ -130,8 +311,26 @@ int m3_draw_layout3(void)
 	return ret;
 }
 
+int m3_restore_text(void)
+{
+	char *desc_win = "Install game modifications. Press <Q> to go back.";
+
+	mm_insert_text(mtstdbigwin, -1, desc_win, 4, 4, 2);
+	// mm_insert_text(tui_layout3__.modloader_win, -1, "MLWIN", 4, 4, 2);
+	// mm_insert_text(tui_layout3__.version_win, -1, "VWIN", 4, 4, 2);
+
+	mtui_highlight_menu_item(&modld_menu_items__, 0);
+
+	mm_insert_menu_text(tui_layout3__.modloader_win, &modld_menu_items__,
+			    4, 4, 2);
+
+	return 0;
+}
+
 int menu3(struct tui_info *info)
 {
+	fnresult_t ret = 0;
+
 	if (!tui_layout3__.init)
 	{
 		struct prc_context *ctx = &info->ctx;
@@ -173,17 +372,118 @@ int menu3(struct tui_info *info)
 	struct prc_window *version_win = tui_layout3__.version_win;
 	// struct prc_context *ctx = tui_layout3__.ctx;
 
+	if (nodelay(tui_layout3__.modloader_win->win, TRUE) != OK)
+	{
+		ret = -1;
+		return ret;
+	}
+
+	if (keypad(tui_layout3__.modloader_win->win, TRUE) != OK)
+	{
+		ret = -1;
+		return ret;
+	}
+
+	m3_restore_text();
+
 	wnoutrefresh(mtstdbigwin->win);
 	wnoutrefresh(modloader_win->win);
 	wnoutrefresh(version_win->win);
 	doupdate();
 
 	uint32_t c;
-	while((c = getch()))
+	struct prc_generic_event fevt = {0};
+	unsigned char item_selected = 0;
+	unsigned char chselect = 0;
+	// while((c = getch()))
+	// {
+	// 	if (c == 'q' || c == 'Q')
+	// 		return 0;
+	// }
+
+	do
 	{
-		if (c == 'q' || c == 'Q')
-			return 0;
-	}
+		wmove(mtstdbigwin->win, 0, 0);
+		prc_poll_for_event(tui_layout3__.modloader_win);
+		while ((ret = prc_get_first_event(&fevt)) == FN_SUCCESS)
+		{
+			c = fevt.detail;
+			switch(c)
+			{
+				case KEY_UP:
+					if (!item_selected)
+					{
+						prc_use_event();
+						continue;
+					}
+					chselect = TRUE;
+					modld_menu_items__.selected = 0;
+
+					if (mtui_rmhl_menu_item(&modld_menu_items__,
+						item_selected)
+						!= 0)
+						return ret;
+
+					--item_selected;
+					PRC_SETBIT_1(modld_menu_items__.selected, item_selected);
+
+					break;
+
+				case KEY_DOWN:
+					if (item_selected == modld_menu_items__.nitems - 1)
+					{
+						prc_use_event();
+						continue;
+					}
+
+					chselect = TRUE;
+					modld_menu_items__.selected = 0;
+
+					if (mtui_rmhl_menu_item(&modld_menu_items__, item_selected)
+						!= 0)
+						return ret;
+
+					++item_selected;
+					PRC_SETBIT_1(modld_menu_items__.selected, item_selected);
+
+					break;
+
+				case KEY_ENTER:
+				case '\n':
+				case '\r':
+					break;
+
+				default:
+					break;
+			}
+
+			if (chselect)
+			{
+				werase(tui_layout3__.modloader_win->win);
+				prc_draw_window_border(tui_layout3__.modloader_win);
+
+				if (mtui_highlight_menu_item(&modld_menu_items__, item_selected)
+					!= 0)
+					return ret;
+
+				if (mm_insert_menu_text(tui_layout3__.modloader_win,
+					&modld_menu_items__,
+					4, 4, 2) != 0)
+					return -1;
+
+				wnoutrefresh(tui_layout3__.modloader_win->win);
+			}
+
+			prc_use_event();
+		}
+
+		mvwprintw(stdscr, 0, 0, "%d", item_selected + 1);
+		wnoutrefresh(stdscr);
+		wnoutrefresh(mtstdlogwin->win);
+		doupdate();
+		wtimeout(tui_layout3__.modloader_win->win, 10);
+
+	} while (c != 'q' && c != 'Q');
 
 	return 0;
 }
