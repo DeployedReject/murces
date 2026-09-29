@@ -107,7 +107,7 @@ void *initRouter(void *temp) {
 
               if (status == 10)
                 ready = 1;
-              else if (status != 0) {
+              else if (status == 1) {
                 cJSON *errorItem = cJSON_GetObjectItem(response, "error");
                 char *error_str =
                     errorItem ? errorItem->valuestring : "Unknown error";
@@ -130,7 +130,15 @@ void *initRouter(void *temp) {
                 } else if (strcmp(type, "server") == 0) {
                   enqueue(&qServer, response);
                 } else {
-                  cJSON_Delete(response);
+                  if (status == 2 || status == 3) {
+                    cJSON *dup = cJSON_Duplicate(response, 1);
+                    enqueue(&qDownload, response);
+                    if (dup) {
+                      enqueue(&qServer, dup);
+                    }
+                  } else {
+                    cJSON_Delete(response);
+                  }
                 }
               }
             }

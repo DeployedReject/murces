@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+int current_log_line = 2;
+
 char *logMurces(const char *prefix, char *const array[]) {
   if (!prefix) {
     prefix = "";

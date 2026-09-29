@@ -363,7 +363,14 @@ int mm_insert_text(struct prc_window *win, short pair,
 	if (win == NULL || s == NULL)
 		return -1;
 
+<<<<<<< HEAD
 	unsigned int ogsize = strlen(s);
+=======
+  if (win == mtstdlogwin && top == 2) {
+    werase(win->win);
+    prc_draw_window_border(win);
+  }
+>>>>>>> e8714c4 (Dont care at this point)
 
 	int bufsize = win->width - right - left;
 	if(bufsize < 0)
@@ -629,6 +636,15 @@ int main_menu(struct tui_info *info)
 	return ret;
 }
 
+<<<<<<< HEAD
+=======
+void kick_the_buddy(void) {
+  threadStarter();
+  download("modrinth", "sodium", "1.20.4", "fabric", "0");
+  threadKiller();
+}
+
+>>>>>>> e8714c4 (Dont care at this point)
 int threadStarter(void) {
   ready = 0;
   void *IOP = init_orchestrator(1);

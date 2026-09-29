@@ -82,6 +82,7 @@ public class ServerHandler {
         vanilla();
         forge();
         response.add("server", list);
+        response.addProperty("type", "server");
         response.addProperty("status", 0);
         Communicator.printer(response);
         break;
@@ -368,6 +369,7 @@ public class ServerHandler {
 
     JsonObject response = new JsonObject();
     response.addProperty("status", 2);
+    response.addProperty("type", "server");
     Communicator.printer(response);
 
     try {
@@ -388,6 +390,7 @@ public class ServerHandler {
 
     JsonObject response = new JsonObject();
     response.addProperty("status", 2);
+    response.addProperty("type", "server");
     Communicator.printer(response);
 
     try (FileWriter eulaWriter = new FileWriter("eula.txt")) {

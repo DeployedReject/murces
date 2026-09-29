@@ -18,6 +18,14 @@ char **search(const char *modBrowser, const char *query, const char *version,
 // Returns a list of modloaders based on availability.
 char **modLoader(const char *version);
 
+// Downloads a mod and displays status and logs.
+char **download(const char *modBrowser, const char *modName, const char *version,
+                const char *modLoader, const char *modId);
+
+// Manages server tasks and returns 0 for success or 1 for failure.
+int server(const char *serverType, const char *gameVersion, const char *loaderVersion,
+           int ram, int job);
+
 // Shuts down the orchestrator and cleans up.
 void cleanup_orchestrator();
 

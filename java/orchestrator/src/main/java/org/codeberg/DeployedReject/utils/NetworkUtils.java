@@ -37,6 +37,7 @@ public class NetworkUtils {
 
         JsonObject responseEnd = new JsonObject();
         responseEnd.addProperty("status", 3);
+        responseEnd.addProperty("type", "download");
         Communicator.printer(responseEnd);
       } catch (Exception e) {
         ErrorHelper.errorJson(e.toString());
