@@ -405,6 +405,24 @@ public class OrchestratorBridge {
         return res.exitCode == 0;
     }
 
+    public static String getLiveConsoleOutput(int maxLines) {
+        if (!isServerRunning()) {
+            return "[Server not started - Start server from Server Control [S] to view live output]";
+        }
+        ProcessResult res = runShell("tmux", "capture-pane", "-t", "mcsv", "-p", "-S", "-" + maxLines);
+        if (res.exitCode == 0 && res.output != null && !res.output.trim().isEmpty()) {
+            return res.output.trim();
+        }
+        File logFile = new File("logs/latest.log");
+        if (logFile.exists() && logFile.canRead()) {
+            ProcessResult tailRes = runShell("tail", "-n", String.valueOf(maxLines), "logs/latest.log");
+            if (tailRes.exitCode == 0 && tailRes.output != null && !tailRes.output.trim().isEmpty()) {
+                return tailRes.output.trim();
+            }
+        }
+        return "[Server running - Waiting for console output...]";
+    }
+
     public static ProcessResult startServer(boolean publicTunnel) {
         String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
         if (publicTunnel) {
