@@ -187,6 +187,9 @@ public class ModBrowseWindow extends BasicWindow {
     }
 
     private void onDownload() {
+        if (selectedMod == null && resultsList.getSelectedIndex() >= 0 && resultsList.getSelectedIndex() < currentResults.size()) {
+            selectedMod = currentResults.get(resultsList.getSelectedIndex());
+        }
         if (selectedMod == null) {
             MessageDialog.showMessageDialog(gui, "No Selection", "Please click/select a mod from the results list first!", MessageDialogButton.OK);
             return;
