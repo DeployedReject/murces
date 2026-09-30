@@ -10,6 +10,7 @@ import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.input.MouseAction;
 import com.googlecode.lanterna.input.MouseActionType;
+import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.ArrayList;
@@ -160,8 +161,8 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
 
                 component.lastRenderHeight = height;
 
-                // Clear background with dark Minecraft gray / black
-                graphics.setBackgroundColor(MinecraftTheme.DEEP_BLACK);
+                // Clear background with theme log background (or transparent DEFAULT)
+                graphics.setBackgroundColor(LazyVimTheme.getLogBackgroundColor());
                 graphics.fill(' ');
 
                 // Leave 2 characters on right edge for scrollbar track
@@ -198,11 +199,11 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                     boolean isScrolledUp = effectiveOffset > 0;
 
                     // Top indicator / arrow
-                    graphics.setForegroundColor(isScrolledUp ? MinecraftTheme.GOLD_YELLOW : MinecraftTheme.STONE_GRAY);
+                    graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getWarningColor() : LazyVimTheme.getMutedColor());
                     graphics.putString(barCol, 0, "▲");
 
                     // Bottom indicator / arrow
-                    graphics.setForegroundColor(isScrolledUp ? MinecraftTheme.STONE_GRAY : MinecraftTheme.CREEPER_GREEN);
+                    graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getMutedColor() : LazyVimTheme.getSuccessColor());
                     graphics.putString(barCol, height - 1, "▼");
 
                     if (height > 2) {
@@ -212,10 +213,10 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
 
                         for (int y = 1; y < height - 1; y++) {
                             if (y == thumbY) {
-                                graphics.setForegroundColor(isFocused ? MinecraftTheme.CREEPER_GREEN : (isScrolledUp ? MinecraftTheme.GOLD_YELLOW : MinecraftTheme.STONE_GRAY));
+                                graphics.setForegroundColor(isFocused ? LazyVimTheme.getSuccessColor() : (isScrolledUp ? LazyVimTheme.getWarningColor() : LazyVimTheme.getAccentColor()));
                                 graphics.putString(barCol, y, "█");
                             } else {
-                                graphics.setForegroundColor(TextColor.ANSI.BLACK_BRIGHT);
+                                graphics.setForegroundColor(LazyVimTheme.getMutedColor());
                                 graphics.putString(barCol, y, "░");
                             }
                         }
@@ -270,21 +271,21 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
     }
 
     private TextColor getColorForLine(String line) {
-        if (line == null || line.isEmpty()) return TextColor.ANSI.WHITE;
+        if (line == null || line.isEmpty()) return LazyVimTheme.getActivePalette().fg;
         String upper = line.toUpperCase();
 
         if (upper.startsWith("[OK") || upper.startsWith("OK:") || upper.contains("SUCCESS") || upper.contains("DONE (")) {
-            return MinecraftTheme.CREEPER_GREEN;
+            return LazyVimTheme.getSuccessColor();
         } else if (upper.startsWith("[ERR") || upper.startsWith("ERR:") || upper.contains("ERROR") || upper.contains("EXCEPTION") || upper.contains("FATAL")) {
-            return MinecraftTheme.REDSTONE_RED;
+            return LazyVimTheme.getErrorColor();
         } else if (upper.startsWith("[WARN") || upper.startsWith("[WRN") || upper.startsWith("WRN:") || upper.contains("WARN")) {
-            return MinecraftTheme.GOLD_YELLOW;
+            return LazyVimTheme.getWarningColor();
         } else if (upper.startsWith("[PROG") || upper.startsWith("[BUSY") || upper.startsWith("[STATUS") || upper.startsWith("[SELECTED")) {
-            return MinecraftTheme.DIAMOND_CYAN;
+            return LazyVimTheme.getAccentColor();
         } else if (upper.contains("[SERVER NOT STARTED") || upper.contains("[SERVER STOPPED")) {
-            return MinecraftTheme.STONE_GRAY;
+            return LazyVimTheme.getMutedColor();
         }
-        return TextColor.ANSI.WHITE;
+        return LazyVimTheme.getActivePalette().fg;
     }
 
     private static List<String> wrapLine(String text, int width) {

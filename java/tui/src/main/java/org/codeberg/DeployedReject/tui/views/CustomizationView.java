@@ -1,0 +1,198 @@
+package org.codeberg.DeployedReject.tui.views;
+
+import com.googlecode.lanterna.TerminalSize;
+import com.googlecode.lanterna.gui2.*;
+import org.codeberg.DeployedReject.tui.config.ConfigManager;
+import org.codeberg.DeployedReject.tui.config.TuiConfig;
+import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Dedicated customization workspace view allowing users to select LazyVim themes,
+ * adjust background transparency levels, toggle 24-bit TrueColor, minimum size enforcement,
+ * and Minecraft pickaxe loading animations.
+ */
+public class CustomizationView implements WorkspaceView {
+
+    private final MainWindow mainWindow;
+    private final Panel root;
+    private final ComboBox<String> themeCombo;
+    private final ComboBox<String> transparencyCombo;
+    private final CheckBox trueColorCheck;
+    private final CheckBox minSizeCheck;
+    private final CheckBox animationCheck;
+    private final Label statusLabel;
+    private final Map<Character, Runnable> hotkeys = new HashMap<>();
+
+    private static final String[] TRANSPARENCY_OPTIONS = {
+            "0%  (Opaque - Theme solid background)",
+            "25% (Low - Transparent terminal canvas)",
+            "50% (Medium - Transparent panels & cards)",
+            "75% (High - Transparent controls)",
+            "100% (Full - Maximum terminal transparency)"
+    };
+
+    public CustomizationView(MainWindow mainWindow) {
+        this.mainWindow = mainWindow;
+        this.root = new Panel(new LinearLayout(Direction.VERTICAL));
+
+        Label header = new Label("Theme & Interface Customization");
+        header.setForegroundColor(LazyVimTheme.getAccentColor());
+        root.addComponent(header);
+        root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
+        root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+
+        // Form layout
+        Panel formPanel = new Panel(new GridLayout(2));
+
+        // 1. Theme
+        formPanel.addComponent(new Label("[T]heme: "));
+        themeCombo = new ComboBox<>();
+        List<String> themeNames = LazyVimTheme.getAvailableThemeNames();
+        for (String t : themeNames) {
+            themeCombo.addItem(t);
+        }
+        formPanel.addComponent(themeCombo);
+
+        // 2. Transparency
+        formPanel.addComponent(new Label("Trans[p]arency: "));
+        transparencyCombo = new ComboBox<>();
+        for (String opt : TRANSPARENCY_OPTIONS) {
+            transparencyCombo.addItem(opt);
+        }
+        formPanel.addComponent(transparencyCombo);
+
+        root.addComponent(formPanel.withBorder(Borders.singleLine("Appearance Settings")));
+
+        // 3. Toggles
+        Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
+        trueColorCheck = new CheckBox("Enable 24-bit TrueColor (ANSI RGB)");
+        minSizeCheck = new CheckBox("Enforce Minimum Screen Size (>= 70x18)");
+        animationCheck = new CheckBox("Minecraft pickaxe dirt-breaking loading animation");
+
+        togglePanel.addComponent(trueColorCheck);
+        togglePanel.addComponent(minSizeCheck);
+        togglePanel.addComponent(animationCheck);
+
+        root.addComponent(togglePanel.withBorder(Borders.singleLine("Options & Animations")));
+
+        // 4. Status
+        statusLabel = new Label("[OK:] Ready.");
+        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+        root.addComponent(statusLabel);
+
+        // 5. Actions
+        Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+        Button saveBtn = new Button("[S]ave & Apply", this::onSaveAndApply);
+        Button resetBtn = new Button("[R]eset Defaults", this::onResetDefaults);
+        Button backBtn = new Button("[B]ack", mainWindow::showMainMenu);
+
+        actionPanel.addComponent(saveBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        actionPanel.addComponent(resetBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        actionPanel.addComponent(backBtn);
+
+        root.addComponent(actionPanel);
+
+        // Hotkeys
+        hotkeys.put('S', this::onSaveAndApply);
+        hotkeys.put('R', this::onResetDefaults);
+        hotkeys.put('B', mainWindow::showMainMenu);
+        hotkeys.put('T', themeCombo::takeFocus);
+        hotkeys.put('P', transparencyCombo::takeFocus);
+
+        loadCurrentConfig();
+    }
+
+    private void loadCurrentConfig() {
+        TuiConfig config = ConfigManager.getInstance().getConfig();
+
+        // Theme
+        String currentTheme = config.getTheme();
+        for (int i = 0; i < themeCombo.getItemCount(); i++) {
+            if (themeCombo.getItem(i).equalsIgnoreCase(currentTheme)) {
+                themeCombo.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // Transparency
+        int currentTrans = config.getTransparencyPercent();
+        if (currentTrans <= 0) transparencyCombo.setSelectedIndex(0);
+        else if (currentTrans <= 25) transparencyCombo.setSelectedIndex(1);
+        else if (currentTrans <= 50) transparencyCombo.setSelectedIndex(2);
+        else if (currentTrans <= 75) transparencyCombo.setSelectedIndex(3);
+        else transparencyCombo.setSelectedIndex(4);
+
+        // Toggles
+        trueColorCheck.setChecked(config.isTrueColor());
+        minSizeCheck.setChecked(config.isEnforceMinSize());
+        animationCheck.setChecked(config.isPickaxeAnimation());
+    }
+
+    private void onSaveAndApply() {
+        TuiConfig config = ConfigManager.getInstance().getConfig();
+
+        String selectedTheme = themeCombo.getSelectedItem();
+        config.setTheme(selectedTheme != null ? selectedTheme : "Tokyo Night");
+
+        int transIdx = transparencyCombo.getSelectedIndex();
+        int transPercent = 0;
+        switch (transIdx) {
+            case 1: transPercent = 25; break;
+            case 2: transPercent = 50; break;
+            case 3: transPercent = 75; break;
+            case 4: transPercent = 100; break;
+            default: transPercent = 0; break;
+        }
+        config.setTransparencyPercent(transPercent);
+
+        config.setTrueColor(trueColorCheck.isChecked());
+        config.setEnforceMinSize(minSizeCheck.isChecked());
+        config.setPickaxeAnimation(animationCheck.isChecked());
+
+        ConfigManager.getInstance().save();
+
+        mainWindow.applyConfig(config);
+        statusLabel.setText("[OK:] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
+        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+    }
+
+    private void onResetDefaults() {
+        TuiConfig def = new TuiConfig();
+        ConfigManager.getInstance().setConfig(def);
+        loadCurrentConfig();
+        mainWindow.applyConfig(def);
+        statusLabel.setText("[OK:] Reset to default configuration.");
+        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+    }
+
+    @Override
+    public String getTitle() {
+        return "Customization & Themes";
+    }
+
+    @Override
+    public Component getComponent() {
+        return root;
+    }
+
+    @Override
+    public Map<Character, Runnable> getHotkeys() {
+        return hotkeys;
+    }
+
+    @Override
+    public Interactable getDefaultFocus() {
+        return themeCombo;
+    }
+
+    @Override
+    public void onActivated() {
+        loadCurrentConfig();
+    }
+}

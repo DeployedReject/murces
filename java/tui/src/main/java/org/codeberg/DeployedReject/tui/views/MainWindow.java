@@ -9,6 +9,9 @@ import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.input.MouseAction;
 import com.googlecode.lanterna.input.MouseActionType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
+import org.codeberg.DeployedReject.tui.config.ConfigManager;
+import org.codeberg.DeployedReject.tui.config.TuiConfig;
+import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.*;
@@ -24,6 +27,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *  3. Server Console Window (Bottom, full-width, auto-wrapping, scrollable [L])
  */
 public class MainWindow extends BasicWindow {
+
+    private final Panel root;
+    private final Panel tooSmallPanel;
+    private final Label tooSmallSizeLabel;
+    private final Border tooSmallBordered;
 
     private final WindowBasedTextGUI gui;
     private final Panel workspaceContainer;
@@ -42,6 +50,7 @@ public class MainWindow extends BasicWindow {
     private final MigratePlayerView migratePlayerView;
     private final ModBrowseView modBrowseView;
     private final ModManageView modManageView;
+    private final CustomizationView customizationView;
 
     private WorkspaceView currentView;
     private String lastConsoleOutput = "";
@@ -56,7 +65,18 @@ public class MainWindow extends BasicWindow {
         this.gui = gui;
         setHints(Arrays.asList(Hint.FULL_SCREEN, Hint.FIT_TERMINAL_WINDOW));
 
-        Panel root = new Panel(new BorderLayout());
+        // Too small warning panel overlay
+        tooSmallPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+        Label warnTitle = new Label("⚠️  TERMINAL WINDOW TOO SMALL");
+        warnTitle.setForegroundColor(LazyVimTheme.getErrorColor());
+        tooSmallPanel.addComponent(warnTitle);
+        tooSmallSizeLabel = new Label("Current: 0x0 | Required: >= 70x18");
+        tooSmallSizeLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+        tooSmallPanel.addComponent(tooSmallSizeLabel);
+        tooSmallPanel.addComponent(new Label("Please enlarge or maximize your terminal window."));
+        tooSmallBordered = tooSmallPanel.withBorder(Borders.doubleLine("Display Warning"));
+
+        this.root = new Panel(new BorderLayout());
 
         // 1. Top Header Tooltip (Location.TOP)
         Label tip = KeyboardNavigationHelper.createTooltip();
@@ -127,6 +147,10 @@ public class MainWindow extends BasicWindow {
         this.migratePlayerView = new MigratePlayerView(this);
         this.modBrowseView = new ModBrowseView(this);
         this.modManageView = new ModManageView(this);
+        this.customizationView = new CustomizationView(this);
+
+        // Apply persistent theme and configuration
+        applyConfig(ConfigManager.getInstance().getConfig());
 
         // Connect Activity Logger
         ActivityLogger.addListener(msg -> {
@@ -145,16 +169,35 @@ public class MainWindow extends BasicWindow {
 
     public void updateLayoutDimensions(TerminalSize termSize) {
         if (termSize == null) return;
-        int cols = Math.max(70, termSize.getColumns());
-        int rows = Math.max(20, termSize.getRows());
+        int cols = termSize.getColumns();
+        int rows = termSize.getRows();
 
-        // Console height: ~25% of rows (min 5, max 12)
-        int consHeight = Math.max(5, Math.min(12, rows / 4));
+        boolean enforceMin = ConfigManager.getInstance().getConfig().isEnforceMinSize();
+        if (enforceMin && (cols < 70 || rows < 18)) {
+            tooSmallSizeLabel.setText(String.format("Current: %dx%d | Minimum Required: 70x18", cols, rows));
+            if (getComponent() != tooSmallBordered) {
+                setComponent(tooSmallBordered);
+            }
+            invalidate();
+            return;
+        } else {
+            if (getComponent() != root) {
+                setComponent(root);
+            }
+        }
+
+        // Dynamic UI scaling on full screen
+        // Console height: ~25% of rows (min 5, max 16 on full screen)
+        int consHeight = Math.max(5, Math.min(16, rows / 4));
         consoleBordered.setPreferredSize(new TerminalSize(cols, consHeight));
 
-        // Activity width: ~35% of cols (min 28, max 55)
-        int actWidth = Math.max(28, Math.min(55, (cols * 35) / 100));
+        // Activity width: ~35% of cols (min 28, max 65 on full screen)
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         activityBordered.setPreferredSize(new TerminalSize(actWidth, Math.max(10, rows - consHeight - 4)));
+
+        if (currentView != null) {
+            currentView.onResized(termSize);
+        }
 
         invalidate();
     }
@@ -189,6 +232,7 @@ public class MainWindow extends BasicWindow {
     public void showMigratePlayer() { showView(migratePlayerView); }
     public void showModBrowse() { showView(modBrowseView); }
     public void showModManage() { showView(modManageView); }
+    public void showCustomization() { showView(customizationView); }
 
     public MainMenuView getMainMenuView() { return mainMenuView; }
     public ServerControlView getServerControlView() { return serverControlView; }
@@ -198,6 +242,25 @@ public class MainWindow extends BasicWindow {
     public MigratePlayerView getMigratePlayerView() { return migratePlayerView; }
     public ModBrowseView getModBrowseView() { return modBrowseView; }
     public ModManageView getModManageView() { return modManageView; }
+    public CustomizationView getCustomizationView() { return customizationView; }
+
+    public void applyConfig(TuiConfig config) {
+        if (config == null) return;
+        com.googlecode.lanterna.graphics.Theme theme = LazyVimTheme.createTheme(
+                config.getTheme(),
+                config.getTransparencyPercent(),
+                config.isTrueColor()
+        );
+        gui.setTheme(theme);
+        activityLogView.invalidate();
+        consoleLogView.invalidate();
+        invalidate();
+        TerminalSize size = gui.getScreen() != null ? gui.getScreen().getTerminalSize() : new TerminalSize(80, 24);
+        updateLayoutDimensions(size);
+        try {
+            gui.updateScreen();
+        } catch (Exception ignored) {}
+    }
 
     public void exit() {
         poller.shutdownNow();
@@ -341,6 +404,13 @@ public class MainWindow extends BasicWindow {
                         if (c == 'B' && currentView != mainMenuView) {
                             deliver.set(false);
                             showMainMenu();
+                            return;
+                        }
+
+                        // Global customization shortcut [Z]
+                        if (c == 'Z' && currentView != customizationView) {
+                            deliver.set(false);
+                            showCustomization();
                             return;
                         }
 

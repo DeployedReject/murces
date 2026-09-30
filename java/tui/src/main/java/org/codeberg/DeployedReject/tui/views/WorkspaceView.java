@@ -39,4 +39,9 @@ public interface WorkspaceView {
      * Called when this view is replaced by another view.
      */
     default void onDeactivated() {}
+
+    /**
+     * Called when the terminal or dashboard layout is resized.
+     */
+    default void onResized(com.googlecode.lanterna.TerminalSize newSize) {}
 }

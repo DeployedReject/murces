@@ -47,7 +47,7 @@ public class MainMenuView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        menuList = new MurcesListBox(new TerminalSize(42, 8));
+        menuList = new MurcesListBox(new TerminalSize(44, 9));
         menuList.addItem("1. [S]erver Control & Console", mainWindow::showServerControl);
         menuList.addItem("2. [I]nstall Server Engine", mainWindow::showInstallServer);
         menuList.addItem("3. [C]onfigure Properties", mainWindow::showConfigServer);
@@ -55,7 +55,8 @@ public class MainMenuView implements WorkspaceView {
         menuList.addItem("5. [P]layer UUID Migration", mainWindow::showMigratePlayer);
         menuList.addItem("6. [D]ownload & Browse Mods", mainWindow::showModBrowse);
         menuList.addItem("7. [M]anage Installed Mods", mainWindow::showModManage);
-        menuList.addItem("8. [E]xit Murces", mainWindow::exit);
+        menuList.addItem("8. [Z] Customization & Themes", mainWindow::showCustomization);
+        menuList.addItem("9. [E]xit Murces", mainWindow::exit);
 
         root.addComponent(menuList.withBorder(Borders.singleLine("Main Navigation (Enter to select)")));
 
@@ -67,7 +68,8 @@ public class MainMenuView implements WorkspaceView {
         Runnable openMigrateItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(4); mainWindow.showMigratePlayer(); };
         Runnable openBrowseItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(5); mainWindow.showModBrowse(); };
         Runnable openManageItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(6); mainWindow.showModManage(); };
-        Runnable doExitItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(7); mainWindow.exit(); };
+        Runnable openCustomizationItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(7); mainWindow.showCustomization(); };
+        Runnable doExitItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(8); mainWindow.exit(); };
 
         hotkeys.put('S', openSvCtrlItem);
         hotkeys.put('1', openSvCtrlItem);
@@ -83,8 +85,10 @@ public class MainMenuView implements WorkspaceView {
         hotkeys.put('6', openBrowseItem);
         hotkeys.put('M', openManageItem);
         hotkeys.put('7', openManageItem);
+        hotkeys.put('Z', openCustomizationItem);
+        hotkeys.put('8', openCustomizationItem);
         hotkeys.put('E', doExitItem);
-        hotkeys.put('8', doExitItem);
+        hotkeys.put('9', doExitItem);
         hotkeys.put('Q', doExitItem);
     }
 
