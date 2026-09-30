@@ -136,7 +136,10 @@ public class InstallServerWindow extends BasicWindow {
         new Thread(() -> {
             try {
                 OrchestratorBridge.getInstance().installServer(engine, gameVer, loaderVer, ramVal, job, msg -> {
-                    gui.getGUIThread().invokeLater(() -> appendLog("[STATUS] " + msg));
+                    gui.getGUIThread().invokeLater(() -> {
+                        progressLabel.setText("[BUSY] " + msg);
+                        appendLog("[STATUS] " + msg);
+                    });
                 }).get();
 
                 gui.getGUIThread().invokeLater(() -> {
