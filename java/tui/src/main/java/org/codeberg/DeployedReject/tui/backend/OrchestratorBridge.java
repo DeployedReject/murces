@@ -96,24 +96,69 @@ public class OrchestratorBridge {
     }
 
     private void loadConfig() {
+        // 1. Try config.properties from classpath / packaged resources
         Properties env = new Properties();
         try (InputStream envStream = getClass().getClassLoader().getResourceAsStream("config.properties")) {
             if (envStream != null) {
                 env.load(envStream);
-                if (env.getProperty("curseAPI") != null) {
-                    curseAPI = env.getProperty("curseAPI");
+                String propCurse = env.getProperty("curseAPI");
+                if (propCurse != null && !propCurse.startsWith("${") && !propCurse.isEmpty()) {
+                    curseAPI = propCurse;
                 }
-                if (env.getProperty("email") != null) {
-                    email = env.getProperty("email");
+                String propEmail = env.getProperty("email");
+                if (propEmail != null && !propEmail.startsWith("${") && !propEmail.isEmpty()) {
+                    email = propEmail;
                 }
             }
         } catch (Exception ignored) {}
 
+        // 2. Try loading .env file from working directory or parent directory
+        File[] envCandidates = new File[] {
+            new File(".env"),
+            new File("../.env"),
+            new File(System.getProperty("user.dir", "."), ".env")
+        };
+        for (File f : envCandidates) {
+            if (f.exists() && f.isFile()) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(f, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.isEmpty() || line.startsWith("#")) continue;
+                        int eq = line.indexOf('=');
+                        if (eq > 0) {
+                            String key = line.substring(0, eq).trim();
+                            String val = line.substring(eq + 1).trim();
+                            if ((val.startsWith("\"") && val.endsWith("\"")) ||
+                                (val.startsWith("'") && val.endsWith("'"))) {
+                                val = val.substring(1, val.length() - 1);
+                            }
+                            if ("curseAPI".equalsIgnoreCase(key) && !val.isEmpty()) {
+                                curseAPI = val;
+                            } else if ("email".equalsIgnoreCase(key) && !val.isEmpty()) {
+                                email = val;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        // 3. System environment variables take highest precedence
         if (System.getenv("curseAPI") != null && !System.getenv("curseAPI").isEmpty()) {
             curseAPI = System.getenv("curseAPI");
         }
         if (System.getenv("email") != null && !System.getenv("email").isEmpty()) {
             email = System.getenv("email");
+        }
+
+        // Sanitize any unresolved Maven placeholder
+        if (curseAPI != null && (curseAPI.startsWith("${") || curseAPI.isEmpty())) {
+            curseAPI = "";
+        }
+        if (email != null && (email.startsWith("${") || email.isEmpty())) {
+            email = "user@murces.local";
         }
     }
 
