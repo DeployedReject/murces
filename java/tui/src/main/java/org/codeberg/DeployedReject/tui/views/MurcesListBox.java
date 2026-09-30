@@ -33,13 +33,64 @@ public class MurcesListBox extends ActionListBox {
 
     @Override
     public synchronized MurcesListBox setSelectedIndex(int index) {
+        if (getItemCount() == 0) {
+            super.clearItems();
+            if (selectionListener != null) {
+                selectionListener.onSelectionChanged(-1);
+            }
+            return this;
+        }
+        int clamped = Math.max(0, Math.min(index, getItemCount() - 1));
         int old = getSelectedIndex();
-        super.setSelectedIndex(index);
+        super.setSelectedIndex(clamped);
         int cur = getSelectedIndex();
         if (old != cur && selectionListener != null) {
             selectionListener.onSelectionChanged(cur);
         }
         return this;
+    }
+
+    @Override
+    public synchronized MurcesListBox clearItems() {
+        super.clearItems();
+        if (selectionListener != null) {
+            selectionListener.onSelectionChanged(-1);
+        }
+        return this;
+    }
+
+    @Override
+    public synchronized Runnable getSelectedItem() {
+        int idx = getSelectedIndex();
+        if (idx < 0 || idx >= getItemCount()) {
+            return null;
+        }
+        return super.getSelectedItem();
+    }
+
+    @Override
+    public void runSelectedItem() {
+        int idx = getSelectedIndex();
+        if (idx < 0 || idx >= getItemCount()) {
+            return;
+        }
+        super.runSelectedItem();
+    }
+
+    @Override
+    public synchronized Runnable getItemAt(int index) {
+        if (index < 0 || index >= getItemCount()) {
+            return null;
+        }
+        return super.getItemAt(index);
+    }
+
+    @Override
+    public synchronized Runnable removeItem(int index) {
+        if (index < 0 || index >= getItemCount()) {
+            return null;
+        }
+        return super.removeItem(index);
     }
 
     @Override
@@ -50,6 +101,15 @@ public class MurcesListBox extends ActionListBox {
 
     @Override
     public synchronized Interactable.Result handleKeyStroke(KeyStroke keyStroke) {
+        if (getItemCount() == 0) {
+            if (keyStroke instanceof com.googlecode.lanterna.input.MouseAction) {
+                return Interactable.Result.HANDLED;
+            }
+            if (isKeyboardActivationStroke(keyStroke)) {
+                return Interactable.Result.HANDLED;
+            }
+        }
+
         if (isKeyboardActivationStroke(keyStroke)) {
             runSelectedItem();
             return Interactable.Result.HANDLED;
@@ -122,6 +182,9 @@ public class MurcesListBox extends ActionListBox {
                 return Interactable.Result.MOVE_FOCUS_PREVIOUS;
 
             default:
+                if (count == 0) {
+                    return Interactable.Result.HANDLED;
+                }
                 return super.handleKeyStroke(keyStroke);
         }
     }

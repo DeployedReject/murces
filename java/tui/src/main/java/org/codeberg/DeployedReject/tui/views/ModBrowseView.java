@@ -83,7 +83,9 @@ public class ModBrowseView implements WorkspaceView {
 
         searchBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                resultsList.takeFocus();
+                if (resultsList.getItemCount() > 0) {
+                    resultsList.takeFocus();
+                }
                 return false;
             }
             if (keyStroke.getKeyType() == KeyType.Enter) {
@@ -150,6 +152,11 @@ public class ModBrowseView implements WorkspaceView {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     onModSelected(currentResults.get(idx));
                 });
+            } else if (idx < 0) {
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    selectedMod = null;
+                    updateDetailsDisplay();
+                });
             }
         });
 
@@ -158,19 +165,33 @@ public class ModBrowseView implements WorkspaceView {
         root.addComponent(backBtn);
 
         // Hotkeys
-        hotkeys.put('L', resultsList::takeFocus);
+        hotkeys.put('L', () -> {
+            if (resultsList.getItemCount() > 0) {
+                resultsList.takeFocus();
+            } else {
+                searchBox.takeFocus();
+            }
+        });
         hotkeys.put('S', KeyboardNavigationHelper.focus(searchBtn, this::onSearch));
         hotkeys.put('D', KeyboardNavigationHelper.focus(downloadBtn, this::onDownload));
         hotkeys.put('Q', searchBox::takeFocus);
         hotkeys.put('/', searchBox::takeFocus);
-        hotkeys.put('K', modVersionCombo::takeFocus);
+        hotkeys.put('K', () -> {
+            if (modVersionCombo.getItemCount() > 0) {
+                modVersionCombo.takeFocus();
+            }
+        });
         hotkeys.put('P', KeyboardNavigationHelper.focus(platformBox, () -> {
-            int next = (platformBox.getSelectedIndex() + 1) % platformBox.getItemCount();
-            platformBox.setSelectedIndex(next);
+            if (platformBox.getItemCount() > 0) {
+                int next = (platformBox.getSelectedIndex() + 1) % platformBox.getItemCount();
+                platformBox.setSelectedIndex(next);
+            }
         }));
         hotkeys.put('O', KeyboardNavigationHelper.focus(loaderBox, () -> {
-            int next = (loaderBox.getSelectedIndex() + 1) % loaderBox.getItemCount();
-            loaderBox.setSelectedIndex(next);
+            if (loaderBox.getItemCount() > 0) {
+                int next = (loaderBox.getSelectedIndex() + 1) % loaderBox.getItemCount();
+                loaderBox.setSelectedIndex(next);
+            }
         }));
         hotkeys.put('V', KeyboardNavigationHelper.focus(versionComboBox, () -> MinecraftVersionHelper.cycleVersion(versionComboBox)));
         hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
@@ -241,8 +262,19 @@ public class ModBrowseView implements WorkspaceView {
     private void updateDetailsDisplay() {
         descPanel.removeAllComponents();
         if (selectedMod == null) {
-            titleAuthorLabel.setText("Title: No mod selected\nAuthor: -");
-            descPanel.addComponent(new Label("Select a mod from the results list to view its description."));
+            String q = searchBox != null ? searchBox.getText().trim() : "";
+            if (!q.isEmpty() && currentResults.isEmpty()) {
+                titleAuthorLabel.setText("Title: No mod found\nAuthor: -");
+                Label noModLbl = new Label("No mods found matching query: \"" + q + "\"");
+                noModLbl.setForegroundColor(LazyVimTheme.getLogWarnColor());
+                descPanel.addComponent(noModLbl);
+                Label hintLbl = new Label("Try checking the spelling or changing filters.");
+                hintLbl.setForegroundColor(LazyVimTheme.getLogMutedColor());
+                descPanel.addComponent(hintLbl);
+            } else {
+                titleAuthorLabel.setText("Title: No mod selected\nAuthor: -");
+                descPanel.addComponent(new Label("Select a mod from the results list to view its description."));
+            }
             return;
         }
 
@@ -293,16 +325,21 @@ public class ModBrowseView implements WorkspaceView {
     }
 
     private void onModSelected(OrchestratorBridge.ModResult mod) {
+        if (mod == null) {
+            this.selectedMod = null;
+            updateDetailsDisplay();
+            return;
+        }
         this.selectedMod = mod;
         updateDetailsDisplay();
 
         // Fetch compatible versions for the chosen game version
-        String platform = platformBox.getSelectedItem().toLowerCase();
+        String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
         if ("curseforge".equals(platform)) {
             platform = "curseForge";
         }
         String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
-        String loader = loaderBox.getSelectedItem();
+        String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
 
         modVersionCombo.clearItems();
         modVersionCombo.addItem("[Latest Compatible]");
@@ -327,12 +364,12 @@ public class ModBrowseView implements WorkspaceView {
 
     private void onSearch() {
         String query = searchBox.getText().trim();
-        String platform = platformBox.getSelectedItem().toLowerCase();
+        String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
         if ("curseforge".equals(platform)) {
             platform = "curseForge";
         }
         String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
-        String loader = loaderBox.getSelectedItem();
+        String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
 
         statusLabel.setText("[BUSY] Searching " + platform + " for '" + query + "'...");
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
@@ -347,12 +384,18 @@ public class ModBrowseView implements WorkspaceView {
                     currentResults.addAll(mods);
                     resultsList.clearItems();
                     selectedMod = null;
-                    updateDetailsDisplay();
 
                     if (mods.isEmpty()) {
-                        statusLabel.setText("No mods found matching query.");
+                        modVersionCombo.clearItems();
+                        modVersionCombo.addItem("[No Mod Selected]");
+                        modVersionCombo.setSelectedIndex(0);
+                        currentModVersions.clear();
+                        updateDetailsDisplay();
+
+                        statusLabel.setText("No mods found matching query: \"" + query + "\"");
                         statusLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
                         ActivityLogger.info("No mods found matching query: " + query);
+                        searchBox.takeFocus();
                     } else {
                         statusLabel.setText("Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload.");
                         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
