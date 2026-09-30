@@ -22,6 +22,7 @@ murces
 *.zip
 
 # Runtime data
-mods/
+/mods/
 java/orchestrator/apitest.txt
-java/orchestrator/mods
+/java/orchestrator/mods/
+murces.json

@@ -141,8 +141,18 @@ public class CurseForge implements ModAPI {
         JsonArray mod = new JsonArray();
         JsonObject currentMod = targetArray.get(i).getAsJsonObject();
 
-        mod.add(currentMod.get("id"));
-        mod.add(currentMod.get("name"));
+        mod.add(currentMod.has("id") ? currentMod.get("id").getAsString() : "");
+        mod.add(currentMod.has("name") ? currentMod.get("name").getAsString() : "");
+        String author = "";
+        if (currentMod.has("authors") && currentMod.get("authors").isJsonArray() && currentMod.getAsJsonArray("authors").size() > 0) {
+            JsonObject firstAuthor = currentMod.getAsJsonArray("authors").get(0).getAsJsonObject();
+            if (firstAuthor.has("name") && !firstAuthor.get("name").isJsonNull()) {
+                author = firstAuthor.get("name").getAsString();
+            }
+        }
+        mod.add(author);
+        String summary = currentMod.has("summary") && !currentMod.get("summary").isJsonNull() ? currentMod.get("summary").getAsString() : "";
+        mod.add(summary);
         mods.add(mod);
       }
 

@@ -140,11 +140,13 @@ public class Modrinth implements ModAPI {
     JsonArray mods = new JsonArray();
 
     for (int i = 0; i < x.get("hits").getAsJsonArray().size(); i++) {
+      JsonObject hit = x.get("hits").getAsJsonArray().get(i).getAsJsonObject();
       JsonArray mod = new JsonArray();
-      mod.add(x.get("hits").getAsJsonArray().get(i).getAsJsonObject().get("slug").getAsString());
-      mod.add(x.get("hits").getAsJsonArray().get(i).getAsJsonObject().get("title").getAsString());
+      mod.add(hit.has("slug") && !hit.get("slug").isJsonNull() ? hit.get("slug").getAsString() : "");
+      mod.add(hit.has("title") && !hit.get("title").isJsonNull() ? hit.get("title").getAsString() : "");
+      mod.add(hit.has("author") && !hit.get("author").isJsonNull() ? hit.get("author").getAsString() : "");
+      mod.add(hit.has("description") && !hit.get("description").isJsonNull() ? hit.get("description").getAsString() : "");
       mods.add(mod);
-
     }
 
     response.add("mods", mods);

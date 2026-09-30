@@ -23,6 +23,8 @@ public class NetworkUtils {
         response.addProperty("type", "download");
         response.addProperty("id", filename);
         response.addProperty("progress", 0);
+        response.addProperty("read", 0L);
+        response.addProperty("total", filesize);
 
         Communicator.printer(response);
 
@@ -34,6 +36,8 @@ public class NetworkUtils {
           double pct = filesize > 0 ? Math.min(100.0, (readSize * 100.0) / filesize) : 0.0;
           double rounded = Math.round(pct * 100.0) / 100.0;
           response.addProperty("progress", rounded);
+          response.addProperty("read", (long) readSize);
+          response.addProperty("total", filesize);
           Communicator.printer(response);
         }
 
