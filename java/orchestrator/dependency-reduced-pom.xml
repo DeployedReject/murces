@@ -58,11 +58,10 @@
               <fallback>false</fallback>
               <buildArgs>
                 <buildArg>-H:IncludeResources=config.properties</buildArg>
+                <buildArg>-march=compatibility</buildArg>
                 <buildArg>-Os</buildArg>
                 <buildArg>--gc=serial</buildArg>
                 <buildArg>-H:+StripDebugInfo</buildArg>
-                <buildArg>--static</buildArg>
-                <buildArg>--libc=musl</buildArg>
               </buildArgs>
             </configuration>
           </plugin>
