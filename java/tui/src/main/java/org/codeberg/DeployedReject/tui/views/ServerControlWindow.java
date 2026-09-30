@@ -36,19 +36,19 @@ public class ServerControlWindow extends BasicWindow {
         statusLabel = new Label("CHECKING...");
         statusPanel.addComponent(statusLabel);
 
-        Button refreshBtn = new Button("Update Status", this::updateStatus);
+        Button refreshBtn = new Button("[U]pdate Status", this::updateStatus);
         statusPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
         statusPanel.addComponent(refreshBtn);
         root.addComponent(statusPanel.withBorder(Borders.singleLine("Status")));
 
         // Control Buttons
-        publicTunnelCheckBox = new CheckBox("Playit Tunnel (--public)");
+        publicTunnelCheckBox = new CheckBox("[P]layit Tunnel (--public)");
         root.addComponent(publicTunnelCheckBox);
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        Button startBtn = new Button("Start Server", this::onStart);
-        Button stopBtn = new Button("Terminate Server", this::onStop);
-        Button restartBtn = new Button("Restart Server", this::onRestart);
+        Button startBtn = new Button("[S]tart Server", this::onStart);
+        Button stopBtn = new Button("[T]erminate Server", this::onStop);
+        Button restartBtn = new Button("[R]estart Server", this::onRestart);
 
         actionPanel.addComponent(startBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
