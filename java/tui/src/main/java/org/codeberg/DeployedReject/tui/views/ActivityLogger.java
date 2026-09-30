@@ -39,15 +39,32 @@ public class ActivityLogger {
     public static synchronized void log(String message) {
         if (message == null || message.trim().isEmpty()) return;
         String line = message.trim();
-        buffer.add(line);
-        while (buffer.size() > MAX_BUFFER) {
-            buffer.remove(0);
+        if (!buffer.isEmpty() && isMatchingProgress(line, buffer.get(buffer.size() - 1))) {
+            buffer.set(buffer.size() - 1, line);
+        } else {
+            buffer.add(line);
+            while (buffer.size() > MAX_BUFFER) {
+                buffer.remove(0);
+            }
         }
         for (Consumer<String> l : listeners) {
             try {
                 l.accept(line);
             } catch (Exception ignored) {}
         }
+    }
+
+    public static boolean isMatchingProgress(String line1, String line2) {
+        if (line1 == null || line2 == null) return false;
+        String u1 = line1.toUpperCase();
+        String u2 = line2.toUpperCase();
+        if ((u1.startsWith("[PROG") && u2.startsWith("[PROG")) ||
+            (u1.startsWith("[STATUS") && u2.startsWith("[STATUS"))) {
+            String p1 = u1.replaceAll("[\\d%().\\s]+$", "").trim();
+            String p2 = u2.replaceAll("[\\d%().\\s]+$", "").trim();
+            return p1.equals(p2);
+        }
+        return false;
     }
 
     public static void info(String msg) {

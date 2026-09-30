@@ -41,7 +41,11 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
         for (String l : lines) {
             String trimmed = l.trim();
             if (!trimmed.isEmpty()) {
-                rawLines.add(trimmed);
+                if (!rawLines.isEmpty() && ActivityLogger.isMatchingProgress(trimmed, rawLines.get(rawLines.size() - 1))) {
+                    rawLines.set(rawLines.size() - 1, trimmed);
+                } else {
+                    rawLines.add(trimmed);
+                }
             }
         }
         while (rawLines.size() > MAX_HISTORY) {
@@ -58,8 +62,13 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
         if (fullText != null && !fullText.trim().isEmpty()) {
             String[] lines = fullText.split("\\r?\\n");
             for (String l : lines) {
-                if (!l.trim().isEmpty()) {
-                    rawLines.add(l.trim());
+                String trimmed = l.trim();
+                if (!trimmed.isEmpty()) {
+                    if (!rawLines.isEmpty() && ActivityLogger.isMatchingProgress(trimmed, rawLines.get(rawLines.size() - 1))) {
+                        rawLines.set(rawLines.size() - 1, trimmed);
+                    } else {
+                        rawLines.add(trimmed);
+                    }
                 }
             }
         }
