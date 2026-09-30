@@ -206,17 +206,19 @@ public class ModBrowseView implements WorkspaceView {
         final String targetPlatform = platform;
         new Thread(() -> {
             try {
-                java.util.concurrent.atomic.AtomicInteger lastReported = new java.util.concurrent.atomic.AtomicInteger(-1);
+                java.util.concurrent.atomic.AtomicLong lastReportedTime = new java.util.concurrent.atomic.AtomicLong(0);
+                java.util.concurrent.atomic.AtomicReference<Double> lastReportedVal = new java.util.concurrent.atomic.AtomicReference<>(-1.0);
                 OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, progress -> {
                     if (progress < 0) return;
-                    int prev = lastReported.get();
-                    if (prev == -1 || progress == 100 || progress >= prev + 5) {
-                        if (lastReported.compareAndSet(prev, progress)) {
-                            mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                                statusLabel.setText("[BUSY] Downloading (" + progress + "%)...");
-                                ActivityLogger.prog("Downloading " + mod.name + "... " + progress + "%");
-                            });
-                        }
+                    long now = System.currentTimeMillis();
+                    Double prev = lastReportedVal.get();
+                    if (prev == -1.0 || progress >= 100.0 || (progress - prev >= 0.05 && now - lastReportedTime.get() >= 50)) {
+                        lastReportedVal.set(progress);
+                        lastReportedTime.set(now);
+                        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                            statusLabel.setText(String.format("[BUSY] Downloading (%.2f%%)...", progress));
+                            ActivityLogger.prog(String.format("Downloading %s... %.2f%%", mod.name, progress));
+                        });
                     }
                 }).get();
 

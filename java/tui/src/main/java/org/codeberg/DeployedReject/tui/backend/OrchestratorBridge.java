@@ -271,7 +271,7 @@ public class OrchestratorBridge {
         return future;
     }
 
-    public CompletableFuture<Boolean> downloadMod(String platform, String modIdOrSlug, String version, String loader, Consumer<Integer> progressCallback) {
+    public CompletableFuture<Boolean> downloadMod(String platform, String modIdOrSlug, String version, String loader, Consumer<Double> progressCallback) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
 
         Consumer<JsonObject> handler = new Consumer<>() {
@@ -280,7 +280,7 @@ public class OrchestratorBridge {
                 if (json.has("type") && "download".equals(json.get("type").getAsString())) {
                     int status = json.has("status") ? json.get("status").getAsInt() : -1;
                     if (json.has("progress") && progressCallback != null) {
-                        progressCallback.accept(json.get("progress").getAsInt());
+                        progressCallback.accept(json.get("progress").getAsDouble());
                     }
                     if (status == 3) {
                         removeListener(this);
@@ -320,10 +320,10 @@ public class OrchestratorBridge {
             @Override
             public void accept(JsonObject json) {
                 if (json.has("type") && "download".equals(json.get("type").getAsString())) {
-                    int prog = json.has("progress") ? json.get("progress").getAsInt() : -1;
+                    double prog = json.has("progress") ? json.get("progress").getAsDouble() : -1.0;
                     String file = json.has("id") ? json.get("id").getAsString() : "server.jar";
                     if (statusCallback != null && prog >= 0) {
-                        statusCallback.accept(String.format("Downloading %s (%d%%)", file, prog));
+                        statusCallback.accept(String.format("Downloading %s (%.2f%%)", file, prog));
                     }
                 } else if (json.has("type") && "server".equals(json.get("type").getAsString())) {
                     int status = json.has("status") ? json.get("status").getAsInt() : -1;

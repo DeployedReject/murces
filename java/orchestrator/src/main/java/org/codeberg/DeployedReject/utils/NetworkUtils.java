@@ -31,7 +31,9 @@ public class NetworkUtils {
         while ((bytesRead = x.read(buffer)) != -1) {
           file.write(buffer, 0, bytesRead);
           readSize += bytesRead;
-          response.addProperty("progress", (int) ((readSize * 100.0) / filesize));
+          double pct = filesize > 0 ? Math.min(100.0, (readSize * 100.0) / filesize) : 0.0;
+          double rounded = Math.round(pct * 100.0) / 100.0;
+          response.addProperty("progress", rounded);
           Communicator.printer(response);
         }
 

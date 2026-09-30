@@ -210,13 +210,13 @@ public class ModBrowseWindow extends BasicWindow {
 
         new Thread(() -> {
             try {
-                int[] lastLoggedProg = new int[] { -1 };
+                double[] lastLoggedProg = new double[] { -1.0 };
                 OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, progress -> {
                     gui.getGUIThread().invokeLater(() -> {
-                        statusLabel.setText("[BUSY] Downloading " + mod.name + " (" + progress + "%)...");
-                        if (progress >= 0 && (progress == 0 || progress == 100 || (progress - lastLoggedProg[0] >= 20))) {
+                        statusLabel.setText(String.format("[BUSY] Downloading %s (%.2f%%)...", mod.name, progress));
+                        if (progress >= 0 && (progress == 0.0 || progress >= 100.0 || (progress - lastLoggedProg[0] >= 5.0))) {
                             lastLoggedProg[0] = progress;
-                            appendLog(String.format("[PROG] Downloading %s... %d%%", mod.name, progress));
+                            appendLog(String.format("[PROG] Downloading %s... %.2f%%", mod.name, progress));
                         }
                     });
                 }).get();
