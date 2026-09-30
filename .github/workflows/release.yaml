@@ -40,10 +40,10 @@ jobs:
           echo "" >> release_notes.md
 
       # Pinned to graalvm/setup-graalvm v1.4.1 commit SHA
-      - name: Set up GraalVM JDK 21
-        uses: graalvm/setup-graalvm@2f2cf68cf4910cf904fa871feea603612d1b7642
+      - name: Set up GraalVM JDK 25
+        uses: graalvm/setup-graalvm@b9b7e9b0682fa0b0805128ff40c42245b736b446
         with:
-          java-version: "21"
+          java-version: "25"
           distribution: "graalvm"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
