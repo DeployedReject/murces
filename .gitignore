@@ -17,3 +17,4 @@ java/tui/target/
 java/orchestrator/target/graalvm-reachability-metadata/
 *.log
 *.zip
+mods/
