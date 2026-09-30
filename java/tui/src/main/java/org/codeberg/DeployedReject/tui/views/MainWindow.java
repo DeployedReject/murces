@@ -1,10 +1,13 @@
 package org.codeberg.DeployedReject.tui.views;
 
+import com.googlecode.lanterna.TerminalPosition;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import com.googlecode.lanterna.gui2.table.Table;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
+import com.googlecode.lanterna.input.MouseAction;
+import com.googlecode.lanterna.input.MouseActionType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
@@ -17,8 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Automatically expands to fill the entire terminal window in full-screen mode without dead space.
  * Panes:
  *  1. Center Workspace / Menu (Left/Center, fills remaining area)
- *  2. Activity & Diagnostics Window (Right/Side, color-coded, auto-wrapping)
- *  3. Server Console Window (Bottom, full-width, auto-wrapping)
+ *  2. Activity & Diagnostics Window (Right/Side, color-coded, auto-wrapping, scrollable [A])
+ *  3. Server Console Window (Bottom, full-width, auto-wrapping, scrollable [L])
  */
 public class MainWindow extends BasicWindow {
 
@@ -79,7 +82,7 @@ public class MainWindow extends BasicWindow {
         midPanel.addComponent(workspaceBordered);
 
         activityLogView = new ColoredLogView(false);
-        activityBordered = activityLogView.withBorder(Borders.singleLine("Activity & Diagnostics"));
+        activityBordered = activityLogView.withBorder(Borders.singleLine("Activity & Diagnostics [A]"));
         activityBordered.setLayoutData(BorderLayout.Location.RIGHT);
         midPanel.addComponent(activityBordered);
 
@@ -88,7 +91,7 @@ public class MainWindow extends BasicWindow {
         // 3. Bottom Pane: Server Console (Location.BOTTOM)
         consoleLogView = new ColoredLogView(true);
         consoleLogView.setContent("[Server not started - Start server from Server Control [S] to view live output]");
-        consoleBordered = consoleLogView.withBorder(Borders.singleLine("Server Console"));
+        consoleBordered = consoleLogView.withBorder(Borders.singleLine("Server Console [L]"));
         consoleBordered.setLayoutData(BorderLayout.Location.BOTTOM);
         root.addComponent(consoleBordered);
 
@@ -211,6 +214,22 @@ public class MainWindow extends BasicWindow {
         } catch (Exception ignored) {}
     }
 
+    private boolean isInside(Component comp, TerminalPosition pos) {
+        if (comp == null || pos == null) return false;
+        TerminalPosition origin;
+        try {
+            origin = comp.toGlobal(TerminalPosition.TOP_LEFT_CORNER);
+        } catch (Exception e) {
+            return false;
+        }
+        TerminalSize size = comp.getSize();
+        if (origin == null || size == null) return false;
+        return pos.getColumn() >= origin.getColumn() &&
+               pos.getColumn() < origin.getColumn() + size.getColumns() &&
+               pos.getRow() >= origin.getRow() &&
+               pos.getRow() < origin.getRow() + size.getRows();
+    }
+
     private void setupInputHandling() {
         setEnableDirectionBasedMovements(false);
         addWindowListener(new WindowListenerAdapter() {
@@ -224,13 +243,44 @@ public class MainWindow extends BasicWindow {
                     return;
                 }
 
+                // 0a. MOUSE WHEEL SCROLLING & CLICK FOCUS FOR LOG PANES
+                if (keyStroke instanceof MouseAction) {
+                    MouseAction ma = (MouseAction) keyStroke;
+                    TerminalPosition pos = ma.getPosition();
+                    if (pos != null) {
+                        if (ma.getActionType() == MouseActionType.SCROLL_UP || ma.getActionType() == MouseActionType.SCROLL_DOWN) {
+                            if (isInside(activityBordered, pos) || isInside(activityLogView, pos)) {
+                                if (ma.getActionType() == MouseActionType.SCROLL_UP) activityLogView.scrollUp(3);
+                                else activityLogView.scrollDown(3);
+                                deliver.set(false);
+                                return;
+                            } else if (isInside(consoleBordered, pos) || isInside(consoleLogView, pos)) {
+                                if (ma.getActionType() == MouseActionType.SCROLL_UP) consoleLogView.scrollUp(3);
+                                else consoleLogView.scrollDown(3);
+                                deliver.set(false);
+                                return;
+                            }
+                        } else if (ma.getActionType() == MouseActionType.CLICK_DOWN) {
+                            if (isInside(activityBordered, pos) || isInside(activityLogView, pos)) {
+                                activityLogView.takeFocus();
+                                deliver.set(false);
+                                return;
+                            } else if (isInside(consoleBordered, pos) || isInside(consoleLogView, pos)) {
+                                consoleLogView.takeFocus();
+                                deliver.set(false);
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 KeyType type = keyStroke.getKeyType();
                 Interactable focused = basePane.getFocusedInteractable();
                 boolean isEditableText = (focused instanceof TextBox) && !((TextBox) focused).isReadOnly();
 
-                // 1. ESCAPE KEY
+                // 1. ESCAPE KEY: Universal Un-focus / Navigation
                 if (type == KeyType.Escape) {
-                    if (isEditableText) {
+                    if (focused != null) {
                         basePane.setFocusedInteractable(null);
                         deliver.set(false);
                         return;
@@ -241,7 +291,7 @@ public class MainWindow extends BasicWindow {
                     }
                 }
 
-                // 2. SUPPRESS ARROWS ON BUTTONS
+                // 2. SUPPRESS ARROWS ON BUTTONS (Allow on lists, tables, textboxes, and scrollable log views)
                 if (type == KeyType.ArrowDown || type == KeyType.ArrowUp ||
                     type == KeyType.ArrowLeft || type == KeyType.ArrowRight) {
                     if (focused instanceof ComboBox) {
@@ -259,10 +309,11 @@ public class MainWindow extends BasicWindow {
                         }
                     }
 
-                    boolean isListOrText = (focused instanceof ActionListBox) ||
-                                           (focused instanceof Table) ||
-                                           (focused instanceof TextBox);
-                    if (!isListOrText) {
+                    boolean isScrollableOrText = (focused instanceof ActionListBox) ||
+                                                 (focused instanceof Table) ||
+                                                 (focused instanceof TextBox) ||
+                                                 (focused instanceof ColoredLogView);
+                    if (!isScrollableOrText) {
                         deliver.set(false);
                         return;
                     }
@@ -275,6 +326,17 @@ public class MainWindow extends BasicWindow {
                         c = Character.toUpperCase(keyStroke.getCharacter());
                     }
                     if (c != null) {
+                        // Global focus shortcuts: [A] Activity Log, [L] Server Console
+                        if (c == 'A') {
+                            deliver.set(false);
+                            activityLogView.takeFocus();
+                            return;
+                        } else if (c == 'L' && (currentView == null || currentView.getHotkeys() == null || !currentView.getHotkeys().containsKey('L'))) {
+                            deliver.set(false);
+                            consoleLogView.takeFocus();
+                            return;
+                        }
+
                         // Global subview Back action
                         if (c == 'B' && currentView != mainMenuView) {
                             deliver.set(false);

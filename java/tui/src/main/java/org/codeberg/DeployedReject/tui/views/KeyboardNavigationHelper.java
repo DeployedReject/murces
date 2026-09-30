@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class KeyboardNavigationHelper {
 
     public static Label createTooltip() {
-        Label tip = new Label("[TIP] CAPITAL key focuses & triggers | [ESC] un-focuses text | [TAB] cycles | Arrow keys for lists");
+        Label tip = new Label("[TIP] [A] Activity Log | [L] Server Console | [TAB] Cycle Focus | [ESC] Un-focus / Back");
         tip.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         return tip;
     }
@@ -55,11 +55,9 @@ public class KeyboardNavigationHelper {
                 Interactable focused = basePane.getFocusedInteractable();
                 boolean isEditableText = (focused instanceof TextBox) && !((TextBox) focused).isReadOnly();
 
-                // 1. ESCAPE KEY IN TEXT FIELD:
-                // While inside an editable textfield, pressing Esc puts it out of focus
-                // so shortcuts can be used again, instead of exiting the menu.
+                // 1. ESCAPE KEY: Unfocus any currently focused component
                 if (type == KeyType.Escape) {
-                    if (isEditableText) {
+                    if (focused != null) {
                         basePane.setFocusedInteractable(null);
                         deliver.set(false);
                         return;
