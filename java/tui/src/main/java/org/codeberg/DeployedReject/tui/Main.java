@@ -82,56 +82,34 @@ public class Main {
             MultiWindowTextGUI gui = new MultiWindowTextGUI(screen);
             gui.setTheme(new MinecraftTheme());
 
-            System.out.println("[TEST] Instantiating ServerControlWindow...");
-            ServerControlWindow scw = new ServerControlWindow(gui);
-            gui.addWindow(scw);
+            System.out.println("[TEST] Instantiating MainWindow (Unified 3-Pane Dashboard)...");
+            MainWindow mw = new MainWindow(gui);
+            gui.addWindow(mw);
             gui.updateScreen();
-            gui.removeWindow(scw);
 
-            System.out.println("[TEST] Instantiating InstallServerWindow...");
-            InstallServerWindow isw = new InstallServerWindow(gui);
-            gui.addWindow(isw);
+            System.out.println("[TEST] Testing workspace view swapping...");
+            mw.showServerControl();
             gui.updateScreen();
-            gui.removeWindow(isw);
+            mw.showInstallServer();
+            gui.updateScreen();
+            mw.showConfigServer();
+            gui.updateScreen();
+            mw.showBackup();
+            gui.updateScreen();
+            mw.showMigratePlayer();
+            gui.updateScreen();
+            mw.showModBrowse();
+            gui.updateScreen();
+            mw.showModManage();
+            gui.updateScreen();
+            mw.showMainMenu();
+            gui.updateScreen();
 
-            System.out.println("[TEST] Instantiating ConfigServerWindow...");
-            ConfigServerWindow csw = new ConfigServerWindow(gui);
-            gui.addWindow(csw);
-            gui.updateScreen();
-            gui.removeWindow(csw);
-
-            System.out.println("[TEST] Instantiating BackupWindow...");
-            BackupWindow bw = new BackupWindow(gui);
-            gui.addWindow(bw);
-            gui.updateScreen();
-            gui.removeWindow(bw);
-
-            System.out.println("[TEST] Instantiating MigratePlayerWindow...");
-            MigratePlayerWindow mpw = new MigratePlayerWindow(gui);
-            gui.addWindow(mpw);
-            gui.updateScreen();
-            gui.removeWindow(mpw);
-
-            System.out.println("[TEST] Instantiating ModBrowseWindow...");
-            ModBrowseWindow mbw = new ModBrowseWindow(gui);
-            gui.addWindow(mbw);
-            gui.updateScreen();
-            gui.removeWindow(mbw);
-
-            System.out.println("[TEST] Instantiating ModManageWindow...");
-            ModManageWindow mmw = new ModManageWindow(gui);
-            gui.addWindow(mmw);
-            gui.updateScreen();
-            gui.removeWindow(mmw);
-
-            System.out.println("[TEST] Instantiating MainMenuWindow...");
-            MainMenuWindow mm = new MainMenuWindow(gui);
-            gui.addWindow(mm);
-            gui.updateScreen();
-            gui.removeWindow(mm);
+            mw.exit();
+            gui.removeWindow(mw);
 
             screen.stopScreen();
-            System.out.println("[TEST] All 7 TUI modules instantiated, rendered, and verified successfully!");
+            System.out.println("[TEST] All unified dashboard panes and workspace views instantiated, rendered, and verified successfully!");
         } catch (Exception e) {
             System.err.println("[TEST ERROR] " + e.getMessage());
             e.printStackTrace();
@@ -170,7 +148,7 @@ public class Main {
             }, "MurcesShutdown");
             Runtime.getRuntime().addShutdownHook(shutdownHook);
 
-            gui.addWindowAndWait(new MainMenuWindow(gui));
+            gui.addWindowAndWait(new MainWindow(gui));
 
         } catch (IOException e) {
             System.err.println("Error initializing terminal GUI: " + e.getMessage());
