@@ -12,3 +12,6 @@ c/murces-TUI/precursor
 # c/murces-TUI/compile_commands.json
 venv
 *compile_commands.json*
+java/tui/target/
+java/orchestrator/target/graalvm-reachability-metadata/
+*.log
