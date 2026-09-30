@@ -9,81 +9,84 @@
     Minecraft Server Manager v0.1       
 ```
 
-**MurCes** is a lightweight, all-in-one Minecraft server manager designed for Linux environments. It provides both an interactive Terminal User Interface (TUI) and headless CLI commands to configure, deploy, mod, and maintain Minecraft servers effortlessly—without requiring complex terminal scripts or heavy web panel stacks.
+MurCes is a terminal manager for dedicated Minecraft servers on Linux. It combines a terminal interface (TUI) and simple CLI flags to handle server installs, configuration tweaks, mod management, and background session controls without having to run heavy web panels like Pterodactyl or AMP.
 
-MurCes is compiled ahead-of-time (AOT) into a standalone native binary via GraalVM, making it start instantly with minimal memory usage, optimized for low-resource VPS instances and older laptops.
-
----
-
-## 📌 Repository Branches
-
-- **`main` (Default Branch)**: The active development branch containing the full Lanterna-based TUI, integrated orchestrator backend, and native GraalVM build configuration.
-- **`archived`**: Preserves the legacy C prototype and precursor-based TUI implementation for historical reference.
+It is built in Java using Lanterna and compiled into a standalone native binary with GraalVM Native Image, giving it near-instant startup and small memory overhead for low-resource VPS nodes and older machines.
 
 ---
 
-## ✨ Features
+## Branches
 
-- **🚀 Engine Installer**: Download, install, and configure **Paper**, **Fabric**, **Forge**, **Spigot**, and **Vanilla** servers across any Minecraft version. Automatically agrees to the Mojang EULA.
-- **📦 Mod Browser & Downloader**: Direct integration with both **Modrinth** and **CurseForge** APIs. Search, filter by loader (Fabric, Forge, NeoForge, Quilt) and game version, and download mods straight to `mods/`.
-- **🎮 Server Lifecycle & Console**: Runs servers in detached `tmux` sessions. Send console commands directly from the TUI with live log capture.
-- **🌐 Public Tunneling**: Seamless integration with [Playit.gg](https://playit.gg/) (`--public` / `-p`) to make your server publicly accessible without port forwarding.
-- **⚙️ Server Properties Editor**: Real-time property searching and categorized editor for all `server.properties` settings.
-- **💾 World Backups**: Automated tar backups with safe world save flushing (`save-all`, `save-off`, `save-on`), backup retention rotation, and optional cloud sync via `rclone`.
-- **🔄 Player UUID Migration**: Effortlessly migrate player data (`playerdata`, `stats`, `advancements`, `usercache.json`) between offline and online UUIDs.
+- **`main`**: Active development branch containing the Lanterna TUI, orchestrator backend, and GraalVM build configuration.
+- **`archived`**: Legacy C prototype and precursor library codebase kept for reference.
 
 ---
 
-## 🚀 Quickstart
+## What It Does
 
-### Running the Native Binary
-If you have the compiled `murces` binary:
+- **Engine Setup**: Installs and sets up Paper, Fabric, Forge, Spigot, or Vanilla across chosen Minecraft versions, automatically accepting the Mojang EULA.
+- **Mod Browser**: Queries Modrinth and CurseForge APIs to find mods matching your server loader (Fabric, Forge, NeoForge, Quilt) and version, downloading `.jar` files straight to `mods/`.
+- **Runtime & Console**: Runs servers inside detached `tmux` sessions. Lets you send in-game console commands directly from the interface and monitor log output.
+- **Network Tunneling**: Optional integration with Playit.gg (`--public` / `-p`) to open servers to friends without manual port forwarding.
+- **Settings Editor**: Searchable editor for `server.properties` with categorized key-value edits.
+- **World Backups**: Safe tar archive snapshots that flush world data first (`save-all`, `save-off`, `save-on`), with retention limits and optional `rclone` cloud sync.
+- **Player Migration**: Utility to transfer playerdata, stats, advancements, and usercache between UUIDs.
+
+---
+
+## Quickstart
+
+Download the latest `murces.zip` from [Releases](https://github.com/DeployedReject/murces/releases) and extract it into your server folder:
+
 ```sh
-chmod +x murces
+unzip murces.zip
+chmod +x murces svctrl.sh backup.sh
 ./murces
 ```
 
-### CLI Commands
-In addition to the interactive TUI, MurCes supports headless CLI subcommands:
+### CLI Subcommands
+You can also run commands directly from the shell without opening the full menu:
 
 ```sh
-murces                  # Launch interactive TUI
-murces start [-p]       # Start server (add -p / --public for Playit.gg tunnel)
-murces stop             # Stop running server
-murces status           # Query whether server is running
-murces backup           # Trigger a world backup
-murces --test-tui       # Run automated self-test across all 7 TUI modules
-murces --help           # Show help and usage options
-murces --version        # Display version information
+./murces start [-p]    # Start server (-p / --public enables Playit.gg)
+./murces stop          # Stop server
+./murces status        # Check if the server is running
+./murces backup        # Run a world backup
+./murces --test-tui    # Headless test across all interface screens
+./murces --help        # Show help options
+./murces --version     # Print version
 ```
 
 ---
 
-## 🛠️ Building from Source
+## Requirements
 
-### Prerequisites
-- **Linux** (or WSL on Windows 10+)
-- **JDK 21+** (JDK 25 recommended)
-- **Apache Maven 3.8+**
-- **tmux** (required for background server execution)
-- **GraalVM Native Image** (optional, only required if compiling a standalone native binary)
+- **OS**: Linux 64-bit (or WSL on Windows 10+)
+- **System packages**: `tmux` (required for background sessions), `curl` or `wget`
+- **Optional**: `rclone` (for cloud sync backups), `playit` (for public tunneling)
+- **Java runtime**: Java 21+ or GraalVM only if compiling from source. The native binary runs standalone without a JDK installed.
 
-### 1. Build the Orchestrator
+---
+
+## Building from Source
+
+If you want to build the project yourself instead of using the precompiled release:
+
+### 1. Build Orchestrator
 ```sh
 cd java/orchestrator
 mvn clean install
 cd ../..
 ```
 
-### 2. Build the TUI (Jar)
+### 2. Build TUI (JAR)
 ```sh
 cd java/tui
 mvn clean package
-# The shaded JAR will be at java/tui/target/murces-tui-0.1.jar
+# Produces java/tui/target/murces-tui-0.1.jar
 ```
 
 ### 3. Build Native Binary (GraalVM)
-To compile the standalone AOT native binary (`murces`):
 ```sh
 cd java/tui
 mvn clean package -Pnative
@@ -92,17 +95,17 @@ cp target/murces ../../
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-Optional configuration for external services (e.g. CurseForge API key and contact email) can be supplied via environment variables or a `.env` file in the root directory:
+Credentials for external APIs (like your CurseForge developer key and contact email) can be placed in a `.env` file in the same directory:
 
 ```sh
-curseAPI="YOUR_CURSEFORGE_API_KEY"
+curseAPI="YOUR_KEY"
 email="your_email@example.com"
 ```
 
 ---
 
-## 🤝 Contributing & Issues
+## Issues & Contributing
 
-Feedback, feature requests, and bug reports are welcome! Please open an issue on the [GitHub Issue Tracker](https://github.com/DeployedReject/murces/issues).
+If you encounter bugs, broken dependencies, or have suggestions, feel free to open an issue on the [GitHub Issue Tracker](https://github.com/DeployedReject/murces/issues).
