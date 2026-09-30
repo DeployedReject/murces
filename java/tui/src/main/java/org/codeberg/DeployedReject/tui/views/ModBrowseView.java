@@ -289,7 +289,7 @@ public class ModBrowseView implements WorkspaceView {
 
         int wrapWidth = Math.max(28, descCardWidth - 6);
         List<String> lines = wrapText(rawDesc, wrapWidth);
-        int maxLines = Math.max(2, Math.min(6, lines.size()));
+        int maxLines = Math.min(6, lines.size());
         for (int i = 0; i < maxLines; i++) {
             Label l = new Label(lines.get(i));
             l.setForegroundColor(LazyVimTheme.getActivePalette().fg);
@@ -304,19 +304,19 @@ public class ModBrowseView implements WorkspaceView {
 
     private static List<String> wrapText(String text, int width) {
         List<String> result = new ArrayList<>();
-        if (text == null || text.isEmpty()) {
-            result.add("");
+        if (text == null || text.trim().isEmpty()) {
             return result;
         }
-        String remaining = text;
+        int safeWidth = Math.max(10, width);
+        String remaining = text.trim();
         while (!remaining.isEmpty()) {
-            if (remaining.length() <= width) {
+            if (remaining.length() <= safeWidth) {
                 result.add(remaining);
                 break;
             }
-            int split = remaining.lastIndexOf(' ', width);
+            int split = remaining.lastIndexOf(' ', safeWidth);
             if (split <= 0) {
-                split = width;
+                split = Math.min(safeWidth, remaining.length());
             }
             result.add(remaining.substring(0, split).trim());
             remaining = remaining.substring(split).trim();
@@ -352,11 +352,15 @@ public class ModBrowseView implements WorkspaceView {
                 List<OrchestratorBridge.ModVersionInfo> versions = OrchestratorBridge.getInstance()
                         .getModVersions(finalPlat, mod.id, version, loader).get();
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    currentModVersions.clear();
-                    currentModVersions.addAll(versions);
-                    for (OrchestratorBridge.ModVersionInfo v : versions) {
-                        modVersionCombo.addItem(v.toString());
-                    }
+                    try {
+                        currentModVersions.clear();
+                        currentModVersions.addAll(versions);
+                        for (OrchestratorBridge.ModVersionInfo v : versions) {
+                            if (v != null && v.versionNumber != null) {
+                                modVersionCombo.addItem(v.toString());
+                            }
+                        }
+                    } catch (Exception ignored) {}
                 });
             } catch (Exception ignored) {}
         }).start();
@@ -380,37 +384,41 @@ public class ModBrowseView implements WorkspaceView {
             try {
                 List<OrchestratorBridge.ModResult> mods = OrchestratorBridge.getInstance().searchMods(targetPlatform, query, version, loader).get();
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    currentResults.clear();
-                    currentResults.addAll(mods);
-                    resultsList.clearItems();
-                    selectedMod = null;
+                    try {
+                        currentResults.clear();
+                        currentResults.addAll(mods);
+                        resultsList.clearItems();
+                        selectedMod = null;
 
-                    if (mods.isEmpty()) {
-                        modVersionCombo.clearItems();
-                        modVersionCombo.addItem("[No Mod Selected]");
-                        modVersionCombo.setSelectedIndex(0);
-                        currentModVersions.clear();
-                        updateDetailsDisplay();
+                        if (mods.isEmpty()) {
+                            modVersionCombo.clearItems();
+                            modVersionCombo.addItem("[No Mod Selected]");
+                            modVersionCombo.setSelectedIndex(0);
+                            currentModVersions.clear();
+                            updateDetailsDisplay();
 
-                        statusLabel.setText("No mods found matching query: \"" + query + "\"");
-                        statusLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
-                        ActivityLogger.info("No mods found matching query: " + query);
-                        searchBox.takeFocus();
-                    } else {
-                        statusLabel.setText("Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload.");
-                        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
-                        ActivityLogger.ok("Found " + mods.size() + " mods for query: " + query);
+                            statusLabel.setText("No mods found matching query: \"" + query + "\"");
+                            statusLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
+                            ActivityLogger.info("No mods found matching query: " + query);
+                            searchBox.takeFocus();
+                        } else {
+                            statusLabel.setText("Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload.");
+                            statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+                            ActivityLogger.ok("Found " + mods.size() + " mods for query: " + query);
 
-                        for (OrchestratorBridge.ModResult m : mods) {
-                            resultsList.addItem(m.name + (m.author.isEmpty() ? "" : " by " + m.author), () -> {
-                                onModSelected(m);
-                                onDownload();
-                            });
+                            for (OrchestratorBridge.ModResult m : mods) {
+                                resultsList.addItem(m.name + (m.author.isEmpty() ? "" : " by " + m.author), () -> {
+                                    onModSelected(m);
+                                    onDownload();
+                                });
+                            }
+                            if (!mods.isEmpty()) {
+                                onModSelected(mods.get(0));
+                            }
+                            resultsList.takeFocus();
                         }
-                        if (!mods.isEmpty()) {
-                            onModSelected(mods.get(0));
-                        }
-                        resultsList.takeFocus();
+                    } catch (Exception err) {
+                        ActivityLogger.err("Search UI error: " + err.getMessage());
                     }
                 });
             } catch (Exception e) {

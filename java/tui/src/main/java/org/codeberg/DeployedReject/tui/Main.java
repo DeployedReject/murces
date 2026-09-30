@@ -149,6 +149,19 @@ public class Main {
 
             TerminalResizeHelper.setup(virtualScreen, gui, terminal);
 
+            gui.getGUIThread().setExceptionHandler(new com.googlecode.lanterna.gui2.TextGUIThread.ExceptionHandler() {
+                @Override
+                public boolean onRuntimeException(RuntimeException e) {
+                    ActivityLogger.err("GUI Exception: " + e.getMessage());
+                    return true; // Absorb runtime exceptions so GUI event loop never terminates unexpectedly
+                }
+
+                @Override
+                public boolean onIOException(IOException e) {
+                    return false;
+                }
+            });
+
             if (terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
                 try {
                     ((com.googlecode.lanterna.terminal.ExtendedTerminal) terminal).setMouseCaptureMode(com.googlecode.lanterna.terminal.MouseCaptureMode.CLICK_RELEASE);
