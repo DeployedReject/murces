@@ -17,7 +17,7 @@ MurCes is compiled ahead-of-time (AOT) into a standalone native binary via Graal
 
 ## 📌 Repository Branches
 
-- **`unstable` (Default / Main Branch)**: The active development branch containing the full Lanterna-based TUI, integrated orchestrator backend, and native GraalVM build configuration.
+- **`main` (Default Branch)**: The active development branch containing the full Lanterna-based TUI, integrated orchestrator backend, and native GraalVM build configuration.
 - **`archived`**: Preserves the legacy C prototype and precursor-based TUI implementation for historical reference.
 
 ---
