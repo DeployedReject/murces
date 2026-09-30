@@ -1,0 +1,83 @@
+name: Continuous Release on Push
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Pinned to actions/checkout v4.2.2 commit SHA
+      - name: Check out repository (full history)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Tag and Commit Notes
+        id: notes
+        run: |
+          TAG_NAME="v0.1-$(date +'%Y%m%d')-build${{ github.run_number }}"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          echo "### Changes in this Release" > release_notes.md
+          echo "" >> release_notes.md
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Commits since **$PREV_TAG**:" >> release_notes.md
+            git log "${PREV_TAG}..HEAD" --pretty=format:"* %s (%h by @%an)" >> release_notes.md
+          else
+            echo "Commits included in this release:" >> release_notes.md
+            git log -n 20 --pretty=format:"* %s (%h by @%an)" >> release_notes.md
+          fi
+          echo "" >> release_notes.md
+
+      # Pinned to graalvm/setup-graalvm v1.4.1 commit SHA
+      - name: Set up GraalVM JDK 21
+        uses: graalvm/setup-graalvm@2f2cf68cf4910cf904fa871feea603612d1b7642
+        with:
+          java-version: "21"
+          distribution: "graalvm"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+
+      - name: Build Orchestrator
+        run: |
+          cd java/orchestrator
+          mvn clean install -DskipTests
+
+      - name: Build Native Binary (GraalVM Native Image)
+        run: |
+          cd java/tui
+          mvn clean package -Pnative -DskipTests
+
+      - name: Verify Binary with Headless Self-Test
+        run: |
+          chmod +x java/tui/target/murces
+          ./java/tui/target/murces --test-tui
+
+      - name: Package Release ZIP
+        run: |
+          mkdir -p dist
+          cp java/tui/target/murces dist/
+          cp c/Shell/svctrl.sh dist/
+          cp c/Shell/backup.sh dist/
+          chmod +x dist/murces dist/*.sh
+          cd dist
+          zip -r ../murces.zip murces svctrl.sh backup.sh
+          cd ..
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.notes.outputs.tag_name }}" murces.zip \
+            --title "MurCes ${{ steps.notes.outputs.tag_name }}" \
+            --notes-file release_notes.md
