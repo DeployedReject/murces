@@ -509,7 +509,7 @@ public class OrchestratorBridge {
                         out.write(buf, 0, n);
                         totalRead += n;
                         long now = System.currentTimeMillis();
-                        if (now - lastCallback >= 100 || (filesize > 0 && totalRead == filesize)) {
+                        if (now - lastCallback >= 500 || (filesize > 0 && totalRead == filesize)) {
                             lastCallback = now;
                             double elapsedSec = Math.max(0.001, (now - startTime) / 1000.0);
                             double speedMBps = (totalRead / (1024.0 * 1024.0)) / elapsedSec;

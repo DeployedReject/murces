@@ -35,7 +35,7 @@ public class NetworkUtils {
           file.write(buffer, 0, bytesRead);
           readSize += bytesRead;
           long now = System.currentTimeMillis();
-          if (now - lastProgressTime >= 80 || (filesize > 0 && readSize >= filesize)) {
+          if (now - lastProgressTime >= 500 || (filesize > 0 && readSize >= filesize)) {
             lastProgressTime = now;
             double pct = filesize > 0 ? Math.min(100.0, (readSize * 100.0) / filesize) : 0.0;
             double rounded = Math.round(pct * 100.0) / 100.0;
@@ -49,6 +49,9 @@ public class NetworkUtils {
         JsonObject responseEnd = new JsonObject();
         responseEnd.addProperty("status", 3);
         responseEnd.addProperty("type", "download");
+        responseEnd.addProperty("progress", 100.0);
+        responseEnd.addProperty("read", filesize);
+        responseEnd.addProperty("total", filesize);
         Communicator.printer(responseEnd);
       } catch (Exception e) {
         ErrorHelper.errorJson(e.toString());
