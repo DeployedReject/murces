@@ -41,7 +41,7 @@ jobs:
 
       # Pinned to graalvm/setup-graalvm v1.4.1 commit SHA
       - name: Set up GraalVM JDK 25
-        uses: graalvm/setup-graalvm@b9b7e9b0682fa0b0805128ff40c42245b736b446
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276
         with:
           java-version: "25"
           distribution: "graalvm"
