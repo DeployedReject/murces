@@ -43,6 +43,14 @@ public class ModManageView implements WorkspaceView {
 
         // Mods List
         modsList = new MurcesListBox(new TerminalSize(42, 7));
+        modsList.setSelectionListener(idx -> {
+            List<String> mods = OrchestratorBridge.listInstalledMods();
+            if (idx >= 0 && idx < mods.size()) {
+                selectedModFile = mods.get(idx);
+                confirmingDelete = false;
+                statusLabel.setText("Selected: " + selectedModFile);
+            }
+        });
         root.addComponent(modsList.withBorder(Borders.singleLine("Installed Mods [L]ist (mods/)")));
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -78,6 +86,20 @@ public class ModManageView implements WorkspaceView {
     @Override
     public Interactable getDefaultFocus() {
         return modsList;
+    }
+
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int rows = newSize.getRows();
+
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int listWidth = Math.min(72, wsWidth - 4);
+        int listHeight = Math.max(7, Math.min(14, rows - 16));
+        modsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     }
 
     @Override

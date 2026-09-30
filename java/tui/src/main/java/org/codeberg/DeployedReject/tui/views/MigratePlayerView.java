@@ -96,6 +96,18 @@ public class MigratePlayerView implements WorkspaceView {
         return migrateBtn;
     }
 
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int inputWidth = Math.max(18, Math.min(36, wsWidth - 22));
+        oldNameBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        newNameBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+    }
+
     private void onMigrate() {
         String oldName = oldNameBox.getText().trim();
         String newName = newNameBox.getText().trim();

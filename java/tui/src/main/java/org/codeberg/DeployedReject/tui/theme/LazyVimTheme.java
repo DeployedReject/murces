@@ -64,7 +64,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(158, 206, 106),  // #9ece6a
                 new TextColor.RGB(224, 175, 104),  // #e0af68
                 new TextColor.RGB(247, 118, 142),  // #f7768e
-                new TextColor.RGB(59, 66, 97),     // #3b4261
+                new TextColor.RGB(122, 162, 247),  // #7aa2f7 (vibrant Tokyo blue border)
                 new TextColor.RGB(86, 95, 137)     // #565f89
         ));
 
@@ -78,7 +78,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(166, 227, 161),  // #a6e3a1
                 new TextColor.RGB(249, 226, 175),  // #f9e2af
                 new TextColor.RGB(243, 139, 168),  // #f38ba8
-                new TextColor.RGB(88, 91, 112),    // #585b70
+                new TextColor.RGB(203, 166, 247),  // #cba6f7 (vibrant mauve border)
                 new TextColor.RGB(108, 112, 134)   // #6c7086
         ));
 
@@ -92,7 +92,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(166, 218, 149),  // #a6da95
                 new TextColor.RGB(238, 212, 159),  // #eed49f
                 new TextColor.RGB(237, 135, 150),  // #ed8796
-                new TextColor.RGB(91, 96, 120),    // #5b6078
+                new TextColor.RGB(198, 160, 246),  // #c6a0f6 (vibrant mauve border)
                 new TextColor.RGB(110, 115, 141)   // #6e738d
         ));
 
@@ -106,7 +106,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(166, 209, 137),  // #a6d189
                 new TextColor.RGB(229, 200, 144),  // #e5c890
                 new TextColor.RGB(231, 130, 132),  // #e78284
-                new TextColor.RGB(98, 104, 128),   // #626880
+                new TextColor.RGB(202, 158, 230),  // #ca9ee6 (vibrant mauve border)
                 new TextColor.RGB(115, 121, 148)   // #737994
         ));
 
@@ -120,7 +120,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(64, 160, 43),    // #40a02b
                 new TextColor.RGB(223, 142, 29),   // #df8e1d
                 new TextColor.RGB(210, 15, 57),    // #d20f39
-                new TextColor.RGB(188, 192, 204),  // #bcc0cc
+                new TextColor.RGB(136, 57, 239),   // #8839ef (vibrant purple border)
                 new TextColor.RGB(140, 143, 161)   // #8c8fa1
         ));
 
@@ -134,7 +134,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(184, 187, 38),   // #b8bb26
                 new TextColor.RGB(254, 128, 25),   // #fe8019
                 new TextColor.RGB(251, 73, 52),    // #fb4934
-                new TextColor.RGB(102, 92, 84),    // #665c54
+                new TextColor.RGB(250, 189, 47),   // #fabd2f (vibrant gold border)
                 new TextColor.RGB(146, 131, 116)   // #928374
         ));
 
@@ -148,7 +148,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(163, 190, 140),  // #a3be8c
                 new TextColor.RGB(235, 203, 139),  // #ebcb8b
                 new TextColor.RGB(191, 97, 106),   // #bf616a
-                new TextColor.RGB(76, 86, 106),    // #4c566a
+                new TextColor.RGB(136, 192, 208),  // #88c0d0 (vibrant Nord frost blue border)
                 new TextColor.RGB(123, 136, 161)   // #7b88a1
         ));
 
@@ -162,7 +162,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(118, 148, 106),  // #76946a
                 new TextColor.RGB(192, 163, 110),  // #c0a36e
                 new TextColor.RGB(195, 64, 67),    // #c34043
-                new TextColor.RGB(84, 84, 109),    // #54546d
+                new TextColor.RGB(126, 156, 216),  // #7e9cd8 (vibrant wave blue border)
                 new TextColor.RGB(114, 113, 105)   // #727169
         ));
 
@@ -176,7 +176,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(49, 116, 143),   // #31748f
                 new TextColor.RGB(246, 193, 119),  // #f6c177
                 new TextColor.RGB(235, 111, 146),  // #eb6f92
-                new TextColor.RGB(82, 79, 103),    // #524f67
+                new TextColor.RGB(235, 188, 186),  // #ebbcba (vibrant rose border)
                 new TextColor.RGB(144, 140, 170)   // #908caa
         ));
 
@@ -190,7 +190,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(133, 153, 0),    // #859900
                 new TextColor.RGB(181, 137, 0),    // #b58900
                 new TextColor.RGB(220, 50, 47),    // #dc322f
-                new TextColor.RGB(88, 110, 117),   // #586e75
+                new TextColor.RGB(42, 161, 152),   // #2aa198 (vibrant cyan border)
                 new TextColor.RGB(101, 123, 131)   // #657b83
         ));
 
@@ -204,7 +204,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(94, 255, 108),   // #5eff6c
                 new TextColor.RGB(241, 255, 94),   // #f1ff5e
                 new TextColor.RGB(255, 110, 94),   // #ff6e5e
-                new TextColor.RGB(60, 64, 72),     // #3c4048
+                new TextColor.RGB(255, 94, 160),   // #ff5ea0 (vibrant neon pink border)
                 new TextColor.RGB(123, 132, 150)   // #7b8496
         ));
 
@@ -218,7 +218,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(85, 255, 85),    // Emerald green
                 new TextColor.RGB(255, 170, 0),    // Gold yellow
                 new TextColor.RGB(255, 85, 85),    // Redstone red
-                new TextColor.RGB(133, 82, 43),    // Oak border
+                new TextColor.RGB(85, 255, 255),   // Diamond cyan border
                 new TextColor.RGB(170, 170, 170)   // Stone gray
         ));
 
@@ -257,40 +257,23 @@ public class LazyVimTheme {
 
         // Background transparency mapping
         TextColor baseBg;
-        TextColor surfaceBg;
-        TextColor buttonBg;
-
-        if (transparency == 0) {
+        if (activeTransparency == 0) {
             baseBg = trueColor ? p.bg : TextColor.ANSI.BLACK;
-            surfaceBg = trueColor ? p.surface : TextColor.ANSI.BLACK;
-            buttonBg = trueColor ? p.surface : TextColor.ANSI.BLACK;
-        } else if (transparency <= 25) {
-            baseBg = TextColor.ANSI.DEFAULT;
-            surfaceBg = trueColor ? p.surface : TextColor.ANSI.BLACK;
-            buttonBg = trueColor ? p.surface : TextColor.ANSI.BLACK;
-        } else if (transparency <= 50) {
-            baseBg = TextColor.ANSI.DEFAULT;
-            surfaceBg = TextColor.ANSI.DEFAULT;
-            buttonBg = trueColor ? p.surface : TextColor.ANSI.BLACK;
         } else {
-            // >= 75% or 100% full transparent
             baseBg = TextColor.ANSI.DEFAULT;
-            surfaceBg = TextColor.ANSI.DEFAULT;
-            buttonBg = TextColor.ANSI.DEFAULT;
         }
 
-        SimpleTheme theme = SimpleTheme.makeTheme(
-                true,
-                accent, selection,
-                fg, selection,
-                fg, baseBg,
-                muted
-        );
+        SimpleTheme theme = new SimpleTheme(fg, baseBg);
+        theme.getDefaultDefinition()
+                .setSelected(trueColor ? p.bg : TextColor.ANSI.BLACK, accent, com.googlecode.lanterna.SGR.BOLD)
+                .setActive(trueColor ? p.bg : TextColor.ANSI.BLACK, accent, com.googlecode.lanterna.SGR.BOLD)
+                .setPreLight(fg, selection)
+                .setInsensitive(muted, baseBg);
 
-        theme.addOverride(Panel.class, fg, surfaceBg);
+        // Fill all panels, windows, and borders with uniform baseBg - eliminates half-filled boxes!
+        theme.addOverride(Panel.class, fg, baseBg);
         theme.addOverride(Window.class, fg, baseBg);
         theme.addOverride(Border.class, border, baseBg);
-        theme.addOverride(Button.class, fg, buttonBg);
 
         return theme;
     }
@@ -323,10 +306,48 @@ public class LazyVimTheme {
         return getActivePalette().border;
     }
 
+    // High-contrast, vibrant dedicated console log colors (immune to muddy theme palettes)
+    public static final TextColor LOG_BG = new TextColor.RGB(16, 16, 18);
+    public static final TextColor LOG_FG_NORMAL = new TextColor.RGB(240, 240, 245);
+    public static final TextColor LOG_SUCCESS = new TextColor.RGB(85, 255, 85);
+    public static final TextColor LOG_ERROR = new TextColor.RGB(255, 85, 85);
+    public static final TextColor LOG_WARN = new TextColor.RGB(255, 215, 0);
+    public static final TextColor LOG_PROG = new TextColor.RGB(85, 255, 255);
+    public static final TextColor LOG_INFO = new TextColor.RGB(137, 180, 250);
+    public static final TextColor LOG_MUTED = new TextColor.RGB(140, 140, 140);
+
     public static TextColor getLogBackgroundColor() {
         if (activeTransparency >= 50) {
             return TextColor.ANSI.DEFAULT;
         }
-        return getActivePalette().bg;
+        return LOG_BG;
+    }
+
+    public static TextColor getLogTextColor() {
+        return LOG_FG_NORMAL;
+    }
+
+    public static TextColor getLogSuccessColor() {
+        return LOG_SUCCESS;
+    }
+
+    public static TextColor getLogErrorColor() {
+        return LOG_ERROR;
+    }
+
+    public static TextColor getLogWarnColor() {
+        return LOG_WARN;
+    }
+
+    public static TextColor getLogProgColor() {
+        return LOG_PROG;
+    }
+
+    public static TextColor getLogInfoColor() {
+        return LOG_INFO;
+    }
+
+    public static TextColor getLogMutedColor() {
+        return LOG_MUTED;
     }
 }

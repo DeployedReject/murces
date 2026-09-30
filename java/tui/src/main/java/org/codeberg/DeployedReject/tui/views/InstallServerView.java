@@ -100,6 +100,20 @@ public class InstallServerView implements WorkspaceView {
         return installOnlyBtn;
     }
 
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int inputWidth = Math.max(16, Math.min(36, wsWidth - 24));
+        engineComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        gameVersionComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        loaderVersionBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        ramComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+    }
+
     private void cycleEngine() {
         int next = (engineComboBox.getSelectedIndex() + 1) % engineComboBox.getItemCount();
         engineComboBox.setSelectedIndex(next);

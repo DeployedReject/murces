@@ -111,6 +111,17 @@ public class ServerControlView implements WorkspaceView {
     }
 
     @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int cmdWidth = Math.max(22, Math.min(50, wsWidth - 28));
+        commandInput.setPreferredSize(new TerminalSize(cmdWidth, 1));
+    }
+
+    @Override
     public void onActivated() {
         updateStatus();
     }

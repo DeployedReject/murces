@@ -81,6 +81,20 @@ public class BackupView implements WorkspaceView {
     }
 
     @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int rows = newSize.getRows();
+
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int tblWidth = Math.min(74, wsWidth - 4);
+        int tblHeight = Math.max(6, Math.min(14, rows - 16));
+        table.setPreferredSize(new TerminalSize(tblWidth, tblHeight));
+    }
+
+    @Override
     public void onActivated() {
         loadBackups();
     }

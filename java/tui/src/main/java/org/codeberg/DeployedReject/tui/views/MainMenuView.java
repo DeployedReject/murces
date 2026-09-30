@@ -111,4 +111,15 @@ public class MainMenuView implements WorkspaceView {
     public Interactable getDefaultFocus() {
         return menuList;
     }
+
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int listWidth = Math.min(68, wsWidth - 4);
+        menuList.setPreferredSize(new TerminalSize(listWidth, 10));
+    }
 }

@@ -11,10 +11,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Enhanced Mod Browse & Download View with responsive layout scaling,
- * mod author and full-screen description display, compatible version picker,
+ * Enhanced Mod Browse & Download View with responsive 2-column layout,
+ * live mod author and full description display, compatible version picker,
  * Minecraft pickaxe dirt-breaking loading animation, and download finish ETA estimate.
  */
 public class ModBrowseView implements WorkspaceView {
@@ -27,11 +30,11 @@ public class ModBrowseView implements WorkspaceView {
     private final TextBox searchBox;
     private final MurcesListBox resultsList;
     private final ComboBox<String> modVersionCombo;
-    private final Label authorLabel;
-    private final Label descLabel;
+    private final Label titleAuthorLabel;
+    private final Panel descPanel;
     private final Label statusLabel;
     private final MinecraftPickaxeAnimation pickaxeAnim;
-    private final Panel animPanel;
+    private final Panel detailsCard;
     private final Button searchBtn;
     private final Button downloadBtn;
     private final Button backBtn;
@@ -43,12 +46,14 @@ public class ModBrowseView implements WorkspaceView {
     private OrchestratorBridge.ModResult selectedMod = null;
     private boolean isDownloading = false;
     private int currentTermWidth = 80;
+    private int descCardWidth = 46;
+    private ScheduledExecutorService activeTicker = null;
 
     public ModBrowseView(MainWindow mainWindow) {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // 1. Filters row
+        // 1. Top Filters row
         Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         filterPanel.addComponent(new Label("[P]lat:"));
         platformBox = new ComboBox<>("Modrinth", "CurseForge");
@@ -74,7 +79,7 @@ public class ModBrowseView implements WorkspaceView {
         downloadBtn = new Button("[D]ownload", this::onDownload);
 
         // Results list
-        resultsList = new MurcesListBox(new TerminalSize(42, 6));
+        resultsList = new MurcesListBox(new TerminalSize(42, 10));
 
         searchBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
@@ -97,38 +102,58 @@ public class ModBrowseView implements WorkspaceView {
 
         // 3. Status Label
         statusLabel = new Label("Type query, press [S] to search, [D] to download.");
-        statusLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         root.addComponent(statusLabel);
 
-        // 4. Results List
-        root.addComponent(resultsList.withBorder(Borders.singleLine("Results [L]ist (Enter or [D] to download)")));
+        // 4. Middle 2-Column Section (filling space between list and activity log)
+        Panel midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
 
-        // 5. Mod Details & Version Picker Panel
-        Panel detailsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+        // Left Column: Results List
+        Panel leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
+        leftCol.addComponent(resultsList.withBorder(Borders.singleLine("Results [L]ist (↑/↓)")));
+        midCols.addComponent(leftCol);
+
+        midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+
+        // Right Column: Mod Details, Version Picker, Multi-line Description, Pickaxe Animation
+        Panel rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
+        detailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
+
+        titleAuthorLabel = new Label("Title: -\nAuthor: -");
+        titleAuthorLabel.setForegroundColor(LazyVimTheme.getAccentColor());
+        detailsCard.addComponent(titleAuthorLabel);
+
         Panel versionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
         versionRow.addComponent(new Label("Mod Version [K]: "));
         modVersionCombo = new ComboBox<>("[Latest Compatible]");
         versionRow.addComponent(modVersionCombo);
-        detailsPanel.addComponent(versionRow);
+        detailsCard.addComponent(versionRow);
 
-        authorLabel = new Label("Author: -");
-        authorLabel.setForegroundColor(LazyVimTheme.getAccentColor());
-        detailsPanel.addComponent(authorLabel);
+        descPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+        descPanel.addComponent(new Label("Select a mod from the list to view its description."));
+        detailsCard.addComponent(descPanel.withBorder(Borders.singleLine("Description")));
 
-        descLabel = new Label("Description: Select a mod to view details.");
-        descLabel.setForegroundColor(LazyVimTheme.getActivePalette().fg);
-        detailsPanel.addComponent(descLabel);
-
-        root.addComponent(detailsPanel.withBorder(Borders.singleLine("Mod Details & Version")));
-
-        // 6. Minecraft Pickaxe Dirt-Breaking Animation & ETA Container
         pickaxeAnim = new MinecraftPickaxeAnimation();
-        animPanel = new Panel(new LinearLayout(Direction.VERTICAL));
-        animPanel.addComponent(pickaxeAnim);
-        root.addComponent(animPanel);
-        animPanel.setVisible(false);
+        pickaxeAnim.setProgress(0.0);
+        pickaxeAnim.setCustomMessage("⛏ Ready to mine mods");
+        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine("Mining & Download Status")));
 
-        // 7. Footer
+        detailsCard.setPreferredSize(new TerminalSize(48, 12));
+        rightCol.addComponent(detailsCard.withBorder(Borders.singleLine("Mod Details & Version")));
+        midCols.addComponent(rightCol);
+
+        root.addComponent(midCols);
+
+        // Instant arrow-key selection tracking: updates description and compatible versions immediately!
+        resultsList.setSelectionListener(idx -> {
+            if (idx >= 0 && idx < currentResults.size()) {
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    onModSelected(currentResults.get(idx));
+                });
+            }
+        });
+
+        // 5. Footer
         backBtn = new Button("[B]ack to Main Menu", mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
@@ -172,50 +197,99 @@ public class ModBrowseView implements WorkspaceView {
     }
 
     @Override
+    public void onDeactivated() {
+        stopTicker();
+    }
+
+    private synchronized void stopTicker() {
+        if (activeTicker != null) {
+            try {
+                activeTicker.shutdownNow();
+            } catch (Exception ignored) {}
+            activeTicker = null;
+        }
+    }
+
+    @Override
     public void onResized(TerminalSize newSize) {
         if (newSize == null) return;
         this.currentTermWidth = newSize.getColumns();
         int rows = newSize.getRows();
 
-        // Responsive scaling on full screen
-        if (currentTermWidth >= 100) {
-            int listWidth = Math.min(68, currentTermWidth - 36);
-            int listHeight = Math.max(6, Math.min(10, rows - 19));
-            resultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
-            descLabel.setVisible(true);
+        int actWidth = Math.max(28, Math.min(65, (currentTermWidth * 35) / 100));
+        int wsWidth = Math.max(40, currentTermWidth - actWidth - 6);
+
+        if (wsWidth >= 75) {
+            int leftWidth = Math.max(36, Math.min(46, wsWidth / 2 - 2));
+            int rightWidth = Math.max(38, wsWidth - leftWidth - 4);
+            int listHeight = Math.max(8, Math.min(14, rows - 16));
+
+            this.descCardWidth = rightWidth;
+            resultsList.setPreferredSize(new TerminalSize(leftWidth, listHeight));
+            detailsCard.setPreferredSize(new TerminalSize(rightWidth, listHeight + 1));
+            pickaxeAnim.setPreferredSize(new TerminalSize(rightWidth - 4, 3));
         } else {
-            resultsList.setPreferredSize(new TerminalSize(42, 5));
-            // In compact view, keep author and hide lengthy multi-line description
-            descLabel.setVisible(false);
+            int leftWidth = Math.max(36, wsWidth - 4);
+            this.descCardWidth = leftWidth;
+            resultsList.setPreferredSize(new TerminalSize(leftWidth, 5));
+            detailsCard.setPreferredSize(new TerminalSize(leftWidth, 8));
+            pickaxeAnim.setPreferredSize(new TerminalSize(leftWidth - 4, 3));
         }
         updateDetailsDisplay();
     }
 
     private void updateDetailsDisplay() {
+        descPanel.removeAllComponents();
         if (selectedMod == null) {
-            authorLabel.setText("Author: -");
-            descLabel.setText(currentTermWidth >= 100 ? "Select a mod to view full description." : "[Fullscreen to view description]");
+            titleAuthorLabel.setText("Title: No mod selected\nAuthor: -");
+            descPanel.addComponent(new Label("Select a mod from the results list to view its description."));
             return;
         }
 
         String author = (selectedMod.author != null && !selectedMod.author.trim().isEmpty())
                 ? selectedMod.author
                 : "Unknown";
+        titleAuthorLabel.setText("Title: " + selectedMod.name + "\nAuthor: " + author);
 
-        if (currentTermWidth >= 100) {
-            authorLabel.setText("Author: " + author);
-            String desc = (selectedMod.description != null && !selectedMod.description.trim().isEmpty())
-                    ? selectedMod.description.replace("\r", " ").replace("\n", " ").trim()
-                    : "No description provided.";
-            if (desc.length() > 220) {
-                desc = desc.substring(0, 217) + "...";
-            }
-            descLabel.setText("Description: " + desc);
-            descLabel.setVisible(true);
-        } else {
-            authorLabel.setText("Author: " + author + "  (Enlarge window to view description)");
-            descLabel.setVisible(false);
+        String rawDesc = (selectedMod.description != null && !selectedMod.description.trim().isEmpty())
+                ? selectedMod.description.replace("\r\n", " ").replace("\n", " ").trim()
+                : "No description provided.";
+
+        int wrapWidth = Math.max(28, descCardWidth - 6);
+        List<String> lines = wrapText(rawDesc, wrapWidth);
+        int maxLines = Math.max(2, Math.min(6, lines.size()));
+        for (int i = 0; i < maxLines; i++) {
+            Label l = new Label(lines.get(i));
+            l.setForegroundColor(LazyVimTheme.getActivePalette().fg);
+            descPanel.addComponent(l);
         }
+        if (lines.size() > maxLines) {
+            Label more = new Label("... (" + (lines.size() - maxLines) + " more lines)");
+            more.setForegroundColor(LazyVimTheme.getLogMutedColor());
+            descPanel.addComponent(more);
+        }
+    }
+
+    private static List<String> wrapText(String text, int width) {
+        List<String> result = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            result.add("");
+            return result;
+        }
+        String remaining = text;
+        while (!remaining.isEmpty()) {
+            if (remaining.length() <= width) {
+                result.add(remaining);
+                break;
+            }
+            int split = remaining.lastIndexOf(' ', width);
+            if (split <= 0) {
+                split = width;
+            }
+            result.add(remaining.substring(0, split).trim());
+            remaining = remaining.substring(split).trim();
+        }
+        return result;
     }
 
     private void onModSelected(OrchestratorBridge.ModResult mod) {
@@ -261,7 +335,7 @@ public class ModBrowseView implements WorkspaceView {
         String loader = loaderBox.getSelectedItem();
 
         statusLabel.setText("[BUSY] Searching " + platform + " for '" + query + "'...");
-        statusLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         ActivityLogger.info("Searching " + platform + " for '" + query + "' (MC " + version + ", " + loader + ")");
 
         final String targetPlatform = platform;
@@ -277,11 +351,11 @@ public class ModBrowseView implements WorkspaceView {
 
                     if (mods.isEmpty()) {
                         statusLabel.setText("No mods found matching query.");
-                        statusLabel.setForegroundColor(LazyVimTheme.getMutedColor());
+                        statusLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
                         ActivityLogger.info("No mods found matching query: " + query);
                     } else {
                         statusLabel.setText("Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload.");
-                        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+                        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
                         ActivityLogger.ok("Found " + mods.size() + " mods for query: " + query);
 
                         for (OrchestratorBridge.ModResult m : mods) {
@@ -299,7 +373,7 @@ public class ModBrowseView implements WorkspaceView {
             } catch (Exception e) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     statusLabel.setText("[ERR] Search failed: " + e.getMessage());
-                    statusLabel.setForegroundColor(LazyVimTheme.getErrorColor());
+                    statusLabel.setForegroundColor(LazyVimTheme.getLogErrorColor());
                     ActivityLogger.err("Mod search failed: " + e.getMessage());
                 });
             }
@@ -317,7 +391,7 @@ public class ModBrowseView implements WorkspaceView {
         }
         if (selectedMod == null) {
             statusLabel.setText("[WARN] Select a mod from the list first!");
-            statusLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+            statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
             ActivityLogger.warn("Please select a mod from the results list before downloading.");
             return;
         }
@@ -338,15 +412,27 @@ public class ModBrowseView implements WorkspaceView {
         }
 
         boolean showAnimation = ConfigManager.getInstance().getConfig().isPickaxeAnimation();
+        pickaxeAnim.setProgress(0.0);
+        pickaxeAnim.setCustomMessage("Mining " + mod.name + "...");
+
+        stopTicker();
         if (showAnimation) {
-            animPanel.setVisible(true);
-            pickaxeAnim.setProgress(0.0);
-            pickaxeAnim.setCustomMessage("Starting download: " + mod.name + "...");
+            activeTicker = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "PickaxeAnimTicker");
+                t.setDaemon(true);
+                return t;
+            });
+            activeTicker.scheduleAtFixedRate(() -> {
+                pickaxeAnim.tick();
+                try {
+                    mainWindow.getGui().updateScreen();
+                } catch (Exception ignored) {}
+            }, 50, 110, TimeUnit.MILLISECONDS);
         }
 
         isDownloading = true;
         statusLabel.setText("[BUSY] Downloading " + mod.name + "...");
-        statusLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         ActivityLogger.info("Downloading mod: " + mod.name + (chosenVer != null ? " (" + chosenVer.versionNumber + ")" : ""));
 
         final String targetPlatform = platform;
@@ -368,22 +454,26 @@ public class ModBrowseView implements WorkspaceView {
 
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     isDownloading = false;
+                    stopTicker();
                     statusLabel.setText("[OK] " + mod.name + " installed!");
-                    statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
-                    if (showAnimation) {
-                        pickaxeAnim.setProgress(100.0);
-                        pickaxeAnim.setCustomMessage("[OK] " + mod.name + " downloaded and installed!");
-                    }
+                    statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+                    pickaxeAnim.setProgress(100.0);
+                    pickaxeAnim.setCustomMessage("[OK] " + mod.name + " mined & installed!");
+                    try {
+                        mainWindow.getGui().updateScreen();
+                    } catch (Exception ignored) {}
                     ActivityLogger.ok("Mod " + mod.name + " downloaded and installed to mods/ folder!");
                 });
             } catch (Exception e) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     isDownloading = false;
+                    stopTicker();
                     statusLabel.setText("[ERR] Download failed: " + e.getMessage());
-                    statusLabel.setForegroundColor(LazyVimTheme.getErrorColor());
-                    if (showAnimation) {
-                        pickaxeAnim.setCustomMessage("[ERR] " + e.getMessage());
-                    }
+                    statusLabel.setForegroundColor(LazyVimTheme.getLogErrorColor());
+                    pickaxeAnim.setCustomMessage("[ERR] " + e.getMessage());
+                    try {
+                        mainWindow.getGui().updateScreen();
+                    } catch (Exception ignored) {}
                     ActivityLogger.err("Mod download failed: " + e.getMessage());
                 });
             }
@@ -395,12 +485,15 @@ public class ModBrowseView implements WorkspaceView {
             String status = String.format("[BUSY] Downloading %.2f%% (ETA: %s @ %s)...",
                     info.percent, info.formattedEta(), info.formattedSpeed());
             statusLabel.setText(status);
+            statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
 
-            if (animPanel.isVisible()) {
-                pickaxeAnim.setProgress(info.percent);
-                pickaxeAnim.setCustomMessage(String.format("Downloading %s: %.2f%% (ETA: %s @ %s)",
-                        modName, info.percent, info.formattedEta(), info.formattedSpeed()));
-            }
+            pickaxeAnim.setProgress(info.percent);
+            pickaxeAnim.setCustomMessage(String.format("Mining %s: %.2f%% (ETA: %s @ %s)",
+                    modName, info.percent, info.formattedEta(), info.formattedSpeed()));
+
+            try {
+                mainWindow.getGui().updateScreen();
+            } catch (Exception ignored) {}
 
             ActivityLogger.prog(String.format("Downloading %s... %.2f%% (ETA: %s @ %s)",
                     modName, info.percent, info.formattedEta(), info.formattedSpeed()));

@@ -35,6 +35,11 @@ public class ConfigServerView implements WorkspaceView {
 
         // 1. Properties List
         listBox = new MurcesListBox(new TerminalSize(42, 6));
+        listBox.setSelectionListener(idx -> {
+            if (idx >= 0 && idx < displayedKeys.size()) {
+                updateDetailForSelected();
+            }
+        });
 
         // 2. Search filter & Category Row
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -134,6 +139,21 @@ public class ConfigServerView implements WorkspaceView {
     @Override
     public Interactable getDefaultFocus() {
         return listBox;
+    }
+
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int rows = newSize.getRows();
+
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int listWidth = Math.min(74, wsWidth - 4);
+        int listHeight = Math.max(7, Math.min(14, rows - 18));
+        listBox.setPreferredSize(new TerminalSize(listWidth, listHeight));
+        valueInput.setPreferredSize(new TerminalSize(Math.max(18, Math.min(40, listWidth - 18)), 1));
     }
 
     @Override

@@ -79,9 +79,8 @@ public class CustomizationView implements WorkspaceView {
 
         root.addComponent(togglePanel.withBorder(Borders.singleLine("Options & Animations")));
 
-        // 4. Status
         statusLabel = new Label("[OK:] Ready.");
-        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         root.addComponent(statusLabel);
 
         // 5. Actions
@@ -159,7 +158,7 @@ public class CustomizationView implements WorkspaceView {
 
         mainWindow.applyConfig(config);
         statusLabel.setText("[OK:] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
-        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
     }
 
     private void onResetDefaults() {
@@ -168,7 +167,7 @@ public class CustomizationView implements WorkspaceView {
         loadCurrentConfig();
         mainWindow.applyConfig(def);
         statusLabel.setText("[OK:] Reset to default configuration.");
-        statusLabel.setForegroundColor(LazyVimTheme.getSuccessColor());
+        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
     }
 
     @Override
@@ -189,6 +188,18 @@ public class CustomizationView implements WorkspaceView {
     @Override
     public Interactable getDefaultFocus() {
         return themeCombo;
+    }
+
+    @Override
+    public void onResized(TerminalSize newSize) {
+        if (newSize == null) return;
+        int cols = newSize.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        int wsWidth = Math.max(44, cols - actWidth - 6);
+
+        int comboWidth = Math.max(24, Math.min(42, wsWidth - 20));
+        themeCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
+        transparencyCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
     }
 
     @Override
