@@ -138,7 +138,7 @@ public class CustomizationView implements WorkspaceView {
         TuiConfig config = ConfigManager.getInstance().getConfig();
 
         String selectedTheme = themeCombo.getSelectedItem();
-        config.setTheme(selectedTheme != null ? selectedTheme : "Tokyo Night");
+        config.setTheme(selectedTheme != null ? selectedTheme : "Gruvbox Dark");
 
         int transIdx = transparencyCombo.getSelectedIndex();
         int transPercent = 0;

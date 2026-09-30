@@ -5,7 +5,7 @@ package org.codeberg.DeployedReject.tui.config;
  */
 public class TuiConfig {
 
-    private String theme = "Tokyo Night";
+    private String theme = "Gruvbox Dark";
     private int transparencyPercent = 0; // 0, 25, 50, 75, 100
     private boolean trueColor = true;
     private boolean enforceMinSize = true;
@@ -14,7 +14,7 @@ public class TuiConfig {
     public TuiConfig() {}
 
     public String getTheme() {
-        return theme != null && !theme.trim().isEmpty() ? theme : "Tokyo Night";
+        return theme != null && !theme.trim().isEmpty() ? theme : "Gruvbox Dark";
     }
 
     public void setTheme(String theme) {

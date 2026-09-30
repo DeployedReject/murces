@@ -222,7 +222,7 @@ public class LazyVimTheme {
                 new TextColor.RGB(170, 170, 170)   // Stone gray
         ));
 
-        activePalette = PALETTES.get("Tokyo Night");
+        activePalette = PALETTES.get("Gruvbox Dark");
     }
 
     private static void register(ThemePalette palette) {
@@ -241,7 +241,7 @@ public class LazyVimTheme {
             return all.get(new Random().nextInt(all.size()));
         }
         ThemePalette p = PALETTES.get(name);
-        return p != null ? p : PALETTES.get("Tokyo Night");
+        return p != null ? p : PALETTES.get("Gruvbox Dark");
     }
 
     public static synchronized Theme createTheme(String themeName, int transparency, boolean trueColor) {
@@ -296,7 +296,7 @@ public class LazyVimTheme {
     }
 
     public static ThemePalette getActivePalette() {
-        return activePalette != null ? activePalette : PALETTES.get("Tokyo Night");
+        return activePalette != null ? activePalette : PALETTES.get("Gruvbox Dark");
     }
 
     public static TextColor getSuccessColor() {
