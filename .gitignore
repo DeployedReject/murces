@@ -1,10 +1,6 @@
 .clangd
 .env
 .cache
-java/orchestrator/target/original-murces-orchestrator-0.1.jar
-java/orchestrator/target/murces-orchestrator-0.1.jar
-java/orchestrator/apitest.txt
-java/orchestrator/mods
 /main
 /build
 c/build/
@@ -13,8 +9,19 @@ c/murces-TUI/precursor
 # c/murces-TUI/compile_commands.json
 venv
 *compile_commands.json*
-java/tui/target/
-java/orchestrator/target/graalvm-reachability-metadata/
+
+# Maven build targets and compiled artifacts
+target/
+**/target/
+*.class
+
+# Native binaries and archives
+/murces
+murces
 *.log
 *.zip
+
+# Runtime data
 mods/
+java/orchestrator/apitest.txt
+java/orchestrator/mods
