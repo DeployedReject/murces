@@ -1,6 +1,10 @@
 #!/usr/bin/bash
 
-SV_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+if [[ -f "./sv_start.sh" || -f "./server.jar" || -f "./run.sh" || -f "./eula.txt" ]]; then
+  SV_DIR=$(pwd)
+else
+  SV_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+fi
 cd "$SV_DIR"
 
 TXSN_MCSV='mcsv'
@@ -107,10 +111,20 @@ migrate_player() {
 
 case $1 in
 'start')
+  if [[ ! -f "$SV_DIR/sv_start.sh" && ! -f "$SV_DIR/server.jar" && ! -f "$SV_DIR/run.sh" ]]; then
+    echo "svctrl: No server installed in '$SV_DIR'. Run installer first."
+    exit 1
+  fi
+
   for SESSION in "$TXSN_MCSV"; do
     if tmux has-session -t "$SESSION" 2>/dev/null; then
-      echo "svctrl: tmux session: '$SESSION' is already running."
-      exit 1
+      if pgrep -u "$USER" -f "$SV_JARFILE" >/dev/null || pgrep -u "$USER" -f "java" >/dev/null; then
+        echo "svctrl: tmux session: '$SESSION' is already running."
+        exit 1
+      else
+        echo "svctrl: Cleaning up dead tmux session: '$SESSION'."
+        tmux kill-session -t "$SESSION" 2>/dev/null
+      fi
     fi
   done
 
@@ -146,9 +160,18 @@ case $1 in
   shift
   MC_CMD="$*"
   if tmux has-session -t "$TXSN_MCSV" 2>/dev/null; then
+    if ! pgrep -u "$USER" -f "$SV_JARFILE" >/dev/null && ! pgrep -u "$USER" -f "java" >/dev/null; then
+      echo "svctrl: Server process is not running inside session '$TXSN_MCSV'."
+      exit 1
+    fi
     tmux send-keys -t "$TXSN_MCSV" "$MC_CMD" C-m
 
-    timeout 30 tail -n 50 -F logs/latest.log | awk -v target="$TIMESTAMP" '
+    if [[ ! -f "logs/latest.log" ]]; then
+      echo "svctrl: Command sent to console."
+      exit 0
+    fi
+
+    timeout 5 tail -n 50 -F logs/latest.log | awk -v target="$TIMESTAMP" '
 BEGIN { 
     found = 0 
 }
@@ -166,7 +189,7 @@ BEGIN {
 }
 END {
     if (found == 0) {
-        print "Timeout, Command MAYBE suceeded. Check logs"
+        print "Command dispatched to console."
     }
 }'
     exit 0
