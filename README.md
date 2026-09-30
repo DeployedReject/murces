@@ -1,88 +1,108 @@
-## Introduction
-**MurCes** is a Minecraft server configuration tool. While setting up a Minecraft server is nothing
-too difficult &mdash; this tool makes it simpler for users inexperienced with a terminal by providing
-a user-friendly terminal interface.
+# MurCes
 
-For more information, check out the `doc` directory.
-> **Note**:
-This is still in early development and only supports Linux devices. It *can* be run on Windows via
-[Mingw-w64](https://en.wikipedia.org/wiki/Mingw-w64), [Cygwin](https://en.wikipedia.org/wiki/Cygwin),
-or [Windows Subsystem for Linux](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux) (WSL).
-WSL is only supported from Windows 10 onwards. If you are using Windows versions prior to Windows 10
-Mingw-w64 and Cygwin are better alternatives.
-
-## Obtaining sources
-MurCes uses the [precursor](https://codeberg.org/nilabhro/precursor) library as a submodule. Therefore,
-to get the source code on your machine, you'll have to run the following command:
-```sh
-git clone --recurse-submodules https://github.com/DeployedReject/murces.git MurCes
 ```
-If you did not clone the repository with the `--recurse-submodules` flag, you can later update the
-submodule(s) with the following command:
-```sh
-git submodule update --init --recursive --remote --merge
+  __  __                                
+ |  \/  |_   _ _ __ ___ ___  ___        
+ | |\/| | | | | '__/ __/ _ \/ __|       
+ | |  | | |_| | | | (_|  __/\__ \       
+ |_|  |_|\__,_|_|  \___\___||___/       
+    Minecraft Server Manager v0.1       
 ```
 
-## Building
-This repository is divided into two modules: the frontend (i.e. the terminal user interface) and
-the backend (i.e. the orchestrator). You will have to build each module separately. 
+**MurCes** is a lightweight, all-in-one Minecraft server manager designed for Linux environments. It provides both an interactive Terminal User Interface (TUI) and headless CLI commands to configure, deploy, mod, and maintain Minecraft servers effortlessly—without requiring complex terminal scripts or heavy web panel stacks.
 
-To build the terminal user interface (a.k.a. TUI) you will have to run the following command:
+MurCes is compiled ahead-of-time (AOT) into a standalone native binary via GraalVM, making it start instantly with minimal memory usage, optimized for low-resource VPS instances and older laptops.
+
+---
+
+## 📌 Repository Branches
+
+- **`unstable` (Default / Main Branch)**: The active development branch containing the full Lanterna-based TUI, integrated orchestrator backend, and native GraalVM build configuration.
+- **`archived`**: Preserves the legacy C prototype and precursor-based TUI implementation for historical reference.
+
+---
+
+## ✨ Features
+
+- **🚀 Engine Installer**: Download, install, and configure **Paper**, **Fabric**, **Forge**, **Spigot**, and **Vanilla** servers across any Minecraft version. Automatically agrees to the Mojang EULA.
+- **📦 Mod Browser & Downloader**: Direct integration with both **Modrinth** and **CurseForge** APIs. Search, filter by loader (Fabric, Forge, NeoForge, Quilt) and game version, and download mods straight to `mods/`.
+- **🎮 Server Lifecycle & Console**: Runs servers in detached `tmux` sessions. Send console commands directly from the TUI with live log capture.
+- **🌐 Public Tunneling**: Seamless integration with [Playit.gg](https://playit.gg/) (`--public` / `-p`) to make your server publicly accessible without port forwarding.
+- **⚙️ Server Properties Editor**: Real-time property searching and categorized editor for all `server.properties` settings.
+- **💾 World Backups**: Automated tar backups with safe world save flushing (`save-all`, `save-off`, `save-on`), backup retention rotation, and optional cloud sync via `rclone`.
+- **🔄 Player UUID Migration**: Effortlessly migrate player data (`playerdata`, `stats`, `advancements`, `usercache.json`) between offline and online UUIDs.
+
+---
+
+## 🚀 Quickstart
+
+### Running the Native Binary
+If you have the compiled `murces` binary:
 ```sh
-make -C c
+chmod +x murces
+./murces
 ```
 
-Finally, to build the orchestrator, you will need to run this command
+### CLI Commands
+In addition to the interactive TUI, MurCes supports headless CLI subcommands:
+
 ```sh
+murces                  # Launch interactive TUI
+murces start [-p]       # Start server (add -p / --public for Playit.gg tunnel)
+murces stop             # Stop running server
+murces status           # Query whether server is running
+murces backup           # Trigger a world backup
+murces --test-tui       # Run automated self-test across all 7 TUI modules
+murces --help           # Show help and usage options
+murces --version        # Display version information
+```
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+- **Linux** (or WSL on Windows 10+)
+- **JDK 21+** (JDK 25 recommended)
+- **Apache Maven 3.8+**
+- **tmux** (required for background server execution)
+- **GraalVM Native Image** (optional, only required if compiling a standalone native binary)
+
+### 1. Build the Orchestrator
+```sh
+cd java/orchestrator
+mvn clean install
+cd ../..
+```
+
+### 2. Build the TUI (Jar)
+```sh
+cd java/tui
 mvn clean package
-mv java/orchestrator/target/murces-orchestrator.jar .
+# The shaded JAR will be at java/tui/target/murces-tui-0.1.jar
 ```
 
-### Want to rebuild?
-Just rerun the same commands but force move the `murces-orchestrator` binary since you presumably
-do not need to old one anymore. However, if you want to keep the old one, here's how you can do it:
+### 3. Build Native Binary (GraalVM)
+To compile the standalone AOT native binary (`murces`):
 ```sh
-make -C c
-mvn clean package
-mv murces-orchestrator murces-orchestrator.jar.old && mv java/orchestrator/target/murces-orchestrator.jar .
+cd java/tui
+mvn clean package -Pnative
+cp target/murces ../../
 ```
 
-> **Note**:
-To build a native binary for `murces-orchestrator`, you will need to run `mvn clean package -Pnative`
-instead of `mvn clean package`. This requires you to have
-[GraalVM](https://en.wikipedia.org/wiki/GraalVM).
+---
 
-## `compile_commands.json`
-If using a LSP (Language Server Protocol) you can use the `compile_commands.json` file. In your LSP's configuration file, you can explictly point it towards the `compile_commands.json` file. To generate the
-JSON file, run the following commands:
+## ⚙️ Configuration
+
+Optional configuration for external services (e.g. CurseForge API key and contact email) can be supplied via environment variables or a `.env` file in the root directory:
+
 ```sh
-pip install compiledb
-compiledb make -C c
+curseAPI="YOUR_CURSEFORGE_API_KEY"
+email="your_email@example.com"
 ```
 
-If this command fails, you probably need a virtual environment to run `pip` commands:
-```sh
-python -m venv venv
-source venv/bin/activate
-pip install compiledb
-compiledb make -C c
-```
-To exit this virtual environment, simply run the following command:
-```sh
-deactivate
-```
+---
 
-Here is an example of how you might want to configure
-[clangd](https://clangd.llvm.org/):
-1. Create a `.clangd` file in the project's root directory.
-2. Copy and paste the following:
-```yaml
-CompileFlags:
-    CompilationDatabase: c
-```
-It should use a relative path from your .clangd file if you decide to create it somewhere else.
+## 🤝 Contributing & Issues
 
-## Issues
-Any bugs, suggestions, or feedback must be submitted to the project's issue tracker &mdash; either on
-[GitHub](https://github.com/DeployedReject/murces/issues) or
-[Codeberg](https://codeberg.org/nilabhro/MurCes/issues).
+Feedback, feature requests, and bug reports are welcome! Please open an issue on the [GitHub Issue Tracker](https://github.com/DeployedReject/murces/issues).
