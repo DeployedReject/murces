@@ -21,6 +21,8 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
     private final List<String> rawLines = new ArrayList<>();
     private final boolean isConsoleMode;
 
+    private Runnable onUpdate;
+
     public ColoredLogView() {
         this(false);
     }
@@ -29,31 +31,53 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
         this.isConsoleMode = isConsoleMode;
     }
 
+    public void setOnUpdate(Runnable onUpdate) {
+        this.onUpdate = onUpdate;
+    }
+
     public synchronized void addLine(String line) {
         if (line == null || line.trim().isEmpty()) return;
-        rawLines.add(line.trim());
+        String[] lines = line.split("\\r?\\n");
+        for (String l : lines) {
+            String trimmed = l.trim();
+            if (!trimmed.isEmpty()) {
+                rawLines.add(trimmed);
+            }
+        }
         while (rawLines.size() > MAX_HISTORY) {
             rawLines.remove(0);
         }
         invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
     }
 
     public synchronized void setContent(String fullText) {
         rawLines.clear();
         if (fullText != null && !fullText.trim().isEmpty()) {
-            String[] lines = fullText.split("\n");
+            String[] lines = fullText.split("\\r?\\n");
             for (String l : lines) {
                 if (!l.trim().isEmpty()) {
                     rawLines.add(l.trim());
                 }
             }
         }
+        while (rawLines.size() > MAX_HISTORY) {
+            rawLines.remove(0);
+        }
         invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
     }
 
     public synchronized void clear() {
         rawLines.clear();
         invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
     }
 
     @Override

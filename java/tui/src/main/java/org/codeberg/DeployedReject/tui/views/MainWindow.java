@@ -78,7 +78,6 @@ public class MainWindow extends BasicWindow {
         workspaceBordered.setLayoutData(BorderLayout.Location.CENTER);
         midPanel.addComponent(workspaceBordered);
 
-        // Side Activity Pane (Location.RIGHT)
         activityLogView = new ColoredLogView(false);
         activityBordered = activityLogView.withBorder(Borders.singleLine("Activity & Diagnostics"));
         activityBordered.setLayoutData(BorderLayout.Location.RIGHT);
@@ -92,6 +91,23 @@ public class MainWindow extends BasicWindow {
         consoleBordered = consoleLogView.withBorder(Borders.singleLine("Server Console"));
         consoleBordered.setLayoutData(BorderLayout.Location.BOTTOM);
         root.addComponent(consoleBordered);
+
+        // Real-time live screen refresh callbacks for continuous log streaming
+        activityLogView.setOnUpdate(() -> {
+            activityBordered.invalidate();
+            invalidate();
+            try {
+                gui.updateScreen();
+            } catch (Exception ignored) {}
+        });
+
+        consoleLogView.setOnUpdate(() -> {
+            consoleBordered.invalidate();
+            invalidate();
+            try {
+                gui.updateScreen();
+            } catch (Exception ignored) {}
+        });
 
         setComponent(root);
 
