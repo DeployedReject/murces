@@ -140,6 +140,8 @@ public class TerminalResizeHelper {
             lastKnownSize.set(realSize);
             terminal.notifyResized(realSize);
 
+            final TerminalSize effectiveSize = realSize;
+
             // Execute GUI refresh on the GUI thread
             gui.getGUIThread().invokeLater(() -> {
                 try {
@@ -151,6 +153,9 @@ public class TerminalResizeHelper {
 
                     // Invalidate active windows for the new dimensions
                     for (Window w : gui.getWindows()) {
+                        if (w instanceof org.codeberg.DeployedReject.tui.views.MainWindow) {
+                            ((org.codeberg.DeployedReject.tui.views.MainWindow) w).updateLayoutDimensions(effectiveSize);
+                        }
                         w.invalidate();
                     }
 

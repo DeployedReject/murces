@@ -14,18 +14,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Unified 3-Pane Dashboard Window.
+ * Automatically expands to fill the entire terminal window in full-screen mode without dead space.
  * Panes:
- *  1. Center Workspace / Menu (Left/Center)
- *  2. Activity & Diagnostics Window (Right/Side)
- *  3. Server Console Window (Bottom)
+ *  1. Center Workspace / Menu (Left/Center, fills remaining area)
+ *  2. Activity & Diagnostics Window (Right/Side, color-coded, auto-wrapping)
+ *  3. Server Console Window (Bottom, full-width, auto-wrapping)
  */
 public class MainWindow extends BasicWindow {
 
     private final WindowBasedTextGUI gui;
     private final Panel workspaceContainer;
     private final Label workspaceTitleLabel;
-    private final TextBox activityBox;
-    private final TextBox consoleBox;
+    private final Border workspaceBordered;
+    private final Border activityBordered;
+    private final Border consoleBordered;
+    private final ColoredLogView activityLogView;
+    private final ColoredLogView consoleLogView;
 
     private final MainMenuView mainMenuView;
     private final ServerControlView serverControlView;
@@ -49,48 +53,51 @@ public class MainWindow extends BasicWindow {
         this.gui = gui;
         setHints(Arrays.asList(Hint.FULL_SCREEN, Hint.FIT_TERMINAL_WINDOW));
 
-        Panel root = new Panel(new LinearLayout(Direction.VERTICAL));
+        Panel root = new Panel(new BorderLayout());
 
-        // 1. Top Header Tooltip
-        root.addComponent(KeyboardNavigationHelper.createTooltip());
+        // 1. Top Header Tooltip (Location.TOP)
+        Label tip = KeyboardNavigationHelper.createTooltip();
+        tip.setLayoutData(BorderLayout.Location.TOP);
+        root.addComponent(tip);
 
-        // 2. Middle Row: Left/Center Workspace + Right Activity Window
-        Panel midPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+        // 2. Middle Row: Left/Center Workspace + Right Activity Window (Location.CENTER)
+        Panel midPanel = new Panel(new BorderLayout());
+        midPanel.setLayoutData(BorderLayout.Location.CENTER);
 
         // Center Workspace Pane
         Panel workspaceOuter = new Panel(new LinearLayout(Direction.VERTICAL));
-        workspaceOuter.setPreferredSize(new TerminalSize(44, 14));
         workspaceTitleLabel = new Label("=== Workspace: Main Menu ===");
         workspaceTitleLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         workspaceOuter.addComponent(workspaceTitleLabel);
 
         workspaceContainer = new Panel(new LinearLayout(Direction.VERTICAL));
+        workspaceContainer.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow));
         workspaceOuter.addComponent(workspaceContainer);
-        midPanel.addComponent(workspaceOuter.withBorder(Borders.singleLine("Workspace / Menu")));
 
-        midPanel.addComponent(new EmptySpace(new TerminalSize(1, 14)));
+        workspaceBordered = workspaceOuter.withBorder(Borders.singleLine("Workspace / Menu"));
+        workspaceBordered.setLayoutData(BorderLayout.Location.CENTER);
+        midPanel.addComponent(workspaceBordered);
 
-        // Side Activity Pane
-        Panel activityOuter = new Panel(new LinearLayout(Direction.VERTICAL));
-        activityOuter.setPreferredSize(new TerminalSize(31, 14));
-        activityBox = new TextBox(new TerminalSize(29, 12));
-        activityBox.setReadOnly(true);
-        activityBox.setText("[OK:] Murces initialized.\n[OK:] Ready.");
-        activityOuter.addComponent(activityBox);
-        midPanel.addComponent(activityOuter.withBorder(Borders.singleLine("Activity & Diagnostics")));
+        // Side Activity Pane (Location.RIGHT)
+        activityLogView = new ColoredLogView(false);
+        activityBordered = activityLogView.withBorder(Borders.singleLine("Activity & Diagnostics"));
+        activityBordered.setLayoutData(BorderLayout.Location.RIGHT);
+        midPanel.addComponent(activityBordered);
 
         root.addComponent(midPanel);
 
-        // 3. Bottom Pane: Server Console
-        Panel consoleOuter = new Panel(new LinearLayout(Direction.VERTICAL));
-        consoleOuter.setPreferredSize(new TerminalSize(76, 6));
-        consoleBox = new TextBox(new TerminalSize(74, 4));
-        consoleBox.setReadOnly(true);
-        consoleBox.setText("[Server not started - Start server from Server Control [S] to view live output]");
-        consoleOuter.addComponent(consoleBox);
-        root.addComponent(consoleOuter.withBorder(Borders.singleLine("Server Console")));
+        // 3. Bottom Pane: Server Console (Location.BOTTOM)
+        consoleLogView = new ColoredLogView(true);
+        consoleLogView.setContent("[Server not started - Start server from Server Control [S] to view live output]");
+        consoleBordered = consoleLogView.withBorder(Borders.singleLine("Server Console"));
+        consoleBordered.setLayoutData(BorderLayout.Location.BOTTOM);
+        root.addComponent(consoleBordered);
 
         setComponent(root);
+
+        // Initial dynamic dimensions
+        TerminalSize initialSize = gui.getScreen() != null ? gui.getScreen().getTerminalSize() : new TerminalSize(80, 24);
+        updateLayoutDimensions(initialSize);
 
         // Instantiate workspace views
         this.mainMenuView = new MainMenuView(this);
@@ -104,17 +111,7 @@ public class MainWindow extends BasicWindow {
 
         // Connect Activity Logger
         ActivityLogger.addListener(msg -> {
-            gui.getGUIThread().invokeLater(() -> {
-                String cur = activityBox.getText();
-                String[] lines = cur.split("\n");
-                StringBuilder sb = new StringBuilder();
-                int start = Math.max(0, lines.length - 40);
-                for (int i = start; i < lines.length; i++) {
-                    sb.append(lines[i]).append("\n");
-                }
-                sb.append(msg);
-                activityBox.setText(sb.toString().trim());
-            });
+            gui.getGUIThread().invokeLater(() -> activityLogView.addLine(msg));
         });
 
         // Setup Console Poller (every 1 second)
@@ -125,6 +122,22 @@ public class MainWindow extends BasicWindow {
 
         // Show Main Menu View by default
         showView(mainMenuView);
+    }
+
+    public void updateLayoutDimensions(TerminalSize termSize) {
+        if (termSize == null) return;
+        int cols = Math.max(70, termSize.getColumns());
+        int rows = Math.max(20, termSize.getRows());
+
+        // Console height: ~25% of rows (min 5, max 12)
+        int consHeight = Math.max(5, Math.min(12, rows / 4));
+        consoleBordered.setPreferredSize(new TerminalSize(cols, consHeight));
+
+        // Activity width: ~35% of cols (min 28, max 55)
+        int actWidth = Math.max(28, Math.min(55, (cols * 35) / 100));
+        activityBordered.setPreferredSize(new TerminalSize(actWidth, Math.max(10, rows - consHeight - 4)));
+
+        invalidate();
     }
 
     public WindowBasedTextGUI getGui() {
@@ -174,10 +187,10 @@ public class MainWindow extends BasicWindow {
 
     private void pollServerConsole() {
         try {
-            String output = OrchestratorBridge.getLiveConsoleOutput(6);
+            String output = OrchestratorBridge.getLiveConsoleOutput(12);
             if (!Objects.equals(output, lastConsoleOutput)) {
                 lastConsoleOutput = output;
-                gui.getGUIThread().invokeLater(() -> consoleBox.setText(output));
+                gui.getGUIThread().invokeLater(() -> consoleLogView.setContent(output));
             }
         } catch (Exception ignored) {}
     }
