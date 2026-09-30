@@ -2,6 +2,8 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialog;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
@@ -57,10 +59,18 @@ public class ServerControlWindow extends BasicWindow {
 
         // Console Command
         Panel cmdPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        cmdPanel.addComponent(new Label("Command: /"));
-        commandInput = new TextBox(new TerminalSize(35, 1));
+        cmdPanel.addComponent(new Label("[C]onsole Command (/): "));
+        commandInput = new TextBox(new TerminalSize(32, 1));
+        Button sendBtn = new Button("[D]ispatch Cmd", this::onSendCommand);
+        commandInput.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Escape ||
+                keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.ArrowDown) {
+                sendBtn.takeFocus();
+                return false;
+            }
+            return true;
+        });
         cmdPanel.addComponent(commandInput);
-        Button sendBtn = new Button("Dispatch Cmd", this::onSendCommand);
         cmdPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         cmdPanel.addComponent(sendBtn);
         root.addComponent(cmdPanel.withBorder(Borders.singleLine("Minecraft Console")));
@@ -106,14 +116,22 @@ public class ServerControlWindow extends BasicWindow {
     }
 
     private void updateStatus() {
-        boolean running = OrchestratorBridge.isServerRunning();
-        if (running) {
-            statusLabel.setText("[RUNNING] - Port 25565");
-            statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
-        } else {
-            statusLabel.setText("[STOPPED]");
-            statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
-        }
+        new Thread(() -> {
+            boolean running = OrchestratorBridge.isServerRunning();
+            boolean installed = OrchestratorBridge.isServerInstalled();
+            gui.getGUIThread().invokeLater(() -> {
+                if (running) {
+                    statusLabel.setText("[RUNNING] - Port 25565");
+                    statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+                } else if (!installed) {
+                    statusLabel.setText("[NOT INSTALLED]");
+                    statusLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
+                } else {
+                    statusLabel.setText("[STOPPED]");
+                    statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
+                }
+            });
+        }).start();
     }
 
     private void appendLog(String line) {
@@ -126,46 +144,107 @@ public class ServerControlWindow extends BasicWindow {
     }
 
     private void onStart() {
-        boolean pub = publicTunnelCheckBox.isChecked();
-        appendLog("[INFO] Starting server (public=" + pub + ")...");
-        OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub);
-        if (res.exitCode == 0) {
-            appendLog("[OK:] " + (res.output.isEmpty() ? "Server started successfully." : res.output));
-        } else {
-            appendLog("[ERR:] " + (res.output.isEmpty() ? "Failed to start server (code " + res.exitCode + ")" : res.output));
+        if (!OrchestratorBridge.isServerInstalled()) {
+            appendLog("[WARN:] No server installed! Please use '[I]nstall Server Engine' first.");
+            MessageDialog.showMessageDialog(gui, "No Server Installed", "No Minecraft server is installed yet!\nPlease use '[I]nstall Server Engine' from the main menu first.", MessageDialogButton.OK);
+            return;
         }
-        updateStatus();
+        if (OrchestratorBridge.isServerRunning()) {
+            appendLog("[WARN:] Server is already running.");
+            return;
+        }
+
+        boolean pub = publicTunnelCheckBox.isChecked();
+        statusLabel.setText("[STARTING...]");
+        statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        appendLog("[INFO] Starting server (public=" + pub + ")...");
+
+        new Thread(() -> {
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub);
+            gui.getGUIThread().invokeLater(() -> {
+                if (res.exitCode == 0) {
+                    appendLog("[OK:] " + (res.output.isEmpty() ? "Server started successfully." : res.output));
+                } else {
+                    appendLog("[ERR:] " + (res.output.isEmpty() ? "Failed to start server (code " + res.exitCode + ")" : res.output));
+                }
+                updateStatus();
+            });
+        }).start();
     }
 
     private void onStop() {
-        appendLog("[INFO] Stopping server...");
-        OrchestratorBridge.ProcessResult res = OrchestratorBridge.stopServer();
-        if (res.exitCode == 0) {
-            appendLog("[OK:] " + (res.output.isEmpty() ? "Server stopped." : res.output));
-        } else {
-            appendLog("[ERR:] " + (res.output.isEmpty() ? "Failed to stop server." : res.output));
+        if (!OrchestratorBridge.isServerRunning()) {
+            appendLog("[WARN:] Server is not running.");
+            return;
         }
-        updateStatus();
+
+        statusLabel.setText("[STOPPING...]");
+        statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        appendLog("[INFO] Stopping server...");
+
+        new Thread(() -> {
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.stopServer();
+            gui.getGUIThread().invokeLater(() -> {
+                if (res.exitCode == 0) {
+                    appendLog("[OK:] " + (res.output.isEmpty() ? "Server stopped." : res.output));
+                } else {
+                    appendLog("[ERR:] " + (res.output.isEmpty() ? "Failed to stop server." : res.output));
+                }
+                updateStatus();
+            });
+        }).start();
     }
 
     private void onRestart() {
-        onStop();
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException ignored) {}
-        onStart();
+        if (!OrchestratorBridge.isServerInstalled()) {
+            appendLog("[WARN:] No server installed! Please use '[I]nstall Server Engine' first.");
+            MessageDialog.showMessageDialog(gui, "No Server Installed", "No Minecraft server is installed yet!\nPlease use '[I]nstall Server Engine' from the main menu first.", MessageDialogButton.OK);
+            return;
+        }
+
+        statusLabel.setText("[RESTARTING...]");
+        statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        appendLog("[INFO] Restarting server...");
+
+        new Thread(() -> {
+            OrchestratorBridge.stopServer();
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException ignored) {}
+            boolean pub = publicTunnelCheckBox.isChecked();
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub);
+            gui.getGUIThread().invokeLater(() -> {
+                if (res.exitCode == 0) {
+                    appendLog("[OK:] " + (res.output.isEmpty() ? "Server restarted." : res.output));
+                } else {
+                    appendLog("[ERR:] " + res.output);
+                }
+                updateStatus();
+            });
+        }).start();
     }
 
     private void onSendCommand() {
         String cmd = commandInput.getText().trim();
         if (cmd.isEmpty()) return;
+
+        if (!OrchestratorBridge.isServerRunning()) {
+            appendLog("[WARN:] Cannot send command: Server is not running.");
+            return;
+        }
+
         appendLog("[INFO] Executing: /" + cmd);
         commandInput.setText("");
-        OrchestratorBridge.ProcessResult res = OrchestratorBridge.sendConsoleCommand(cmd);
-        if (res.output != null && !res.output.isEmpty()) {
-            appendLog(res.output);
-        } else {
-            appendLog("[OK:] Command dispatched.");
-        }
+
+        new Thread(() -> {
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.sendConsoleCommand(cmd);
+            gui.getGUIThread().invokeLater(() -> {
+                if (res.output != null && !res.output.isEmpty()) {
+                    appendLog(res.output);
+                } else {
+                    appendLog("[OK:] Command dispatched.");
+                }
+            });
+        }).start();
     }
 }
