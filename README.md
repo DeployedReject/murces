@@ -97,7 +97,9 @@ cp target/murces ../../
 
 ## Configuration
 
-Credentials for external APIs (like your CurseForge developer key and contact email) can be placed in a `.env` file in the same directory:
+If you downloaded the precompiled release (`murces.zip`), you do **not** need to set up an API key or email. The CurseForge API key and contact details are already baked into the release binary during compilation, so mod browsing works out of the box.
+
+Setting up a `.env` file or environment variables is only needed if you are **building from source** or want to override the defaults with your own developer credentials:
 
 ```sh
 curseAPI="YOUR_KEY"
