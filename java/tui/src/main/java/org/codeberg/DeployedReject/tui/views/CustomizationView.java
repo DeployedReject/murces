@@ -19,6 +19,7 @@ public class CustomizationView implements WorkspaceView {
 
     private final MainWindow mainWindow;
     private final Panel root;
+    private final Label header;
     private final ComboBox<String> themeCombo;
     private final ComboBox<String> transparencyCombo;
     private final CheckBox trueColorCheck;
@@ -39,7 +40,7 @@ public class CustomizationView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        Label header = new Label("Theme & Interface Customization");
+        header = new Label("Theme & Interface Customization");
         header.setForegroundColor(LazyVimTheme.getAccentColor());
         root.addComponent(header);
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
@@ -157,8 +158,10 @@ public class CustomizationView implements WorkspaceView {
         ConfigManager.getInstance().save();
 
         mainWindow.applyConfig(config);
+        header.setForegroundColor(LazyVimTheme.getAccentColor());
         statusLabel.setText("[OK:] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+        ActivityLogger.ok("Applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
     }
 
     private void onResetDefaults() {
@@ -166,8 +169,10 @@ public class CustomizationView implements WorkspaceView {
         ConfigManager.getInstance().setConfig(def);
         loadCurrentConfig();
         mainWindow.applyConfig(def);
-        statusLabel.setText("[OK:] Reset to default configuration.");
+        header.setForegroundColor(LazyVimTheme.getAccentColor());
+        statusLabel.setText("[OK:] Reset to default configuration (Gruvbox Dark).");
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+        ActivityLogger.ok("Reset configuration to default Gruvbox Dark.");
     }
 
     @Override

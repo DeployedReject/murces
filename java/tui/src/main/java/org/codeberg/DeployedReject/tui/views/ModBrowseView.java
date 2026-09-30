@@ -474,10 +474,10 @@ public class ModBrowseView implements WorkspaceView {
                 return t;
             });
             activeTicker.scheduleAtFixedRate(() -> {
-                pickaxeAnim.tick();
-                try {
-                    mainWindow.getGui().updateScreen();
-                } catch (Exception ignored) {}
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    pickaxeAnim.tick();
+                    mainWindow.invalidate();
+                });
             }, 50, 110, TimeUnit.MILLISECONDS);
         }
 
@@ -510,6 +510,7 @@ public class ModBrowseView implements WorkspaceView {
                     statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
                     pickaxeAnim.setProgress(100.0);
                     pickaxeAnim.setCustomMessage("[OK] " + mod.name + " mined & installed!");
+                    mainWindow.invalidate();
                     try {
                         mainWindow.getGui().updateScreen();
                     } catch (Exception ignored) {}
@@ -522,6 +523,7 @@ public class ModBrowseView implements WorkspaceView {
                     statusLabel.setText("[ERR] Download failed: " + e.getMessage());
                     statusLabel.setForegroundColor(LazyVimTheme.getLogErrorColor());
                     pickaxeAnim.setCustomMessage("[ERR] " + e.getMessage());
+                    mainWindow.invalidate();
                     try {
                         mainWindow.getGui().updateScreen();
                     } catch (Exception ignored) {}
@@ -531,7 +533,15 @@ public class ModBrowseView implements WorkspaceView {
         }).start();
     }
 
+    private volatile long lastProgressUiUpdate = 0;
+
     private void updateProgressUI(String modName, OrchestratorBridge.DownloadProgressInfo info) {
+        long now = System.currentTimeMillis();
+        if (info.percent < 100.0 && (now - lastProgressUiUpdate < 100)) {
+            return;
+        }
+        lastProgressUiUpdate = now;
+
         mainWindow.getGui().getGUIThread().invokeLater(() -> {
             String status = String.format("[BUSY] Downloading %.2f%% (ETA: %s @ %s)...",
                     info.percent, info.formattedEta(), info.formattedSpeed());
@@ -542,12 +552,7 @@ public class ModBrowseView implements WorkspaceView {
             pickaxeAnim.setCustomMessage(String.format("Mining %s: %.2f%% (ETA: %s @ %s)",
                     modName, info.percent, info.formattedEta(), info.formattedSpeed()));
 
-            try {
-                mainWindow.getGui().updateScreen();
-            } catch (Exception ignored) {}
-
-            ActivityLogger.prog(String.format("Downloading %s... %.2f%% (ETA: %s @ %s)",
-                    modName, info.percent, info.formattedEta(), info.formattedSpeed()));
+            mainWindow.invalidate();
         });
     }
 }

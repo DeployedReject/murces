@@ -252,9 +252,19 @@ public class MainWindow extends BasicWindow {
                 config.isTrueColor()
         );
         gui.setTheme(theme);
+        setTheme(theme);
+        workspaceTitleLabel.setForegroundColor(LazyVimTheme.getAccentColor());
+        activityBordered.invalidate();
+        consoleBordered.invalidate();
+        workspaceBordered.invalidate();
         activityLogView.invalidate();
         consoleLogView.invalidate();
         invalidate();
+        try {
+            if (gui.getScreen() != null) {
+                gui.getScreen().clear();
+            }
+        } catch (Exception ignored) {}
         TerminalSize size = gui.getScreen() != null ? gui.getScreen().getTerminalSize() : new TerminalSize(80, 24);
         updateLayoutDimensions(size);
         try {

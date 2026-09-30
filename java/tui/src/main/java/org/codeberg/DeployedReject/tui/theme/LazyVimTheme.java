@@ -236,12 +236,14 @@ public class LazyVimTheme {
     }
 
     public static ThemePalette getPalette(String name) {
-        if (name == null || name.equalsIgnoreCase(RANDOM_THEME) || name.equalsIgnoreCase("Random")) {
+        if (name != null && (name.equalsIgnoreCase(RANDOM_THEME) || name.equalsIgnoreCase("Random"))) {
             List<ThemePalette> all = new ArrayList<>(PALETTES.values());
             return all.get(new Random().nextInt(all.size()));
         }
-        ThemePalette p = PALETTES.get(name);
-        return p != null ? p : PALETTES.get("Gruvbox Dark");
+        if (name != null && PALETTES.containsKey(name)) {
+            return PALETTES.get(name);
+        }
+        return PALETTES.get("Gruvbox Dark");
     }
 
     public static synchronized Theme createTheme(String themeName, int transparency, boolean trueColor) {

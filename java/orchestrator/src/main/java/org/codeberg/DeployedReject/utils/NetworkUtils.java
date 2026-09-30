@@ -30,15 +30,20 @@ public class NetworkUtils {
 
         response.addProperty("status", 0);
 
+        long lastProgressTime = 0;
         while ((bytesRead = x.read(buffer)) != -1) {
           file.write(buffer, 0, bytesRead);
           readSize += bytesRead;
-          double pct = filesize > 0 ? Math.min(100.0, (readSize * 100.0) / filesize) : 0.0;
-          double rounded = Math.round(pct * 100.0) / 100.0;
-          response.addProperty("progress", rounded);
-          response.addProperty("read", (long) readSize);
-          response.addProperty("total", filesize);
-          Communicator.printer(response);
+          long now = System.currentTimeMillis();
+          if (now - lastProgressTime >= 80 || (filesize > 0 && readSize >= filesize)) {
+            lastProgressTime = now;
+            double pct = filesize > 0 ? Math.min(100.0, (readSize * 100.0) / filesize) : 0.0;
+            double rounded = Math.round(pct * 100.0) / 100.0;
+            response.addProperty("progress", rounded);
+            response.addProperty("read", (long) readSize);
+            response.addProperty("total", filesize);
+            Communicator.printer(response);
+          }
         }
 
         JsonObject responseEnd = new JsonObject();
