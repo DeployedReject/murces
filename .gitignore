@@ -5,8 +5,8 @@ java/orchestrator/target/original-murces-orchestrator-0.1.jar
 java/orchestrator/target/murces-orchestrator-0.1.jar
 java/orchestrator/apitest.txt
 java/orchestrator/mods
-main
-build
+/main
+/build
 c/murces-TUI/precursor
 # c/compile_commands.json
 # c/murces-TUI/compile_commands.json
