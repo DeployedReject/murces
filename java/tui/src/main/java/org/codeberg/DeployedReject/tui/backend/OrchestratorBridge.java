@@ -80,7 +80,11 @@ public class OrchestratorBridge {
 
     private final CopyOnWriteArrayList<Consumer<JsonObject>> listeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Consumer<String>> logListeners = new CopyOnWriteArrayList<>();
-    private final ExecutorService workerPool = Executors.newCachedThreadPool();
+    private final ExecutorService workerPool = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "OrchestratorWorker");
+        t.setDaemon(true);
+        return t;
+    });
     private String curseAPI = "";
     private String email = "user@murces.local";
 
@@ -167,6 +171,20 @@ public class OrchestratorBridge {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     JsonObject json = Communicator.printBuffer.take();
+                    if (json.has("type") && "download".equals(json.get("type").getAsString())) {
+                        int status = json.has("status") ? json.get("status").getAsInt() : -1;
+                        int progress = json.has("progress") ? json.get("progress").getAsInt() : -1;
+                        String id = json.has("id") ? json.get("id").getAsString() : "";
+                        if (status == 2) {
+                            log("[WRN:] Download started: " + (id.isEmpty() ? "file" : id));
+                        } else if (status == 0 && progress >= 0 && (progress % 10 == 0 || progress == 100)) {
+                            log(String.format("[WRN:] Downloading %s... Progress: %d%%", id.isEmpty() ? "file" : id, progress));
+                        } else if (status == 3) {
+                            log("[OK:] Download complete: " + (id.isEmpty() ? "file" : id));
+                        }
+                    } else if (json.has("error")) {
+                        log("[ERR:] " + json.get("error").getAsString());
+                    }
                     for (Consumer<JsonObject> l : listeners) {
                         try {
                             l.accept(json);
@@ -312,7 +330,13 @@ public class OrchestratorBridge {
         Consumer<JsonObject> handler = new Consumer<>() {
             @Override
             public void accept(JsonObject json) {
-                if (json.has("type") && "server".equals(json.get("type").getAsString())) {
+                if (json.has("type") && "download".equals(json.get("type").getAsString())) {
+                    int prog = json.has("progress") ? json.get("progress").getAsInt() : -1;
+                    String file = json.has("id") ? json.get("id").getAsString() : "server.jar";
+                    if (statusCallback != null && prog >= 0) {
+                        statusCallback.accept(String.format("Downloading %s (%d%%)", file, prog));
+                    }
+                } else if (json.has("type") && "server".equals(json.get("type").getAsString())) {
                     int status = json.has("status") ? json.get("status").getAsInt() : -1;
                     if (statusCallback != null) {
                         statusCallback.accept("Server job status: " + status);
@@ -363,6 +387,13 @@ public class OrchestratorBridge {
         } catch (Exception e) {
             return new ProcessResult(-1, e.getMessage());
         }
+    }
+
+    public static boolean isServerInstalled() {
+        return new File("server.jar").exists() ||
+               new File("run.sh").exists() ||
+               new File("sv_start.sh").exists() ||
+               new File("fabric-server-launch.jar").exists();
     }
 
     public static boolean isServerRunning() {
