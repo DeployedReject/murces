@@ -1,10 +1,15 @@
 package org.codeberg.DeployedReject.tui.views;
 
+import com.googlecode.lanterna.TerminalPosition;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
-import com.googlecode.lanterna.gui2.AbstractComponent;
-import com.googlecode.lanterna.gui2.ComponentRenderer;
+import com.googlecode.lanterna.gui2.AbstractInteractableComponent;
+import com.googlecode.lanterna.gui2.InteractableRenderer;
 import com.googlecode.lanterna.gui2.TextGUIGraphics;
+import com.googlecode.lanterna.input.KeyStroke;
+import com.googlecode.lanterna.input.KeyType;
+import com.googlecode.lanterna.input.MouseAction;
+import com.googlecode.lanterna.input.MouseActionType;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.ArrayList;
@@ -13,15 +18,19 @@ import java.util.List;
 
 /**
  * A custom high-performance Lanterna component that renders color-coded,
- * automatically word-wrapped log streams without horizontal scrollbars.
+ * automatically word-wrapped log streams with interactive mouse wheel / arrow scrolling
+ * and visual scrollbar tracking.
  */
-public class ColoredLogView extends AbstractComponent<ColoredLogView> {
+public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView> {
 
     private static final int MAX_HISTORY = 400;
     private final List<String> rawLines = new ArrayList<>();
     private final boolean isConsoleMode;
 
     private Runnable onUpdate;
+    private int scrollOffsetFromBottom = 0;
+    private int lastRenderHeight = 10;
+    private int lastTotalLines = 0;
 
     public ColoredLogView() {
         this(false);
@@ -33,6 +42,46 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
 
     public void setOnUpdate(Runnable onUpdate) {
         this.onUpdate = onUpdate;
+    }
+
+    public synchronized void scrollUp(int lines) {
+        if (lines <= 0) return;
+        int maxOffset = Math.max(0, lastTotalLines - lastRenderHeight);
+        scrollOffsetFromBottom = Math.min(maxOffset, scrollOffsetFromBottom + lines);
+        invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
+    }
+
+    public synchronized void scrollDown(int lines) {
+        if (lines <= 0) return;
+        scrollOffsetFromBottom = Math.max(0, scrollOffsetFromBottom - lines);
+        invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
+    }
+
+    public synchronized void scrollToTop() {
+        int maxOffset = Math.max(0, lastTotalLines - lastRenderHeight);
+        scrollOffsetFromBottom = maxOffset;
+        invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
+    }
+
+    public synchronized void scrollToBottom() {
+        scrollOffsetFromBottom = 0;
+        invalidate();
+        if (onUpdate != null) {
+            onUpdate.run();
+        }
+    }
+
+    public synchronized int getScrollOffsetFromBottom() {
+        return scrollOffsetFromBottom;
     }
 
     public synchronized void addLine(String line) {
@@ -83,6 +132,7 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
 
     public synchronized void clear() {
         rawLines.clear();
+        scrollOffsetFromBottom = 0;
         invalidate();
         if (onUpdate != null) {
             onUpdate.run();
@@ -90,8 +140,13 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
     }
 
     @Override
-    protected ComponentRenderer<ColoredLogView> createDefaultRenderer() {
-        return new ComponentRenderer<>() {
+    protected InteractableRenderer<ColoredLogView> createDefaultRenderer() {
+        return new InteractableRenderer<>() {
+            @Override
+            public TerminalPosition getCursorLocation(ColoredLogView component) {
+                return null;
+            }
+
             @Override
             public TerminalSize getPreferredSize(ColoredLogView component) {
                 return new TerminalSize(30, 6);
@@ -103,31 +158,115 @@ public class ColoredLogView extends AbstractComponent<ColoredLogView> {
                 int width = Math.max(10, size.getColumns());
                 int height = Math.max(1, size.getRows());
 
+                component.lastRenderHeight = height;
+
                 // Clear background with dark Minecraft gray / black
                 graphics.setBackgroundColor(MinecraftTheme.DEEP_BLACK);
                 graphics.fill(' ');
+
+                // Leave 2 characters on right edge for scrollbar track
+                int contentWidth = Math.max(6, width - 2);
 
                 // Wrap and colorize lines
                 List<LineEntry> wrapped = new ArrayList<>();
                 synchronized (component) {
                     for (String raw : component.rawLines) {
                         TextColor color = getColorForLine(raw);
-                        List<String> segments = wrapLine(raw, width);
+                        List<String> segments = wrapLine(raw, contentWidth);
                         for (String seg : segments) {
                             wrapped.add(new LineEntry(seg, color));
                         }
                     }
                 }
 
-                // Render latest entries anchored to the bottom
-                int start = Math.max(0, wrapped.size() - height);
+                component.lastTotalLines = wrapped.size();
+
+                int maxOffset = Math.max(0, wrapped.size() - height);
+                int effectiveOffset = Math.min(maxOffset, component.scrollOffsetFromBottom);
+                int start = Math.max(0, wrapped.size() - height - effectiveOffset);
+
                 for (int i = 0; i < height && (start + i) < wrapped.size(); i++) {
                     LineEntry entry = wrapped.get(start + i);
                     graphics.setForegroundColor(entry.color);
                     graphics.putString(0, i, entry.text);
                 }
+
+                // Render scrollbar track along column (width - 1) if history exceeds viewport
+                if (wrapped.size() > height) {
+                    int barCol = width - 1;
+                    boolean isFocused = component.isFocused();
+                    boolean isScrolledUp = effectiveOffset > 0;
+
+                    // Top indicator / arrow
+                    graphics.setForegroundColor(isScrolledUp ? MinecraftTheme.GOLD_YELLOW : MinecraftTheme.STONE_GRAY);
+                    graphics.putString(barCol, 0, "▲");
+
+                    // Bottom indicator / arrow
+                    graphics.setForegroundColor(isScrolledUp ? MinecraftTheme.STONE_GRAY : MinecraftTheme.CREEPER_GREEN);
+                    graphics.putString(barCol, height - 1, "▼");
+
+                    if (height > 2) {
+                        int trackLen = height - 2;
+                        double ratio = maxOffset > 0 ? ((double) start / maxOffset) : 1.0;
+                        int thumbY = 1 + (int) Math.round(ratio * (trackLen - 1));
+
+                        for (int y = 1; y < height - 1; y++) {
+                            if (y == thumbY) {
+                                graphics.setForegroundColor(isFocused ? MinecraftTheme.CREEPER_GREEN : (isScrolledUp ? MinecraftTheme.GOLD_YELLOW : MinecraftTheme.STONE_GRAY));
+                                graphics.putString(barCol, y, "█");
+                            } else {
+                                graphics.setForegroundColor(TextColor.ANSI.BLACK_BRIGHT);
+                                graphics.putString(barCol, y, "░");
+                            }
+                        }
+                    }
+                }
             }
         };
+    }
+
+    @Override
+    protected Result handleKeyStroke(KeyStroke keyStroke) {
+        if (keyStroke instanceof MouseAction) {
+            MouseAction ma = (MouseAction) keyStroke;
+            if (ma.getActionType() == MouseActionType.SCROLL_UP) {
+                scrollUp(3);
+                return Result.HANDLED;
+            } else if (ma.getActionType() == MouseActionType.SCROLL_DOWN) {
+                scrollDown(3);
+                return Result.HANDLED;
+            } else if (ma.getActionType() == MouseActionType.CLICK_DOWN) {
+                takeFocus();
+                return Result.HANDLED;
+            }
+        }
+
+        KeyType type = keyStroke.getKeyType();
+        if (type == KeyType.ArrowUp) {
+            scrollUp(1);
+            return Result.HANDLED;
+        } else if (type == KeyType.ArrowDown) {
+            scrollDown(1);
+            return Result.HANDLED;
+        } else if (type == KeyType.PageUp) {
+            scrollUp(Math.max(1, lastRenderHeight - 2));
+            return Result.HANDLED;
+        } else if (type == KeyType.PageDown) {
+            scrollDown(Math.max(1, lastRenderHeight - 2));
+            return Result.HANDLED;
+        } else if (type == KeyType.Home) {
+            scrollToTop();
+            return Result.HANDLED;
+        } else if (type == KeyType.End) {
+            scrollToBottom();
+            return Result.HANDLED;
+        } else if (type == KeyType.Tab) {
+            return Result.MOVE_FOCUS_NEXT;
+        } else if (type == KeyType.ReverseTab) {
+            return Result.MOVE_FOCUS_PREVIOUS;
+        }
+
+        return Result.UNHANDLED;
     }
 
     private TextColor getColorForLine(String line) {

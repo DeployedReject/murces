@@ -142,6 +142,12 @@ public class Main {
 
             TerminalResizeHelper.setup(virtualScreen, gui, terminal);
 
+            if (terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
+                try {
+                    ((com.googlecode.lanterna.terminal.ExtendedTerminal) terminal).setMouseCaptureMode(com.googlecode.lanterna.terminal.MouseCaptureMode.CLICK_RELEASE);
+                } catch (Exception ignored) {}
+            }
+
             Thread shutdownHook = new Thread(() -> {
                 cleanupTerminal(vsRef, termRef);
                 OrchestratorBridge.getInstance().stopOrchestrator();
@@ -179,7 +185,7 @@ public class Main {
         try {
             new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
         } catch (Exception ignored) {}
-        System.out.print("\033[?25h\033[0m");
+        System.out.print("\033[?1000l\033[?1002l\033[?1006l\033[?25h\033[0m");
         System.out.flush();
     }
 }
