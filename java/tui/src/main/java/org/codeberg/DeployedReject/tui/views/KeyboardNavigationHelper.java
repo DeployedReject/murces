@@ -44,6 +44,13 @@ public class KeyboardNavigationHelper {
         window.addWindowListener(new WindowListenerAdapter() {
             @Override
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliver) {
+                // 0. CTRL+C CLEAN TERMINATION IN RAW MODE
+                if (keyStroke.isCtrlDown() && (keyStroke.getCharacter() == 'c' || keyStroke.getCharacter() == 'C')) {
+                    deliver.set(false);
+                    System.exit(0);
+                    return;
+                }
+
                 KeyType type = keyStroke.getKeyType();
                 Interactable focused = basePane.getFocusedInteractable();
                 boolean isEditableText = (focused instanceof TextBox) && !((TextBox) focused).isReadOnly();

@@ -147,6 +147,7 @@ public class Main {
             terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);
         }
 
+        final ResponsiveTerminal termRef = terminal;
         VirtualScreen virtualScreen = null;
         MultiWindowTextGUI gui = null;
         try {
@@ -155,15 +156,19 @@ public class Main {
             virtualScreen.setMinimumSize(new TerminalSize(68, 18));
             virtualScreen.startScreen();
 
+            final VirtualScreen vsRef = virtualScreen;
+
             gui = new MultiWindowTextGUI(virtualScreen);
             gui.setBlockingIO(false);
             gui.setTheme(new MinecraftTheme());
 
             TerminalResizeHelper.setup(virtualScreen, gui, terminal);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            Thread shutdownHook = new Thread(() -> {
+                cleanupTerminal(vsRef, termRef);
                 OrchestratorBridge.getInstance().stopOrchestrator();
-            }));
+            }, "MurcesShutdown");
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
 
             gui.addWindowAndWait(new MainMenuWindow(gui));
 
@@ -176,12 +181,27 @@ public class Main {
                     ((com.googlecode.lanterna.gui2.AsynchronousTextGUIThread) gui.getGUIThread()).stop();
                 } catch (Exception ignored) {}
             }
-            if (virtualScreen != null) {
-                try {
-                    virtualScreen.stopScreen();
-                } catch (IOException ignored) {}
-            }
+            cleanupTerminal(virtualScreen, termRef);
             OrchestratorBridge.getInstance().stopOrchestrator();
+            System.exit(0);
         }
+    }
+
+    public static void cleanupTerminal(VirtualScreen virtualScreen, Terminal terminal) {
+        if (virtualScreen != null) {
+            try {
+                virtualScreen.stopScreen();
+            } catch (Exception ignored) {}
+        }
+        if (terminal != null) {
+            try {
+                terminal.close();
+            } catch (Exception ignored) {}
+        }
+        try {
+            new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
+        } catch (Exception ignored) {}
+        System.out.print("\033[?25h\033[0m");
+        System.out.flush();
     }
 }
