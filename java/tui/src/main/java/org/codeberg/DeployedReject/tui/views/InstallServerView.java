@@ -132,7 +132,19 @@ public class InstallServerView implements WorkspaceView {
         final int finalRam = ramVal;
         new Thread(() -> {
             try {
+                java.util.concurrent.atomic.AtomicInteger lastProg = new java.util.concurrent.atomic.AtomicInteger(-1);
                 OrchestratorBridge.getInstance().installServer(engine, gameVer, loaderVer, finalRam, job, msg -> {
+                    if (msg != null && msg.contains("%")) {
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)%").matcher(msg);
+                        if (m.find()) {
+                            int pct = Integer.parseInt(m.group(1));
+                            int prev = lastProg.get();
+                            if (prev != -1 && pct < 100 && pct < prev + 5) {
+                                return;
+                            }
+                            lastProg.set(pct);
+                        }
+                    }
                     mainWindow.getGui().getGUIThread().invokeLater(() -> {
                         progressLabel.setText("[BUSY] " + msg);
                         ActivityLogger.log("[STATUS] " + msg);

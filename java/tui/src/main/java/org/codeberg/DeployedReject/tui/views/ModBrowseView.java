@@ -206,15 +206,18 @@ public class ModBrowseView implements WorkspaceView {
         final String targetPlatform = platform;
         new Thread(() -> {
             try {
-                int[] lastLoggedProg = new int[] { -1 };
+                java.util.concurrent.atomic.AtomicInteger lastReported = new java.util.concurrent.atomic.AtomicInteger(-1);
                 OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, progress -> {
-                    mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                        statusLabel.setText("[BUSY] Downloading (" + progress + "%)...");
-                        if (progress >= 0 && (progress == 0 || progress == 100 || (progress - lastLoggedProg[0] >= 20))) {
-                            lastLoggedProg[0] = progress;
-                            ActivityLogger.prog("Downloading " + mod.name + "... " + progress + "%");
+                    if (progress < 0) return;
+                    int prev = lastReported.get();
+                    if (prev == -1 || progress == 100 || progress >= prev + 5) {
+                        if (lastReported.compareAndSet(prev, progress)) {
+                            mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                                statusLabel.setText("[BUSY] Downloading (" + progress + "%)...");
+                                ActivityLogger.prog("Downloading " + mod.name + "... " + progress + "%");
+                            });
                         }
-                    });
+                    }
                 }).get();
 
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
