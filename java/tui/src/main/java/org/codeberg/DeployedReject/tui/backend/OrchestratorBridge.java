@@ -171,18 +171,7 @@ public class OrchestratorBridge {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     JsonObject json = Communicator.printBuffer.take();
-                    if (json.has("type") && "download".equals(json.get("type").getAsString())) {
-                        int status = json.has("status") ? json.get("status").getAsInt() : -1;
-                        int progress = json.has("progress") ? json.get("progress").getAsInt() : -1;
-                        String id = json.has("id") ? json.get("id").getAsString() : "";
-                        if (status == 2) {
-                            log("[WRN:] Download started: " + (id.isEmpty() ? "file" : id));
-                        } else if (status == 0 && progress >= 0 && (progress % 10 == 0 || progress == 100)) {
-                            log(String.format("[WRN:] Downloading %s... Progress: %d%%", id.isEmpty() ? "file" : id, progress));
-                        } else if (status == 3) {
-                            log("[OK:] Download complete: " + (id.isEmpty() ? "file" : id));
-                        }
-                    } else if (json.has("error")) {
+                    if (json.has("error")) {
                         log("[ERR:] " + json.get("error").getAsString());
                     }
                     for (Consumer<JsonObject> l : listeners) {
