@@ -19,6 +19,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Required Secrets
+        run: |
+          if [ -z "${{ secrets.CURSE_API }}" ] || [ -z "${{ secrets.EMAIL }}" ]; then
+            echo "::error::Missing required repository secrets: CURSE_API and/or EMAIL must be defined."
+            exit 1
+          fi
+
       - name: Extract Version and Generate Release Notes
         id: notes
         run: |
@@ -50,8 +57,8 @@ jobs:
           fi
           echo "" >> release_notes.md
 
-      # Pinned to graalvm/setup-graalvm v1.3.7
-      - name: Set up GraalVM JDK
+      # Pinned to your specified graalvm/setup-graalvm commit SHA
+      - name: Set up GraalVM JDK 25
         uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173
         with:
           java-version: "25"
@@ -61,16 +68,16 @@ jobs:
 
       - name: Build Orchestrator
         env:
-          email: "release@murces.local"
-          curseAPI: "placeholder"
+          email: ${{ secrets.EMAIL }}
+          curseAPI: ${{ secrets.CURSE_API }}
         run: |
           cd java/orchestrator
           mvn clean install -DskipTests
 
       - name: Build Native Binary (GraalVM Native Image)
         env:
-          email: "release@murces.local"
-          curseAPI: "placeholder"
+          email: ${{ secrets.EMAIL }}
+          curseAPI: ${{ secrets.CURSE_API }}
         run: |
           cd java/tui
           mvn clean package -Pnative -DskipTests
@@ -86,7 +93,7 @@ jobs:
           # Copy compiled native executable
           cp java/tui/target/murces dist/
 
-          # Copy any root shell scripts (svctrl.sh, backup.sh, etc.)
+          # Copy all root shell scripts (svctrl.sh, backup.sh, etc.)
           cp *.sh dist/ 2>/dev/null || true
 
           # Set executable permissions
