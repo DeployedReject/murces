@@ -19,6 +19,35 @@ public final class GlyphHelper {
 
     private static Boolean cachedDetection = null;
 
+    // Standard 16-bit BMP Nerd Font Glyphs (\uE000-\uF8FF, single 16-bit char, 1 terminal column, zero surrogates)
+    public static final String ICON_SERVER = "\uF233";      //  (nf-fa-server)
+    public static final String ICON_PLAY = "\uF04B";        //  (nf-fa-play)
+    public static final String ICON_STOP = "\uF04D";        //  (nf-fa-stop)
+    public static final String ICON_RESTART = "\uF021";     //  (nf-fa-refresh)
+    public static final String ICON_CONFIG = "\uF013";      //  (nf-fa-cog)
+    public static final String ICON_OPTIONS = "\uF085";     //  (nf-fa-cogs)
+    public static final String ICON_SAVE = "\uF0C7";        //  (nf-fa-save)
+    public static final String ICON_USER = "\uF007";        //  (nf-fa-user)
+    public static final String ICON_MOD = "\uF1B2";         //  (nf-fa-cube)
+    public static final String ICON_FOLDER = "\uF07B";      //  (nf-fa-folder)
+    public static final String ICON_THEME = "\uF1FC";       //  (nf-fa-paint_brush)
+    public static final String ICON_TASKS = "\uF0AE";       //  (nf-fa-tasks)
+    public static final String ICON_POWER = "\uF011";       //  (nf-fa-power_off)
+    public static final String ICON_SEARCH = "\uF002";      //  (nf-fa-search)
+    public static final String ICON_CHECK = "\uF00C";       //  (nf-fa-check)
+    public static final String ICON_CROSS = "\uF00D";       //  (nf-fa-times)
+    public static final String ICON_WARN = "\uF071";        //  (nf-fa-warning)
+    public static final String ICON_INFO = "\uF05A";        //  (nf-fa-info_circle)
+    public static final String ICON_TERMINAL = "\uF120";    //  (nf-fa-terminal)
+    public static final String ICON_TUNNEL = "\uF1E6";      //  (nf-fa-plug)
+    public static final String ICON_FILE = "\uF15B";        //  (nf-fa-file)
+    public static final String ICON_BUSY = "\uF110";        //  (nf-fa-spinner)
+    public static final String ICON_BACK = "\uF060";        //  (nf-fa-arrow_left)
+    public static final String ICON_PACKAGE = "\uF187";     //  (nf-fa-archive)
+    public static final String ICON_DOWNLOAD = "\uF019";    //  (nf-fa-download)
+    public static final String ICON_EDIT = "\uF040";        //  (nf-fa-pencil)
+    public static final String ICON_TOOL = "\uF0AD";        //  (nf-fa-wrench)
+
     // Pattern matching Nerd Font Private Use Area glyphs (BMP PUA and Supplementary PUA surrogate pairs) with optional trailing space
     private static final Pattern NERD_FONT_PATTERN = Pattern.compile("([\\uE000-\\uF8FF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])\\s?");
 
@@ -85,38 +114,24 @@ public final class GlyphHelper {
      * Inspects system environment, modern terminal emulators, and font installations.
      */
     private static boolean detectNerdFontSupport() {
-        // 1. Modern terminal emulator environment detection
-        if (System.getenv("KITTY_WINDOW_ID") != null ||
-            System.getenv("GHOSTTY_RESOURCES_DIR") != null ||
-            System.getenv("WEZTERM_EXECUTABLE") != null ||
-            System.getenv("ALACRITTY_LOG") != null ||
-            System.getenv("ALACRITTY_WINDOW_ID") != null ||
-            System.getenv("WT_SESSION") != null ||
-            System.getenv("VSCODE_INJECTION") != null) {
-            return true;
-        }
-
-        String termProg = System.getenv("TERM_PROGRAM");
-        if (termProg != null) {
-            String tp = termProg.toLowerCase();
-            if (tp.contains("iterm") || tp.contains("vscode") || tp.contains("warp") ||
-                tp.contains("wezterm") || tp.contains("ghostty")) {
-                return true;
-            }
-        }
-
-        // 2. Direct filesystem font scan (fast pure Java, no external process)
+        // 1. Direct filesystem font scan (fast pure Java, no external process)
         try {
             String home = System.getProperty("user.home", "");
+            String winDir = System.getenv("WINDIR");
+            String localAppData = System.getenv("LOCALAPPDATA");
             String[] standardFontPaths = {
                 home + "/.local/share/fonts",
                 home + "/.fonts",
                 "/usr/share/fonts",
                 "/usr/local/share/fonts",
                 home + "/Library/Fonts",
-                "/Library/Fonts"
+                "/Library/Fonts",
+                "/System/Library/Fonts",
+                (winDir != null ? winDir + "\\Fonts" : "C:\\Windows\\Fonts"),
+                (localAppData != null ? localAppData + "\\Microsoft\\Windows\\Fonts" : "")
             };
             for (String p : standardFontPaths) {
+                if (p == null || p.isEmpty()) continue;
                 File dir = new File(p);
                 if (dir.exists() && dir.isDirectory()) {
                     if (scanDirForNerdFont(dir, 0)) {
@@ -126,7 +141,7 @@ public final class GlyphHelper {
             }
         } catch (Exception ignored) {}
 
-        // 3. Fallback: query fontconfig (fc-list) on Linux if available
+        // 2. Query fontconfig (fc-list) on Linux/Unix if available
         try {
             ProcessBuilder pb = new ProcessBuilder("fc-list", ":", "family");
             pb.redirectErrorStream(true);
@@ -146,6 +161,13 @@ public final class GlyphHelper {
                 p.destroyForcibly();
             }
         } catch (Exception ignored) {}
+
+        // 3. Known terminal emulators that specifically package or alias Nerd Fonts
+        if (System.getenv("KITTY_WINDOW_ID") != null ||
+            System.getenv("GHOSTTY_RESOURCES_DIR") != null ||
+            System.getenv("WEZTERM_EXECUTABLE") != null) {
+            return true;
+        }
 
         return false;
     }
@@ -194,11 +216,10 @@ public final class GlyphHelper {
              .replace("▾ Read More (Full Description)", "Read More (Full Description)")
              .replace("● [RUNNING]", "[RUNNING]")
              .replace("○ [STOPPED]", "[STOPPED]")
-             .replace("✕ [NOT INSTALLED]", "[NOT INSTALLED]")
-             .replace(" 󰒋", "");
+             .replace("✕ [NOT INSTALLED]", "[NOT INSTALLED]");
 
         if (s.contains("TERMINAL WINDOW TOO SMALL")) {
-            s = s.replace("󰀦", "[!]");
+            s = s.replace(ICON_WARN, "[!]");
         }
 
         // Remove private-use unicode glyphs and at most one trailing space

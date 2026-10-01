@@ -11,11 +11,29 @@ import java.nio.charset.Charset;
 public class ResponsiveUnixTerminal extends UnixTerminal implements ResponsiveTerminal {
 
     public ResponsiveUnixTerminal() throws IOException {
-        super();
+        this(System.in, System.out, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     public ResponsiveUnixTerminal(InputStream in, OutputStream out, Charset charset) throws IOException {
         super(in, out, charset);
+    }
+
+    private char highSurrogate = 0;
+
+    @Override
+    public void putCharacter(char c) throws IOException {
+        if (Character.isHighSurrogate(c)) {
+            highSurrogate = c;
+            return;
+        }
+        if (Character.isLowSurrogate(c) && highSurrogate != 0) {
+            String s = new String(new char[]{highSurrogate, c});
+            highSurrogate = 0;
+            writeToTerminal(s.getBytes(getCharset()));
+            return;
+        }
+        highSurrogate = 0;
+        super.putCharacter(c);
     }
 
     @Override

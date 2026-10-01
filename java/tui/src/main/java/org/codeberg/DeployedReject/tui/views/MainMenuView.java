@@ -49,18 +49,18 @@ public class MainMenuView implements WorkspaceView {
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         menuList = new MurcesListBox(new TerminalSize(48, 10));
-        menuList.addItem(GlyphHelper.apply("1.  󰒋 [S]erver Control & Console"), mainWindow::showServerControl);
-        menuList.addItem(GlyphHelper.apply("2.  󰒓 [I]nstall Server Engine"), mainWindow::showInstallServer);
-        menuList.addItem(GlyphHelper.apply("3.  󰋊 [C]onfigure Properties"), mainWindow::showConfigServer);
-        menuList.addItem(GlyphHelper.apply("4.  󰈚 [B]ackups (World)"), mainWindow::showBackup);
-        menuList.addItem(GlyphHelper.apply("5.  󰑖 [P]layer UUID Migration"), mainWindow::showMigratePlayer);
-        menuList.addItem(GlyphHelper.apply("6.  󰏗 [D]ownload & Browse Mods"), mainWindow::showModBrowse);
-        menuList.addItem(GlyphHelper.apply("7.  󰉋 [M]anage Installed Mods"), mainWindow::showModManage);
-        menuList.addItem(GlyphHelper.apply("8.  󰃨 [Z] Customization & Themes"), mainWindow::showCustomization);
-        menuList.addItem(GlyphHelper.apply("9.  󰓅 [J] Active Tasks & Job Manager"), mainWindow::showJobManager);
-        menuList.addItem(GlyphHelper.apply("10. 󰅖 [E]xit Murces"), mainWindow::exit);
+        menuList.addItem(GlyphHelper.apply("1.  " + GlyphHelper.ICON_SERVER + " [S]erver Control & Console"), mainWindow::showServerControl);
+        menuList.addItem(GlyphHelper.apply("2.  " + GlyphHelper.ICON_PACKAGE + " [I]nstall Server Engine"), mainWindow::showInstallServer);
+        menuList.addItem(GlyphHelper.apply("3.  " + GlyphHelper.ICON_CONFIG + " [C]onfigure Properties"), mainWindow::showConfigServer);
+        menuList.addItem(GlyphHelper.apply("4.  " + GlyphHelper.ICON_SAVE + " [B]ackups (World)"), mainWindow::showBackup);
+        menuList.addItem(GlyphHelper.apply("5.  " + GlyphHelper.ICON_USER + " [P]layer UUID Migration"), mainWindow::showMigratePlayer);
+        menuList.addItem(GlyphHelper.apply("6.  " + GlyphHelper.ICON_DOWNLOAD + " [D]ownload & Browse Mods"), mainWindow::showModBrowse);
+        menuList.addItem(GlyphHelper.apply("7.  " + GlyphHelper.ICON_MOD + " [M]anage Installed Mods"), mainWindow::showModManage);
+        menuList.addItem(GlyphHelper.apply("8.  " + GlyphHelper.ICON_THEME + " [Z] Customization & Themes"), mainWindow::showCustomization);
+        menuList.addItem(GlyphHelper.apply("9.  " + GlyphHelper.ICON_TASKS + " [J] Active Tasks & Job Manager"), mainWindow::showJobManager);
+        menuList.addItem(GlyphHelper.apply("10. " + GlyphHelper.ICON_POWER + " [E]xit Murces"), mainWindow::exit);
 
-        root.addComponent(menuList.withBorder(Borders.singleLine(GlyphHelper.apply("󰍜 Main Navigation (Enter to select)"))));
+        root.addComponent(menuList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Main Navigation (Enter to select)"))));
 
         // Hotkeys
         Runnable openSvCtrlItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(0); mainWindow.showServerControl(); };

@@ -44,7 +44,7 @@ public class ConfigServerView implements WorkspaceView {
 
         // 2. Search filter & Category Row
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        topPanel.addComponent(new Label(GlyphHelper.apply("󰍉 [Q] Filter: ")));
+        topPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Filter: ")));
         filterBox = new TextBox(new TerminalSize(16, 1));
         filterBox.setTextChangeListener((newText, changedByUserInteraction) -> refreshList(null));
         filterBox.setInputFilter((interactable, keyStroke) -> {
@@ -57,17 +57,17 @@ public class ConfigServerView implements WorkspaceView {
         topPanel.addComponent(filterBox);
 
         topPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-        Button catBtn = new Button(GlyphHelper.apply("󰋊 [C]at: All"), this::cycleCategory);
+        Button catBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [C]at: All"), this::cycleCategory);
         topPanel.addComponent(catBtn);
         root.addComponent(topPanel);
 
-        root.addComponent(listBox.withBorder(Borders.singleLine(GlyphHelper.apply("󰒓 Properties [L]ist (Enter toggles/cycles)"))));
+        root.addComponent(listBox.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Properties [L]ist (Enter toggles/cycles)"))));
 
         // 3. Inline Value Editor Row
         Panel editPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        editPanel.addComponent(new Label(GlyphHelper.apply("󰏫 [E]dit Val: ")));
+        editPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_EDIT + " [E]dit Val: ")));
         valueInput = new TextBox(new TerminalSize(18, 1));
-        setValueBtn = new Button(GlyphHelper.apply("󰄬 Set"), this::onApplyValue);
+        setValueBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Set"), this::onApplyValue);
         valueInput.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape) {
                 listBox.takeFocus();
@@ -88,15 +88,15 @@ public class ConfigServerView implements WorkspaceView {
         // 4. Status & Description
         descLabel = new Label("Select a property to view or edit.");
         descLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
-        statusLabel = new Label(GlyphHelper.apply("󰄬 [OK] Ready."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
         root.addComponent(descLabel);
         root.addComponent(statusLabel);
 
         // 5. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        saveBtn = new Button(GlyphHelper.apply("󰆓 [S]ave"), this::onSave);
-        reloadBtn = new Button(GlyphHelper.apply("󰑪 [R]eload"), this::onReload);
-        resetBtn = new Button(GlyphHelper.apply("󰁯 Reset [D]efaults"), this::onResetDefaults);
+        saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave"), this::onSave);
+        reloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]eload"), this::onReload);
+        resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " Reset [D]efaults"), this::onResetDefaults);
         actionPanel.addComponent(saveBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(reloadBtn);
@@ -105,7 +105,7 @@ public class ConfigServerView implements WorkspaceView {
         root.addComponent(actionPanel);
 
         // 6. Footer
-        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -124,7 +124,7 @@ public class ConfigServerView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰒓 Configure Properties");
+        return GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Configure Properties");
     }
 
     @Override
@@ -167,7 +167,7 @@ public class ConfigServerView implements WorkspaceView {
         int idx = cats.indexOf(currentCategory);
         int next = (idx + 1) % cats.size();
         currentCategory = cats.get(next);
-        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Category: " + currentCategory));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Category: " + currentCategory));
         refreshList(null);
     }
 
@@ -263,24 +263,24 @@ public class ConfigServerView implements WorkspaceView {
         try {
             manager.save();
             ActivityLogger.ok("server.properties updated and saved successfully.");
-            statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Saved successfully."));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Saved successfully."));
         } catch (IOException e) {
             ActivityLogger.err("Failed to save server.properties: " + e.getMessage());
-            statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Save failed."));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Save failed."));
         }
     }
 
     private void onReload() {
         manager.load();
         ActivityLogger.ok("server.properties reloaded from disk.");
-        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Reloaded."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Reloaded."));
         refreshList(null);
     }
 
     private void onResetDefaults() {
         manager.resetDefaults();
         ActivityLogger.ok("Default server properties restored.");
-        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Reset defaults."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Reset defaults."));
         refreshList(null);
     }
 }

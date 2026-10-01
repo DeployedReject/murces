@@ -85,7 +85,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                 double subProgress = blockProgress - activeBlock;
 
                 // Pickaxe swing frames: 0 = high, 1 = hitting, 2 = follow-through
-                String toolIcon = org.codeberg.DeployedReject.tui.theme.GlyphHelper.isNerdFontEnabled() ? "󰚌" : "/";
+                String toolIcon = org.codeberg.DeployedReject.tui.theme.GlyphHelper.isNerdFontEnabled() ? org.codeberg.DeployedReject.tui.theme.GlyphHelper.ICON_TOOL : "/";
                 String[] swingIcons = {toolIcon + " \\", toolIcon + " |", toolIcon + " /"};
                 String swing = swingIcons[Math.abs(currentTick) % 3];
 

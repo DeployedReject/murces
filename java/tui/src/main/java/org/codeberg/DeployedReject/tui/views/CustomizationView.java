@@ -42,7 +42,7 @@ public class CustomizationView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        header = new Label(GlyphHelper.apply("󰏘 Theme & Interface Customization"));
+        header = new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Theme & Interface Customization"));
         header.setForegroundColor(LazyVimTheme.getAccentColor());
         root.addComponent(header);
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
@@ -52,7 +52,7 @@ public class CustomizationView implements WorkspaceView {
         Panel formPanel = new Panel(new GridLayout(2));
 
         // 1. Theme
-        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 [T]heme: ")));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [T]heme: ")));
         themeCombo = new ComboBox<>();
         List<String> themeNames = LazyVimTheme.getAvailableThemeNames();
         for (String t : themeNames) {
@@ -61,7 +61,7 @@ public class CustomizationView implements WorkspaceView {
         formPanel.addComponent(themeCombo);
 
         // 2. Transparency
-        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 Trans[p]arency: ")));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Trans[p]arency: ")));
         transparencyCombo = new ComboBox<>();
         for (String opt : TRANSPARENCY_OPTIONS) {
             transparencyCombo.addItem(opt);
@@ -69,11 +69,11 @@ public class CustomizationView implements WorkspaceView {
         formPanel.addComponent(transparencyCombo);
 
         // 3. Nerd Font Glyphs
-        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 [G]lyphs: ")));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [G]lyphs: ")));
         nerdFontCombo = new ComboBox<>("Auto-detect", "Force Nerd Fonts", "Basic (Fallback)");
         formPanel.addComponent(nerdFontCombo);
 
-        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰏘 Appearance Settings"))));
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance Settings"))));
 
         // 4. Toggles
         Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
@@ -85,17 +85,17 @@ public class CustomizationView implements WorkspaceView {
         togglePanel.addComponent(minSizeCheck);
         togglePanel.addComponent(animationCheck);
 
-        root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰒓 Options & Animations"))));
+        root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Options & Animations"))));
 
-        statusLabel = new Label(GlyphHelper.apply("󰄬 [OK] Ready."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         root.addComponent(statusLabel);
 
         // 5. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        Button saveBtn = new Button(GlyphHelper.apply("󰆓 [S]ave & Apply"), this::onSaveAndApply);
-        Button resetBtn = new Button(GlyphHelper.apply("󰁯 [R]eset Defaults"), this::onResetDefaults);
-        Button backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack"), mainWindow::showMainMenu);
+        Button saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave & Apply"), this::onSaveAndApply);
+        Button resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
+        Button backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack"), mainWindow::showMainMenu);
 
         actionPanel.addComponent(saveBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -179,7 +179,7 @@ public class CustomizationView implements WorkspaceView {
 
         mainWindow.applyConfig(config);
         header.setForegroundColor(LazyVimTheme.getAccentColor());
-        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)"));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)"));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         ActivityLogger.ok("Applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
     }
@@ -191,14 +191,14 @@ public class CustomizationView implements WorkspaceView {
         loadCurrentConfig();
         mainWindow.applyConfig(def);
         header.setForegroundColor(LazyVimTheme.getAccentColor());
-        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Reset to default configuration (Gruvbox Dark)."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Reset to default configuration (Gruvbox Dark)."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         ActivityLogger.ok("Reset configuration to default Gruvbox Dark.");
     }
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰏘 Customization & Themes");
+        return GlyphHelper.apply(GlyphHelper.ICON_THEME + " Customization & Themes");
     }
 
     @Override

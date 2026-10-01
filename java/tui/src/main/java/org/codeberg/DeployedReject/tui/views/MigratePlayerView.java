@@ -27,15 +27,15 @@ public class MigratePlayerView implements WorkspaceView {
 
         // Form
         Panel form = new Panel(new GridLayout(2));
-        form.addComponent(new Label(GlyphHelper.apply("󰏗 Old [O] Name:")));
+        form.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_USER + " Old [O] Name:")));
         oldNameBox = new TextBox(new TerminalSize(18, 1));
         form.addComponent(oldNameBox);
 
-        form.addComponent(new Label(GlyphHelper.apply("󰏗 New [N] Name:")));
+        form.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_USER + " New [N] Name:")));
         newNameBox = new TextBox(new TerminalSize(18, 1));
         form.addComponent(newNameBox);
 
-        migrateBtn = new Button(GlyphHelper.apply("󰑓 [M]igrate Player"), this::onMigrate);
+        migrateBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_USER + " [M]igrate Player"), this::onMigrate);
 
         oldNameBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
@@ -53,21 +53,21 @@ public class MigratePlayerView implements WorkspaceView {
             return true;
         });
 
-        root.addComponent(form.withBorder(Borders.singleLine(GlyphHelper.apply("󰏗 Player Identity"))));
+        root.addComponent(form.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_USER + " Player Identity"))));
 
         // Action
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         actionPanel.addComponent(migrateBtn);
         root.addComponent(actionPanel);
 
-        statusLabel = new Label(GlyphHelper.apply("󰄬 Ready to migrate player stats."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Ready to migrate player stats."));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Footer
-        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -79,7 +79,7 @@ public class MigratePlayerView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰏗 Player UUID Migration");
+        return GlyphHelper.apply(GlyphHelper.ICON_USER + " Player UUID Migration");
     }
 
     @Override
@@ -114,21 +114,21 @@ public class MigratePlayerView implements WorkspaceView {
         String newName = newNameBox.getText().trim();
         if (oldName.isEmpty() || newName.isEmpty()) {
             ActivityLogger.warn("Both old and new usernames must be specified for migration.");
-            statusLabel.setText(GlyphHelper.apply("󰀦 [WARN] Enter both old and new names."));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Enter both old and new names."));
             return;
         }
 
-        statusLabel.setText(GlyphHelper.apply("󰑖 [BUSY] Migrating player data..."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Migrating player data..."));
         ActivityLogger.info("Starting player migration: " + oldName + " -> " + newName);
 
         new Thread(() -> {
             OrchestratorBridge.ProcessResult res = OrchestratorBridge.migratePlayer(oldName, newName);
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 if (res.exitCode == 0) {
-                    statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Migration complete!"));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Migration complete!"));
                     ActivityLogger.ok("Player migration completed successfully: " + oldName + " -> " + newName);
                 } else {
-                    statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Migration failed."));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Migration failed."));
                     ActivityLogger.err("Migration error (code " + res.exitCode + "): " + res.output);
                 }
             });

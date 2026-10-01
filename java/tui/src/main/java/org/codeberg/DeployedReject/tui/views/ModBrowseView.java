@@ -67,17 +67,17 @@ public class ModBrowseView implements WorkspaceView {
 
         // 1. Top Filters row
         Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        filterPanel.addComponent(new Label(GlyphHelper.apply("󰍉 [P]lat:")));
+        filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [P]lat:")));
         platformBox = new ComboBox<>("Modrinth", "CurseForge");
         filterPanel.addComponent(platformBox);
 
         filterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-        filterPanel.addComponent(new Label(GlyphHelper.apply("󰑓 L[o]ad:")));
+        filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " L[o]ad:")));
         loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
         filterPanel.addComponent(loaderBox);
 
         filterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-        filterPanel.addComponent(new Label(GlyphHelper.apply("󰒓 [V]er:")));
+        filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " [V]er:")));
         versionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
         filterPanel.addComponent(versionComboBox);
 
@@ -85,10 +85,10 @@ public class ModBrowseView implements WorkspaceView {
 
         // 2. Search Bar row
         Panel searchPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        searchPanel.addComponent(new Label(GlyphHelper.apply("󰍉 [Q] Query: ")));
+        searchPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Query: ")));
         searchBox = new TextBox(new TerminalSize(16, 1), "jei");
-        searchBtn = new Button(GlyphHelper.apply("󰍉 [S]earch"), this::onSearch);
-        downloadBtn = new Button(GlyphHelper.apply("󰇚 [D]ownload"), this::onDownload);
+        searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
+        downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
 
         // Results list
         resultsList = new MurcesListBox(new TerminalSize(42, 10));
@@ -113,12 +113,12 @@ public class ModBrowseView implements WorkspaceView {
         searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         searchPanel.addComponent(downloadBtn);
         searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-        cancelBtn = new Button(GlyphHelper.apply("󰅖 [X] Cancel Download"), this::cancelDownload);
+        cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Download"), this::cancelDownload);
         searchPanel.addComponent(cancelBtn);
         root.addComponent(searchPanel);
 
         // 3. Status Label
-        statusLabel = new Label(GlyphHelper.apply("󰋽 Type query, press [S] to search, [D] to download, [X] to cancel."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Type query, press [S] to search, [D] to download, [X] to cancel."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         root.addComponent(statusLabel);
 
@@ -127,7 +127,7 @@ public class ModBrowseView implements WorkspaceView {
 
         // Left Column: Results List
         Panel leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
-        leftCol.addComponent(resultsList.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Results [L]ist (↑/↓)"))));
+        leftCol.addComponent(resultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Results [L]ist (↑/↓)"))));
         midCols.addComponent(leftCol);
 
         midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -136,18 +136,18 @@ public class ModBrowseView implements WorkspaceView {
         Panel rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
         detailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        titleAuthorLabel = new Label(GlyphHelper.apply("󰈚 Title: -\n󰒋 Author: -"));
+        titleAuthorLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: -\n" + GlyphHelper.ICON_USER + " Author: -"));
         titleAuthorLabel.setForegroundColor(LazyVimTheme.getAccentColor());
         detailsCard.addComponent(titleAuthorLabel);
 
         Panel versionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        versionRow.addComponent(new Label(GlyphHelper.apply("󰑓 Mod Version [K]: ")));
+        versionRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Mod Version [K]: ")));
         modVersionCombo = new ComboBox<>("[Latest Compatible]");
         versionRow.addComponent(modVersionCombo);
         detailsCard.addComponent(versionRow);
 
         Panel modeRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        modeRow.addComponent(new Label(GlyphHelper.apply("󰈚 View [M]ode: ")));
+        modeRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " View [M]ode: ")));
         descModeCombo = new ComboBox<>(GlyphHelper.apply("▾ Summary (Heading)"), GlyphHelper.apply("▾ Read More (Full Description)"));
         descModeCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
             descPageIndex = 0;
@@ -160,13 +160,13 @@ public class ModBrowseView implements WorkspaceView {
         detailsCard.addComponent(modeRow);
 
         descPanel = new Panel(new LinearLayout(Direction.VERTICAL));
-        descPanel.addComponent(new Label(GlyphHelper.apply("󰋽 Select a mod from the list to view its description.")));
-        detailsCard.addComponent(descPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Description"))));
+        descPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the list to view its description.")));
+        detailsCard.addComponent(descPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Description"))));
 
         // Pagination controls for long descriptions
         paginationPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         prevPageBtn = new Button(GlyphHelper.apply("◀ Prev ([)"), this::onPrevPage);
-        pageIndicatorLabel = new Label(GlyphHelper.apply("󰈚 Page 1/1"));
+        pageIndicatorLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
         pageIndicatorLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
         nextPageBtn = new Button(GlyphHelper.apply("Next (]) ▶"), this::onNextPage);
 
@@ -180,10 +180,10 @@ public class ModBrowseView implements WorkspaceView {
         pickaxeAnim = new MinecraftPickaxeAnimation();
         pickaxeAnim.setProgress(0.0);
         pickaxeAnim.setCustomMessage("Ready to download mods");
-        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply("󰚌 Download Status"))));
+        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TOOL + " Download Status"))));
 
         detailsCard.setPreferredSize(new TerminalSize(48, 12));
-        rightCol.addComponent(detailsCard.withBorder(Borders.singleLine(GlyphHelper.apply("󰒋 Mod Details & Versions"))));
+        rightCol.addComponent(detailsCard.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Mod Details & Versions"))));
         midCols.addComponent(rightCol);
 
         root.addComponent(midCols);
@@ -203,7 +203,7 @@ public class ModBrowseView implements WorkspaceView {
         });
 
         // 5. Footer
-        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -249,7 +249,7 @@ public class ModBrowseView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰏗 Download & Browse Mods");
+        return GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " Download & Browse Mods");
     }
 
     @Override
@@ -379,25 +379,25 @@ public class ModBrowseView implements WorkspaceView {
         if (selectedMod == null) {
             String q = searchBox != null ? searchBox.getText().trim() : "";
             if (!q.isEmpty() && currentResults.isEmpty()) {
-                titleAuthorLabel.setText(GlyphHelper.apply("󰈚 Title: No mod found\n󰒋 Author: -"));
-                Label noModLbl = new Label(GlyphHelper.apply("󰅖 No mods found matching query: \"" + q + "\""));
+                titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: No mod found\n" + GlyphHelper.ICON_USER + " Author: -"));
+                Label noModLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " No mods found matching query: \"" + q + "\""));
                 noModLbl.setForegroundColor(LazyVimTheme.getLogWarnColor());
                 descPanel.addComponent(noModLbl);
-                Label hintLbl = new Label(GlyphHelper.apply("󰋽 Try checking the spelling or changing filters."));
+                Label hintLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Try checking the spelling or changing filters."));
                 hintLbl.setForegroundColor(LazyVimTheme.getLogMutedColor());
                 descPanel.addComponent(hintLbl);
             } else {
-                titleAuthorLabel.setText(GlyphHelper.apply("󰈚 Title: No mod selected\n󰒋 Author: -"));
-                descPanel.addComponent(new Label(GlyphHelper.apply("󰋽 Select a mod from the results list to view its description.")));
+                titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: No mod selected\n" + GlyphHelper.ICON_USER + " Author: -"));
+                descPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the results list to view its description.")));
             }
-            pageIndicatorLabel.setText(GlyphHelper.apply("󰈚 Page 1/1"));
+            pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
             return;
         }
 
         String author = (selectedMod.author != null && !selectedMod.author.trim().isEmpty())
                 ? selectedMod.author
                 : "Unknown";
-        titleAuthorLabel.setText(GlyphHelper.apply("󰈚 Title: " + selectedMod.name + "\n󰒋 Author: " + author));
+        titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: " + selectedMod.name + "\n" + GlyphHelper.ICON_USER + " Author: " + author));
 
         boolean isFullDescMode = (descModeCombo.getSelectedIndex() == 1);
         String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
@@ -409,27 +409,27 @@ public class ModBrowseView implements WorkspaceView {
         List<String> lines;
         if (isFullDescMode) {
             if (isFetchingFullDesc && !fullDescCache.containsKey(cacheKey)) {
-                Label loadingLbl = new Label(GlyphHelper.apply("󰑖 Fetching full description from " + platform + "..."));
+                Label loadingLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Fetching full description from " + platform + "..."));
                 loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
                 descPanel.addComponent(loadingLbl);
-                pageIndicatorLabel.setText(GlyphHelper.apply("󰈚 Loading..."));
+                pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
                 return;
             }
             String fullDesc = fullDescCache.get(cacheKey);
             if (fullDesc == null || fullDesc.trim().isEmpty()) {
                 fetchFullDescriptionIfNeeded(selectedMod);
-                Label loadingLbl = new Label(GlyphHelper.apply("󰑖 Requesting full description..."));
+                Label loadingLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Requesting full description..."));
                 loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
                 descPanel.addComponent(loadingLbl);
-                pageIndicatorLabel.setText(GlyphHelper.apply("󰈚 Loading..."));
+                pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
                 return;
             }
             int wrapWidth = Math.max(28, descCardWidth - 6);
             lines = formatAndWrapDescription(fullDesc, wrapWidth);
         } else {
             String rawDesc = (selectedMod.description != null && !selectedMod.description.trim().isEmpty())
-                    ? selectedMod.description
-                    : "No description provided.";
+                ? selectedMod.description
+                : "No description provided.";
             int wrapWidth = Math.max(28, descCardWidth - 6);
             lines = formatAndWrapDescription(rawDesc, wrapWidth);
         }
@@ -457,7 +457,7 @@ public class ModBrowseView implements WorkspaceView {
             descPanel.addComponent(l);
         }
 
-        pageIndicatorLabel.setText(GlyphHelper.apply(String.format("󰈚 Page %d/%d (%d lines)", descPageIndex + 1, totalPages, lines.size())));
+        pageIndicatorLabel.setText(GlyphHelper.apply(String.format(GlyphHelper.ICON_FILE + " Page %d/%d (%d lines)", descPageIndex + 1, totalPages, lines.size())));
     }
 
     private List<String> formatAndWrapDescription(String text, int width) {
@@ -556,7 +556,7 @@ public class ModBrowseView implements WorkspaceView {
         String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
         String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
 
-        statusLabel.setText(GlyphHelper.apply("󰑖 [BUSY] Searching " + platform + " for '" + query + "'..."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Searching " + platform + " for '" + query + "'..."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         ActivityLogger.info("Searching " + platform + " for '" + query + "' (MC " + version + ", " + loader + ")");
 
@@ -578,17 +578,17 @@ public class ModBrowseView implements WorkspaceView {
                             currentModVersions.clear();
                             updateDetailsDisplay();
 
-                            statusLabel.setText(GlyphHelper.apply("󰒋 No mods found matching query: \"" + query + "\""));
+                            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No mods found matching query: \"" + query + "\""));
                             statusLabel.setForegroundColor(LazyVimTheme.getLogMutedColor());
                             ActivityLogger.info("No mods found matching query: " + query);
                             searchBox.takeFocus();
                         } else {
-                            statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload."));
+                            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload."));
                             statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
                             ActivityLogger.ok("Found " + mods.size() + " mods for query: " + query);
 
                             for (OrchestratorBridge.ModResult m : mods) {
-                                resultsList.addItem(GlyphHelper.apply("󰏗 " + m.name + (m.author.isEmpty() ? "" : " • " + m.author)), () -> {
+                                resultsList.addItem(GlyphHelper.apply(GlyphHelper.ICON_MOD + " " + m.name + (m.author.isEmpty() ? "" : " • " + m.author)), () -> {
                                     onModSelected(m);
                                     onDownload();
                                 });
@@ -604,7 +604,7 @@ public class ModBrowseView implements WorkspaceView {
                 });
             } catch (Exception e) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Search failed: " + e.getMessage()));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Search failed: " + e.getMessage()));
                     statusLabel.setForegroundColor(LazyVimTheme.getLogErrorColor());
                     ActivityLogger.err("Mod search failed: " + e.getMessage());
                 });
@@ -614,7 +614,7 @@ public class ModBrowseView implements WorkspaceView {
 
     private void onDownload() {
         if (isDownloading) {
-            statusLabel.setText(GlyphHelper.apply("󰀦 [WARN] Another download is already running."));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Another download is already running."));
             return;
         }
 
@@ -622,7 +622,7 @@ public class ModBrowseView implements WorkspaceView {
             selectedMod = currentResults.get(resultsList.getSelectedIndex());
         }
         if (selectedMod == null) {
-            statusLabel.setText(GlyphHelper.apply("󰀦 [WARN] Select a mod from the list first!"));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Select a mod from the list first!"));
             statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
             ActivityLogger.warn("Please select a mod from the results list before downloading.");
             return;
@@ -663,7 +663,7 @@ public class ModBrowseView implements WorkspaceView {
         }
 
         isDownloading = true;
-        statusLabel.setText(GlyphHelper.apply("󰑖 [BUSY] Downloading " + mod.name + "..."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Downloading " + mod.name + "..."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         ActivityLogger.info("Downloading mod: " + mod.name + (chosenVer != null ? " (" + chosenVer.versionNumber + ")" : ""));
 
@@ -687,10 +687,10 @@ public class ModBrowseView implements WorkspaceView {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     isDownloading = false;
                     stopTicker();
-                    statusLabel.setText(GlyphHelper.apply("󰄬 [OK] " + mod.name + " installed!"));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] " + mod.name + " installed!"));
                     statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
                     pickaxeAnim.setProgress(100.0);
-                    pickaxeAnim.setCustomMessage(GlyphHelper.apply("󰄬 [OK] " + mod.name + " downloaded & installed!"));
+                    pickaxeAnim.setCustomMessage(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] " + mod.name + " downloaded & installed!"));
                     mainWindow.invalidate();
                     try {
                         mainWindow.getGui().updateScreen();
@@ -701,9 +701,9 @@ public class ModBrowseView implements WorkspaceView {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     isDownloading = false;
                     stopTicker();
-                    statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Download failed: " + e.getMessage()));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Download failed: " + e.getMessage()));
                     statusLabel.setForegroundColor(LazyVimTheme.getLogErrorColor());
-                    pickaxeAnim.setCustomMessage(GlyphHelper.apply("󰅖 [ERR] " + e.getMessage()));
+                    pickaxeAnim.setCustomMessage(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] " + e.getMessage()));
                     mainWindow.invalidate();
                     try {
                         mainWindow.getGui().updateScreen();
@@ -727,9 +727,9 @@ public class ModBrowseView implements WorkspaceView {
         });
         isDownloading = false;
         stopTicker();
-        statusLabel.setText(GlyphHelper.apply("󰅖 [CANCELLED] Download cancelled."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [CANCELLED] Download cancelled."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
-        pickaxeAnim.setCustomMessage(GlyphHelper.apply("󰅖 [CANCELLED] Download aborted."));
+        pickaxeAnim.setCustomMessage(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [CANCELLED] Download aborted."));
         mainWindow.invalidate();
     }
 
@@ -743,14 +743,14 @@ public class ModBrowseView implements WorkspaceView {
         lastProgressUiUpdate = now;
 
         mainWindow.getGui().getGUIThread().invokeLater(() -> {
-            String status = String.format("󰑖 [BUSY] Downloading %.2f%% (ETA: %s @ %s)...",
-                    info.percent, info.formattedEta(), info.formattedSpeed());
+            String status = String.format("%s [BUSY] Downloading %.2f%% (ETA: %s @ %s)...",
+                    GlyphHelper.ICON_BUSY, info.percent, info.formattedEta(), info.formattedSpeed());
             statusLabel.setText(GlyphHelper.apply(status));
             statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
 
             pickaxeAnim.setProgress(info.percent);
-            pickaxeAnim.setCustomMessage(GlyphHelper.apply(String.format("󰚌 Downloading %s: %.2f%% (ETA: %s @ %s)",
-                    modName, info.percent, info.formattedEta(), info.formattedSpeed())));
+            pickaxeAnim.setCustomMessage(GlyphHelper.apply(String.format("%s Downloading %s: %.2f%% (ETA: %s @ %s)",
+                    GlyphHelper.ICON_TOOL, modName, info.percent, info.formattedEta(), info.formattedSpeed())));
 
             mainWindow.invalidate();
         });

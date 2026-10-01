@@ -28,15 +28,15 @@ public class BackupView implements WorkspaceView {
 
         // Top Actions
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        backupNowBtn = new Button(GlyphHelper.apply("󰚰 [K] Backup Now"), this::onRunBackup);
-        refreshBtn = new Button(GlyphHelper.apply("󰑪 [R]efresh"), this::loadBackups);
+        backupNowBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [K] Backup Now"), this::onRunBackup);
+        refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]efresh"), this::loadBackups);
 
         topPanel.addComponent(backupNowBtn);
         topPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         topPanel.addComponent(refreshBtn);
         root.addComponent(topPanel);
 
-        statusLabel = new Label(GlyphHelper.apply("󰄬 Ready."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Ready."));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
@@ -44,12 +44,12 @@ public class BackupView implements WorkspaceView {
         table = new Table<>("Archive", "Size", "Date");
         table.setEscapeByArrowKey(false);
         table.setPreferredSize(new TerminalSize(42, 6));
-        root.addComponent(table.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Backups [L]ist"))));
+        root.addComponent(table.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Backups [L]ist"))));
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Footer
-        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -63,7 +63,7 @@ public class BackupView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰒋 World Backups");
+        return GlyphHelper.apply(GlyphHelper.ICON_SAVE + " World Backups");
     }
 
     @Override
@@ -109,7 +109,7 @@ public class BackupView implements WorkspaceView {
 
         File[] files = backupDir.listFiles((dir, name) -> name.endsWith(".zip") || name.endsWith(".tar.gz"));
         if (files == null || files.length == 0) {
-            statusLabel.setText(GlyphHelper.apply("󰒋 No backup archives found."));
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No backup archives found."));
             return;
         }
 
@@ -122,11 +122,11 @@ public class BackupView implements WorkspaceView {
             String date = sdf.format(new Date(f.lastModified()));
             table.getTableModel().addRow(f.getName(), size, date);
         }
-        statusLabel.setText(GlyphHelper.apply("󰒋 Found " + files.length + " backup archive(s)."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Found " + files.length + " backup archive(s)."));
     }
 
     private void onRunBackup() {
-        statusLabel.setText(GlyphHelper.apply("󰑖 [BUSY] Creating world backup..."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Creating world backup..."));
         ActivityLogger.info("Starting world backup process...");
 
         new Thread(() -> {
@@ -134,10 +134,10 @@ public class BackupView implements WorkspaceView {
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 loadBackups();
                 if (res.exitCode == 0) {
-                    statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Backup created!"));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Backup created!"));
                     ActivityLogger.ok(res.output.isEmpty() ? "World backup completed successfully." : res.output);
                 } else {
-                    statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Backup failed (code " + res.exitCode + ")"));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Backup failed (code " + res.exitCode + ")"));
                     ActivityLogger.err("Backup failed: " + res.output);
                 }
             });

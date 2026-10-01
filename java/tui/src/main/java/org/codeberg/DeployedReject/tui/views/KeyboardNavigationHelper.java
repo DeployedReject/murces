@@ -8,7 +8,7 @@ import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 public class KeyboardNavigationHelper {
 
     public static Label createTooltip() {
-        Label tip = new Label(GlyphHelper.apply("󰋽 [TIP] 󰈚 [A] Activity Log │  [L] Server Console │ 󰓅 [J] Active Tasks │ 󰌒 [TAB] Cycle Focus │ 󰁯 [ESC] Back"));
+        Label tip = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " [TIP] " + GlyphHelper.ICON_FILE + " [A] Activity Log │ " + GlyphHelper.ICON_TERMINAL + " [L] Server Console │ " + GlyphHelper.ICON_TASKS + " [J] Active Tasks │ " + GlyphHelper.ICON_OPTIONS + " [TAB] Cycle Focus │ " + GlyphHelper.ICON_BACK + " [ESC] Back"));
         tip.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         return tip;
     }

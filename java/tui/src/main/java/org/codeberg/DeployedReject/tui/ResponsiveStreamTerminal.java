@@ -13,6 +13,24 @@ public class ResponsiveStreamTerminal extends StreamAnsiTerminal implements Resp
         super(inputStream, outputStream, charset);
     }
 
+    private char highSurrogate = 0;
+
+    @Override
+    public void putCharacter(char c) throws IOException {
+        if (Character.isHighSurrogate(c)) {
+            highSurrogate = c;
+            return;
+        }
+        if (Character.isLowSurrogate(c) && highSurrogate != 0) {
+            String s = new String(new char[]{highSurrogate, c});
+            highSurrogate = 0;
+            writeToTerminal(s.getBytes(getCharset()));
+            return;
+        }
+        highSurrogate = 0;
+        super.putCharacter(c);
+    }
+
     @Override
     protected TerminalSize findTerminalSize() throws IOException {
         TerminalSize queried = TerminalResizeHelper.queryPhysicalTerminalSize();

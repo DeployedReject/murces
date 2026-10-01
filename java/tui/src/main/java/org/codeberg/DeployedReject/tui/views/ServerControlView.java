@@ -32,40 +32,40 @@ public class ServerControlView implements WorkspaceView {
 
         // 1. Status Section
         Panel statusPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        statusPanel.addComponent(new Label(GlyphHelper.apply("󰒋 Server Status: ")));
+        statusPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Status: ")));
         statusLabel = new Label("CHECKING...");
         statusPanel.addComponent(statusLabel);
 
-        refreshBtn = new Button(GlyphHelper.apply("󰑪 [U]pdate Status"), this::updateStatus);
+        refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [U]pdate Status"), this::updateStatus);
         statusPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         statusPanel.addComponent(refreshBtn);
-        root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰒋 Server State"))));
+        root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
 
         // 2. Playit Tunnel Checkbox
-        publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(" [P]layit Tunnel (--public)"));
+        publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
         root.addComponent(publicTunnelCheckBox);
 
         // 3. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        startBtn = new Button(GlyphHelper.apply("󰐊 [S]tart Server"), this::onStart);
-        stopBtn = new Button(GlyphHelper.apply("󰓛 [T]erminate Server"), this::onStop);
-        restartBtn = new Button(GlyphHelper.apply("󰑓 [R]estart Server"), this::onRestart);
+        startBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart Server"), this::onStart);
+        stopBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_STOP + " [T]erminate Server"), this::onStop);
+        restartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]estart Server"), this::onRestart);
 
         actionPanel.addComponent(startBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(stopBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(restartBtn);
-        root.addComponent(actionPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰓅 Server Actions"))));
+        root.addComponent(actionPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TASKS + " Server Actions"))));
 
         // Initial sync of button states
         applyButtonStates(OrchestratorBridge.isServerInstalled(), false, false);
 
         // 4. Console Command
         Panel cmdPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        cmdPanel.addComponent(new Label(GlyphHelper.apply(" [C]onsole Cmd (/): ")));
+        cmdPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " [C]onsole Cmd (/): ")));
         commandInput = new TextBox(new TerminalSize(26, 1));
-        sendBtn = new Button(GlyphHelper.apply("󰄬 [D]ispatch"), this::onSendCommand);
+        sendBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [D]ispatch"), this::onSendCommand);
         commandInput.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
                 sendBtn.takeFocus();
@@ -76,10 +76,10 @@ public class ServerControlView implements WorkspaceView {
         cmdPanel.addComponent(commandInput);
         cmdPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         cmdPanel.addComponent(sendBtn);
-        root.addComponent(cmdPanel.withBorder(Borders.singleLine(GlyphHelper.apply(" Command Dispatch"))));
+        root.addComponent(cmdPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " Command Dispatch"))));
 
         // 5. Navigation Footer
-        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Configure Hotkeys
@@ -123,7 +123,7 @@ public class ServerControlView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return GlyphHelper.apply("󰒋 Server Control");
+        return GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Control");
     }
 
     @Override
@@ -174,7 +174,7 @@ public class ServerControlView implements WorkspaceView {
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 applyButtonStates(installed, running, downloading);
                 if (downloading) {
-                    statusLabel.setText(GlyphHelper.apply("󰑪 [INSTALLING...]"));
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [INSTALLING...]"));
                     statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
                 } else if (running) {
                     statusLabel.setText(GlyphHelper.apply("● [RUNNING] - Port 25565"));
@@ -208,7 +208,7 @@ public class ServerControlView implements WorkspaceView {
         }
 
         boolean pub = publicTunnelCheckBox.isChecked();
-        statusLabel.setText(GlyphHelper.apply("󰐊 [STARTING...]"));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [STARTING...]"));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         startBtn.setEnabled(false);
         stopBtn.setEnabled(false);
@@ -235,7 +235,7 @@ public class ServerControlView implements WorkspaceView {
             return;
         }
 
-        statusLabel.setText(GlyphHelper.apply("󰓛 [STOPPING...]"));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_STOP + " [STOPPING...]"));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         startBtn.setEnabled(false);
         stopBtn.setEnabled(false);
@@ -267,7 +267,7 @@ public class ServerControlView implements WorkspaceView {
             return;
         }
 
-        statusLabel.setText(GlyphHelper.apply("󰑓 [RESTARTING...]"));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [RESTARTING...]"));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         startBtn.setEnabled(false);
         stopBtn.setEnabled(false);
