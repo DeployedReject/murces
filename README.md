@@ -74,7 +74,22 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 2. Server Engine & Version Setup
+### 2. Server Control & Command Dispatch
+
+> Monitor server lifecycle, toggle Playit.gg tunnels, and dispatch in-game commands directly to the tmux session.
+
+<p align="center">
+  <img src="assets/server_control.png" alt="Server Control and Command Dispatch" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Process Telemetry**: Live status indicator with active port reporting (`[RUNNING] - Port 25565`).
+- **One-Click Actions**: Start, restart, or safely terminate the Minecraft daemon with graceful world saves.
+- **In-Game Command Prompt**: Dispatch console commands directly into the `mcsv` session without manually attaching tmux.
+- **Networking Controls**: Toggle Playit.gg public tunnels and adjust runtime memory allocations on the fly.
+
+---
+
+### 3. Server Engine & Version Setup
 
 > Configure and boot server engines with automatic Mojang EULA acceptance and custom RAM allocation flags.
 
@@ -132,7 +147,35 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 6. Themes, Transparency & Glyphs
+### 6. World Backups & Live Memory Flushing
+
+> Safe level snapshots that flush memory buffers first to guarantee zero world corruption.
+
+<p align="center">
+  <img src="assets/world_backups.png" alt="World Backups and Safe Archiving" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Automated Memory Flushing**: Issues `save-off` and `save-all` to disk before packaging the tarball, re-enabling auto-saving (`save-on`) on exit.
+- **Archive Management**: View timestamped `.tar` snapshots with file sizes directly in the TUI.
+- **Retention & Cloud Replication**: Automatically retains the latest snapshots and optionally syncs archives offsite via `rclone`.
+
+---
+
+### 7. Player UUID & Data Migration
+
+> Seamlessly transfer inventories, stats, and advancements between player UUIDs.
+
+<p align="center">
+  <img src="assets/player_migration.png" alt="Player UUID Migration Tool" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Identity Mapping**: Migrate stats, advancements, and playerdata from an old player name or UUID to a new one.
+- **Automatic Backup Safeguard**: Bundles existing playerdata, usercache, stats, and advancements into a safety archive before modifying files.
+- **Offline/Online Migration**: Resolve UUID discrepancies caused by switching between offline-mode and Mojang authentication.
+
+---
+
+### 8. Themes, Transparency & Glyphs
 
 > Complete visual customization to match your personal terminal setup.
 
@@ -147,7 +190,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 7. Active Tasks & Job Telemetry
+### 9. Active Tasks & Job Telemetry
 
 > Monitor asynchronous background operations in real time.
 
