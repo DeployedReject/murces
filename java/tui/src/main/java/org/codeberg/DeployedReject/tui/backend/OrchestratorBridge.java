@@ -722,7 +722,9 @@ public class OrchestratorBridge {
         File fabricLaunch = new File("fabric-server-launch.jar");
         if (fabricLaunch.exists() && fabricLaunch.length() > 0) {
             File mcJar = new File("server.jar");
-            if (mcJar.exists() && mcJar.length() > 5_000_000) {
+            File fabricMcJar = new File(".fabric", "server.jar");
+            if ((mcJar.exists() && mcJar.length() > 5_000_000) ||
+                (fabricMcJar.exists() && fabricMcJar.length() > 5_000_000)) {
                 return true;
             }
         }
@@ -734,10 +736,6 @@ public class OrchestratorBridge {
         // Check for Vanilla / Paper / Spigot server.jar
         File sJar = new File("server.jar");
         if (sJar.exists() && sJar.length() > 5_000_000) {
-            return true;
-        }
-        File svStart = new File("sv_start.sh");
-        if (svStart.exists() && svStart.length() > 0) {
             return true;
         }
         return false;

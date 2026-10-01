@@ -57,6 +57,9 @@ public class ServerControlView implements WorkspaceView {
         actionPanel.addComponent(restartBtn);
         root.addComponent(actionPanel.withBorder(Borders.singleLine("Actions")));
 
+        // Initial sync of button states
+        applyButtonStates(OrchestratorBridge.isServerInstalled(), false, false);
+
         // 4. Console Command
         Panel cmdPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         cmdPanel.addComponent(new Label("[C]onsole Cmd (/): "));
@@ -90,6 +93,33 @@ public class ServerControlView implements WorkspaceView {
         hotkeys.put('C', commandInput::takeFocus);
     }
 
+    private void applyButtonStates(boolean installed, boolean running, boolean downloading) {
+        if (downloading) {
+            startBtn.setEnabled(false);
+            stopBtn.setEnabled(false);
+            restartBtn.setEnabled(false);
+        } else if (running) {
+            startBtn.setEnabled(false);
+            stopBtn.setEnabled(true);
+            restartBtn.setEnabled(true);
+        } else if (!installed) {
+            startBtn.setEnabled(false);
+            stopBtn.setEnabled(false);
+            restartBtn.setEnabled(false);
+        } else { // installed and stopped
+            startBtn.setEnabled(true);
+            stopBtn.setEnabled(false);
+            restartBtn.setEnabled(true);
+        }
+
+        if (!startBtn.isEnabled() && mainWindow.getGui() != null && mainWindow.getGui().getFocusedInteractable() == startBtn) {
+            Interactable nextFocus = getDefaultFocus();
+            if (nextFocus != null) {
+                nextFocus.takeFocus();
+            }
+        }
+    }
+
     @Override
     public String getTitle() {
         return "Server Control";
@@ -107,7 +137,16 @@ public class ServerControlView implements WorkspaceView {
 
     @Override
     public Interactable getDefaultFocus() {
-        return startBtn;
+        if (startBtn.isEnabled()) {
+            return startBtn;
+        }
+        if (stopBtn.isEnabled()) {
+            return stopBtn;
+        }
+        if (restartBtn.isEnabled()) {
+            return restartBtn;
+        }
+        return refreshBtn;
     }
 
     @Override
@@ -132,6 +171,7 @@ public class ServerControlView implements WorkspaceView {
             boolean running = OrchestratorBridge.isServerRunning();
             boolean installed = OrchestratorBridge.isServerInstalled();
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                applyButtonStates(installed, running, downloading);
                 if (downloading) {
                     statusLabel.setText("[INSTALLING...]");
                     statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
@@ -162,12 +202,16 @@ public class ServerControlView implements WorkspaceView {
         }
         if (OrchestratorBridge.isServerRunning()) {
             ActivityLogger.warn("Server is already running.");
+            updateStatus();
             return;
         }
 
         boolean pub = publicTunnelCheckBox.isChecked();
         statusLabel.setText("[STARTING...]");
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        startBtn.setEnabled(false);
+        stopBtn.setEnabled(false);
+        restartBtn.setEnabled(false);
         ActivityLogger.info("Starting server (public=" + pub + ")...");
 
         new Thread(() -> {
@@ -186,11 +230,15 @@ public class ServerControlView implements WorkspaceView {
     private void onStop() {
         if (!OrchestratorBridge.isServerRunning()) {
             ActivityLogger.warn("Server is not running.");
+            updateStatus();
             return;
         }
 
         statusLabel.setText("[STOPPING...]");
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        startBtn.setEnabled(false);
+        stopBtn.setEnabled(false);
+        restartBtn.setEnabled(false);
         ActivityLogger.info("Stopping server...");
 
         new Thread(() -> {
@@ -220,6 +268,9 @@ public class ServerControlView implements WorkspaceView {
 
         statusLabel.setText("[RESTARTING...]");
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        startBtn.setEnabled(false);
+        stopBtn.setEnabled(false);
+        restartBtn.setEnabled(false);
         ActivityLogger.info("Restarting server...");
 
         new Thread(() -> {
