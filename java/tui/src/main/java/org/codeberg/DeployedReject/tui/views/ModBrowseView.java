@@ -31,7 +31,7 @@ public class ModBrowseView implements WorkspaceView {
     private final ComboBox<String> modVersionCombo;
     private final ComboBox<String> descModeCombo;
     private final Label titleAuthorLabel;
-    private final Panel descPanel;
+    private final Label descContentLabel;
     private final Label statusLabel;
     private final MinecraftPickaxeAnimation pickaxeAnim;
     private final Panel detailsCard;
@@ -94,7 +94,7 @@ public class ModBrowseView implements WorkspaceView {
         downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
 
         // Results list
-        resultsList = new MurcesListBox(new TerminalSize(42, 10));
+        resultsList = new MurcesListBox(new TerminalSize(38, 10));
 
         searchBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
@@ -161,12 +161,14 @@ public class ModBrowseView implements WorkspaceView {
             updateDetailsDisplay();
             mainWindow.invalidate();
         });
+        // Make descModeCombo non-focusable — purely a toggle via M hotkey
+        descModeCombo.setInputFilter((interactable, keyStroke) -> false);
         modeRow.addComponent(descModeCombo);
         detailsCard.addComponent(modeRow);
 
-        descPanel = new Panel(new LinearLayout(Direction.VERTICAL));
-        descPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the list to view its description.")));
-        detailsCard.addComponent(descPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Description"))));
+        descContentLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the list to view its description."));
+        descContentLabel.setForegroundColor(LazyVimTheme.getActivePalette().fg);
+        detailsCard.addComponent(descContentLabel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Description"))));
 
         // Pagination controls for long descriptions
         paginationPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -182,7 +184,7 @@ public class ModBrowseView implements WorkspaceView {
         paginationPanel.addComponent(nextPageBtn);
         detailsCard.addComponent(paginationPanel);
 
-        detailsCard.setPreferredSize(new TerminalSize(48, 12));
+        detailsCard.setPreferredSize(new TerminalSize(38, 12));
         rightCol.addComponent(detailsCard.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Mod Details & Versions"))));
         midCols.addComponent(rightCol);
 
@@ -234,7 +236,6 @@ public class ModBrowseView implements WorkspaceView {
             }
         });
         hotkeys.put('M', () -> {
-            descModeCombo.takeFocus();
             int next = (descModeCombo.getSelectedIndex() + 1) % descModeCombo.getItemCount();
             descModeCombo.setSelectedIndex(next);
         });
@@ -304,51 +305,43 @@ public class ModBrowseView implements WorkspaceView {
         int width = Math.max(60, currentTermWidth);
         int rows = Math.max(20, currentTermHeight);
 
-        int actWidth = Math.max(28, Math.min(65, (width * 35) / 100));
-        int wsWidth = Math.max(40, width - actWidth - 6);
-
         // Vertical space budget:
         // filterPanel (1) + searchPanel (1) + statusLabel (1) + downloadPanel (5) + backBtn (1) + spacing/margins (2) = 11 rows
         int middleHeight = Math.max(10, rows - 11);
-        boolean isReadMore = (descModeCombo != null && descModeCombo.getSelectedIndex() == 1);
+        // Inside detailsCard: titleAuthorLabel (2) + versionRow (1) + modeRow (1) + paginationPanel (1) + border overhead (2) = 7 rows
+        this.descLinesPerPage = Math.max(6, middleHeight - 7);
 
-        if (wsWidth >= 70) {
-            int leftWidth;
-            int rightWidth;
-            if (isReadMore) {
-                // In Read More mode: make description box significantly bigger (approx 72% width), results list compact
-                leftWidth = Math.max(26, Math.min(32, (wsWidth * 28) / 100));
-                rightWidth = Math.max(42, wsWidth - leftWidth - 3);
-            } else {
-                // In Summary mode: standard 42% / 58% split
-                leftWidth = Math.max(34, (wsWidth * 42) / 100);
-                rightWidth = Math.max(38, wsWidth - leftWidth - 3);
-            }
+        // Full usable width (minus root borders/padding)
+        int usableWidth = Math.max(60, width - 2);
+
+        if (usableWidth >= 70) {
+            // Equal 50/50 split between list and details
+            int halfWidth = (usableWidth - 3) / 2;  // -3 for gap between columns
+            int leftWidth = halfWidth;
+            int rightWidth = usableWidth - leftWidth - 3;
 
             this.descCardWidth = rightWidth;
-            // Inside detailsCard: titleAuthorLabel (2) + versionRow (1) + modeRow (1) + paginationPanel (1) + borders (2) = 7 rows
-            this.descLinesPerPage = Math.max(6, middleHeight - 7);
 
             resultsList.setPreferredSize(new TerminalSize(leftWidth, middleHeight));
             detailsCard.setPreferredSize(new TerminalSize(rightWidth, middleHeight));
-            descPanel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
-            pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, wsWidth - 4), 3));
+            descContentLabel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
+            pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 4), 3));
             if (downloadPanel != null) {
-                downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, wsWidth - 4), 5));
+                downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 2), 5));
             }
-            searchBox.setPreferredSize(new TerminalSize(Math.max(16, (wsWidth * 25) / 100), 1));
+            searchBox.setPreferredSize(new TerminalSize(Math.max(16, (usableWidth * 25) / 100), 1));
         } else {
-            int fullWidth = Math.max(34, wsWidth - 4);
+            int fullWidth = Math.max(34, usableWidth - 4);
             this.descCardWidth = fullWidth;
             int halfH = Math.max(5, middleHeight / 2);
             this.descLinesPerPage = Math.max(4, halfH - 4);
 
             resultsList.setPreferredSize(new TerminalSize(fullWidth, halfH));
             detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 3));
-            descPanel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
+            descContentLabel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
             pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 3));
             if (downloadPanel != null) {
-                downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 5));
+                downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 2), 5));
             }
         }
     }
@@ -419,23 +412,17 @@ public class ModBrowseView implements WorkspaceView {
     }
 
     private void updateDetailsDisplay() {
-        descPanel.removeAllComponents();
         if (selectedMod == null) {
             String q = searchBox != null ? searchBox.getText().trim() : "";
             if (!q.isEmpty() && currentResults.isEmpty()) {
                 titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: No mod found\n" + GlyphHelper.ICON_USER + " Author: -"));
-                Label noModLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " No mods found matching query: \"" + q + "\""));
-                noModLbl.setForegroundColor(LazyVimTheme.getLogWarnColor());
-                descPanel.addComponent(noModLbl);
-                Label hintLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Try checking the spelling or changing filters."));
-                hintLbl.setForegroundColor(LazyVimTheme.getLogMutedColor());
-                descPanel.addComponent(hintLbl);
+                descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " No mods found matching query: \"" + q + "\"\n" + GlyphHelper.ICON_INFO + " Try checking the spelling or changing filters."));
             } else {
                 titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: No mod selected\n" + GlyphHelper.ICON_USER + " Author: -"));
-                descPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the results list to view its description.")));
+                descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the results list to view its description."));
             }
             pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
-            descPanel.invalidate();
+            descContentLabel.invalidate();
             detailsCard.invalidate();
             mainWindow.invalidate();
             return;
@@ -456,11 +443,10 @@ public class ModBrowseView implements WorkspaceView {
         List<String> lines;
         if (isFullDescMode) {
             if (pendingFetches.contains(cacheKey)) {
-                Label loadingLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Fetching full description from " + platform + "..."));
-                loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
-                descPanel.addComponent(loadingLbl);
+                descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Fetching full description from " + platform + "..."));
+                descContentLabel.setForegroundColor(LazyVimTheme.getAccentColor());
                 pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
-                descPanel.invalidate();
+                descContentLabel.invalidate();
                 detailsCard.invalidate();
                 mainWindow.invalidate();
                 return;
@@ -468,11 +454,10 @@ public class ModBrowseView implements WorkspaceView {
             String fullDesc = fullDescCache.get(cacheKey);
             if (fullDesc == null || fullDesc.trim().isEmpty()) {
                 fetchFullDescriptionIfNeeded(selectedMod);
-                Label loadingLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Requesting full description..."));
-                loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
-                descPanel.addComponent(loadingLbl);
+                descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Requesting full description..."));
+                descContentLabel.setForegroundColor(LazyVimTheme.getAccentColor());
                 pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
-                descPanel.invalidate();
+                descContentLabel.invalidate();
                 detailsCard.invalidate();
                 mainWindow.invalidate();
                 return;
@@ -503,15 +488,25 @@ public class ModBrowseView implements WorkspaceView {
         int startIdx = descPageIndex * pageSize;
         int endIdx = Math.min(lines.size(), startIdx + pageSize);
 
+        // Build a single multiline string for the description label
+        StringBuilder sb = new StringBuilder();
         for (int i = startIdx; i < endIdx; i++) {
+            if (i > startIdx) {
+                sb.append('\n');
+            }
             String line = lines.get(i);
-            Label l = new Label(line.isEmpty() ? " " : line);
-            l.setForegroundColor(LazyVimTheme.getActivePalette().fg);
-            descPanel.addComponent(l);
+            sb.append(line.isEmpty() ? " " : line);
+        }
+        // Pad remaining lines with empty space so the label fills the allocated area
+        for (int i = endIdx - startIdx; i < pageSize; i++) {
+            sb.append('\n');
+            sb.append(' ');
         }
 
+        descContentLabel.setText(sb.toString());
+        descContentLabel.setForegroundColor(LazyVimTheme.getActivePalette().fg);
         pageIndicatorLabel.setText(GlyphHelper.apply(String.format(GlyphHelper.ICON_FILE + " Page %d/%d (%d lines)", descPageIndex + 1, totalPages, lines.size())));
-        descPanel.invalidate();
+        descContentLabel.invalidate();
         detailsCard.invalidate();
         mainWindow.invalidate();
     }
