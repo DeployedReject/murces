@@ -64,6 +64,10 @@ public class ServerHandler {
       }
     }
     switch (job) {
+      case 0:
+        // Download only, nothing else to do. Optionally send a completion status.
+        // No further action needed; the download methods already emit progress and final status.
+        break;
       case 1:
 
         if (loader.equals("forge"))
@@ -305,9 +309,8 @@ public class ServerHandler {
         ErrorHelper.errorJson("Server Already Started");
 
       } else {
-        response.addProperty("status", 3);
-        response.addProperty("type", "server");
-        Communicator.printer(response);
+        // Server start initiated. UI will monitor logs for readiness.
+        // No final completion status sent here.
       }
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
