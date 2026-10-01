@@ -1,12 +1,12 @@
 <div align="center">
 
 ```
-  __  __
- |  \/  |_   _ _ __ ___ ___  ___
- | |\/| | | | | '__/ __/ _ \/ __|
- | |  | | |_| | | | (_|  __/\__ \
- |_|  |_|\__,_|_|  \___\___||___/
-    Minecraft Server Manager v1.0.0
+ __  __                                  
+|  \/  | _   _ _ __ ___ ___  ___         
+| |\/| || | | | '__/ __/ _ \/ __|        
+| |  | || |_| | | | (_|  __/\__ \        
+|_|  |_| \__,_|_|  \___\___||___/        
+   Minecraft Server Manager v1.0.0
 ```
 
 # MurCes
@@ -45,7 +45,7 @@
 
 Managing dedicated Minecraft servers on budget VPS nodes or homelabs often forces an uncomfortable compromise:
 
-- **Heavy Web Panels (Pterodactyl, AMP, MineOS)** require Docker daemons, Node.js runtimes, Nginx reverse proxies, MySQL databases, and background web workers—easily eating **500MB–1.5GB of RAM** before your Minecraft server even allocates its heap.
+- **Heavy Web Panels (Pterodactyl, AMP, MineOS)** require Docker daemons, Node.js runtimes, Nginx reverse proxies, MySQL databases, and background web workers, consuming 500MB to 1.5GB of RAM before your Minecraft server even allocates its heap.
 - **Raw Shell Scripts** are brittle, lack visual status monitoring, don't handle dependency resolution, and make tweaking `server.properties` or installing mods a chore.
 
 **MurCes delivers the sweet spot:**
@@ -159,6 +159,56 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **Archive Management**: View timestamped `.tar` snapshots with file sizes directly in the TUI.
 - **Retention & Cloud Replication**: Automatically retains the latest snapshots and optionally syncs archives offsite via `rclone`.
 
+#### Configuring Google Drive Backups (`backup.sh`)
+
+`backup.sh` handles automated save flushing, tar archiving, snapshot rotation, and cloud synchronization via `rclone`.
+
+1. **Install rclone**:
+   ```bash
+   sudo apt install rclone
+   # or: curl https://rclone.org/install.sh | sudo bash
+   ```
+
+2. **Configure the Google Drive remote**:
+   Run the interactive configuration wizard:
+   ```bash
+   rclone config
+   ```
+   - Press `n` for a new remote.
+   - Name the remote `minecraftdrive` (matching line 39 in `backup.sh`).
+   - Select `drive` for Google Drive.
+   - Leave client ID and secret blank for defaults, or provide your own OAuth credentials.
+   - Select access scope `1` (full access).
+   - Complete browser authentication when prompted.
+
+3. **Verify the connection**:
+   ```bash
+   rclone lsd minecraftdrive:
+   ```
+
+4. **Customize `backup.sh` settings** (optional):
+   Edit the parameters at the top of `backup.sh`:
+   ```bash
+   SOURCE_FOLDER="world"   # World directory to archive
+   TARGET_FOLDER="backup"  # Local storage folder for .tar snapshots
+   ```
+   - **Custom Remote Name**: If your rclone remote is named differently, update line 39:
+     ```bash
+     rclone sync "$TARGET_FOLDER" your_remote_name:"$TARGET_FOLDER"
+     ```
+   - **Local Retention Limit**: By default, only the 3 newest `.tar` archives are kept locally. To change this quota, modify line 30:
+     ```bash
+     if [ "$COUNT" -gt 5 ]; then  # Retains 5 newest archives
+     ```
+
+5. **Trigger a backup**:
+   Run directly or via MurCes CLI:
+   ```bash
+   ./murces backup
+   # or execute the script directly:
+   ./backup.sh
+   ```
+
 ---
 
 ### 7. Player UUID & Data Migration
@@ -237,14 +287,14 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 
 | Command               | Description                                                             | Flags                                        |
 | --------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| `./murces`            | Launches the interactive Lanterna TUI dashboard                         | —                                            |
+| `./murces`            | Launches the interactive Lanterna TUI dashboard                         | None                                         |
 | `./murces start`      | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_ |
-| `./murces stop`       | Sends graceful `stop` command and terminates the session                | —                                            |
-| `./murces status`     | Checks if the Minecraft server daemon is active                         | —                                            |
-| `./murces backup`     | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | —                                            |
-| `./murces --test-tui` | Runs headless self-test across all TUI screens and exits                | —                                            |
-| `./murces --help`     | Displays available command options and syntax                           | —                                            |
-| `./murces --version`  | Outputs current release version information                             | —                                            |
+| `./murces stop`       | Sends graceful `stop` command and terminates the session                | None                                         |
+| `./murces status`     | Checks if the Minecraft server daemon is active                         | None                                         |
+| `./murces backup`     | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                         |
+| `./murces --test-tui` | Runs headless self-test across all TUI screens and exits                | None                                         |
+| `./murces --help`     | Displays available command options and syntax                           | None                                         |
+| `./murces --version`  | Outputs current release version information                             | None                                         |
 
 ---
 
@@ -276,6 +326,7 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | **Operating System**            | Linux 64-bit (x86_64) | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, and WSL2    |
 | **Terminal Multiplexer**        | `tmux`                | Required for detached background session supervision              |
 | **HTTP Downloader**             | `curl` or `wget`      | Required for dependency and package fetching                      |
+| **Terminal Font**               | [Nerd Font](https://www.nerdfonts.com/) (v3.0+) | Required for icons, navigation glyphs, and status indicators      |
 | **Cloud Sync** _(Optional)_     | `rclone`              | Required only if using Google Drive/S3 offsite world backups      |
 | **Public Tunnels** _(Optional)_ | `playit`              | Required only if running public servers without port forwarding   |
 | **Runtime Environment**         | _None_                | The native binary runs out of the box with zero Java dependencies |
