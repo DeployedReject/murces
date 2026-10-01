@@ -25,9 +25,8 @@ jobs:
           # 1. Extract version from java/tui/pom.xml
           POM_VERSION=$(grep -m 1 '<version>' java/tui/pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
 
-          # Fallback if parsing fails for any reason
           if [ -z "$POM_VERSION" ]; then
-            POM_VERSION="0.1"
+            POM_VERSION="1.0"
           fi
 
           # 2. Construct tag: v<version>-<YYYYMMDD>.<HHMMSS> (UTC)
@@ -51,21 +50,27 @@ jobs:
           fi
           echo "" >> release_notes.md
 
-      # Pinned to graalvm/setup-graalvm
+      # Pinned to graalvm/setup-graalvm v1.2.5
       - name: Set up GraalVM JDK
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276
+        uses: graalvm/setup-graalvm@b9b7e9b0682fa0b0805128ff40c42245b736b446
         with:
-          java-version: "25"
+          java-version: "21"
           distribution: "graalvm"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
 
       - name: Build Orchestrator
+        env:
+          email: "release@murces.local"
+          curseAPI: "placeholder"
         run: |
           cd java/orchestrator
           mvn clean install -DskipTests
 
       - name: Build Native Binary (GraalVM Native Image)
+        env:
+          email: "release@murces.local"
+          curseAPI: "placeholder"
         run: |
           cd java/tui
           mvn clean package -Pnative -DskipTests
@@ -81,13 +86,13 @@ jobs:
           # Copy compiled native executable
           cp java/tui/target/murces dist/
 
-          # Copy all shell scripts from root directory
+          # Copy any root shell scripts (svctrl.sh, backup.sh, etc.)
           cp *.sh dist/ 2>/dev/null || true
 
           # Set executable permissions
           chmod +x dist/murces dist/*.sh 2>/dev/null || true
 
-          # Bundle all contents of dist into murces.zip
+          # Create zip archive
           cd dist
           zip -r ../murces.zip .
           cd ..
