@@ -95,6 +95,78 @@ cp target/murces ../../
 
 ---
 
+## Using MurCes Orchestrator in Your Own Projects
+
+**MurCes Orchestrator** (`murces-orchestrator`) is designed as a standalone, decoupled backend service. It provides a standardized JSON-based IPC interface over standard I/O (`stdin`/`stdout`), allowing you to build your own custom UIs, web panels, Discord bots, scripts, or remote management tools on top of it.
+
+### Capabilities
+- **Server Lifecycle**: Automated downloading, setup, EULA acceptance, and `tmux` session management for Fabric, Forge, Paper, Spigot, and Vanilla.
+- **Unified Modding**: One consistent API to query and download mods across both Modrinth and CurseForge.
+- **Atomic Operations**: Safe chunked downloads with `.tmp` staging, live progress telemetry, and graceful error handling.
+
+### Running Standalone
+Compile the orchestrator jar:
+```sh
+cd java/orchestrator
+mvn clean package
+# Binary located at java/orchestrator/target/murces-orchestrator-1.0.jar
+```
+
+Run it directly from the terminal or spawn it as a child process:
+```sh
+java -jar java/orchestrator/target/murces-orchestrator-1.0.jar
+```
+
+### Quick IPC Examples
+
+#### Bash / Shell
+Pipe JSON requests directly into stdin:
+
+```sh
+# Query supported server engines
+echo '{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}' | java -jar murces-orchestrator-1.0.jar
+
+# Install and launch Paper 1.20.4 with 4GB RAM
+echo '{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}' | java -jar murces-orchestrator-1.0.jar
+
+# Search Modrinth for "sodium"
+echo '{"type": "modding", "modBrowser": "modrinth", "subType": "search", "modName": "sodium", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}' | java -jar murces-orchestrator-1.0.jar
+```
+
+#### Python Subprocess (Bot or Web Backend)
+```python
+import subprocess
+import json
+
+proc = subprocess.Popen(
+    ["java", "-jar", "murces-orchestrator-1.0.jar"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+    bufsize=1
+)
+
+def send_command(payload):
+    proc.stdin.write(json.dumps(payload) + "\n")
+    proc.stdin.flush()
+    return json.loads(proc.stdout.readline())
+
+# Check server status
+status = send_command({
+    "type": "server",
+    "serverType": "none",
+    "gameVersion": "none",
+    "loaderVersion": "none",
+    "ram": 0,
+    "job": 4
+})
+print(f"Server running: {status.get('running')}")
+```
+
+For complete documentation on all request parameters, status codes, and response structures, see [`doc/API-SPEC.md`](doc/API-SPEC.md).
+
+---
+
 ## Configuration
 
 If you downloaded the precompiled release (`murces.zip`), you do **not** need to set up an API key or email. The CurseForge API key and contact details are already baked into the release binary during compilation, so mod browsing works out of the box.

@@ -16,9 +16,11 @@ public class InstallServerView implements WorkspaceView {
     private final ComboBox<String> gameVersionComboBox;
     private final TextBox loaderVersionBox;
     private final ComboBox<String> ramComboBox;
+    private final ProgressBar progressBar;
     private final Label progressLabel;
     private final Button installOnlyBtn;
     private final Button installStartBtn;
+    private final Button cancelBtn;
     private final Button backBtn;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
 
@@ -54,10 +56,19 @@ public class InstallServerView implements WorkspaceView {
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         installOnlyBtn = new Button("[I]nstall Only", () -> runInstall(0));
         installStartBtn = new Button("[S]tart & Install", () -> runInstall(1));
+        cancelBtn = new Button("[X] Cancel Installation", this::cancelInstallation);
         actionPanel.addComponent(installOnlyBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(installStartBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        actionPanel.addComponent(cancelBtn);
         root.addComponent(actionPanel);
+
+        // Progress bar
+        progressBar = new ProgressBar(0, 100);
+        progressBar.setPreferredSize(new TerminalSize(36, 1));
+        progressBar.setValue(0);
+        root.addComponent(progressBar);
 
         // Progress label
         progressLabel = new Label("Ready to install.");
@@ -73,6 +84,7 @@ public class InstallServerView implements WorkspaceView {
         // Hotkeys
         hotkeys.put('I', KeyboardNavigationHelper.focus(installOnlyBtn, () -> runInstall(0)));
         hotkeys.put('S', KeyboardNavigationHelper.focus(installStartBtn, () -> runInstall(1)));
+        hotkeys.put('X', KeyboardNavigationHelper.focus(cancelBtn, this::cancelInstallation));
         hotkeys.put('E', KeyboardNavigationHelper.focus(engineComboBox, this::cycleEngine));
         hotkeys.put('V', KeyboardNavigationHelper.focus(gameVersionComboBox, () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox)));
         hotkeys.put('L', loaderVersionBox::takeFocus);
@@ -112,6 +124,7 @@ public class InstallServerView implements WorkspaceView {
         gameVersionComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         loaderVersionBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         ramComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        progressBar.setPreferredSize(new TerminalSize(Math.max(20, wsWidth - 6), 1));
     }
 
     private void cycleEngine() {
@@ -124,7 +137,31 @@ public class InstallServerView implements WorkspaceView {
         ramComboBox.setSelectedIndex(next);
     }
 
+    public void cancelInstallation() {
+        if (!OrchestratorBridge.isServerDownloading()) {
+            ActivityLogger.info("No server installation is currently running.");
+            return;
+        }
+        ActivityLogger.warn("Cancelling active server installation...");
+        org.codeberg.DeployedReject.tui.backend.JobTracker.getInstance().getActiveJobs().forEach(j -> {
+            if ("Server".equalsIgnoreCase(j.getType())) {
+                j.cancel();
+            }
+        });
+        installOnlyBtn.setEnabled(true);
+        installStartBtn.setEnabled(true);
+        progressBar.setValue(0);
+        progressLabel.setText("[CANCELLED] Server installation aborted and cleaned up.");
+        mainWindow.invalidate();
+    }
+
     private void runInstall(int job) {
+        if (OrchestratorBridge.isServerDownloading()) {
+            ActivityLogger.warn("Server installation or download is already running! Press [X] to cancel it first.");
+            progressLabel.setText("[BUSY] An installation is already running!");
+            return;
+        }
+
         String engine = engineComboBox.getSelectedItem();
         String gameVer = MinecraftVersionHelper.getSelectedVersion(gameVersionComboBox);
         String loaderVer = loaderVersionBox.getText().trim();
@@ -140,6 +177,10 @@ public class InstallServerView implements WorkspaceView {
             return;
         }
 
+        installOnlyBtn.setEnabled(false);
+        installStartBtn.setEnabled(false);
+        progressBar.setValue(0);
+
         ActivityLogger.info("Starting installation of " + engine + " " + gameVer + " (RAM: " + ramVal + "G)...");
         progressLabel.setText("[BUSY] Installing " + engine + " " + gameVer + "...");
 
@@ -149,14 +190,19 @@ public class InstallServerView implements WorkspaceView {
                 java.util.concurrent.atomic.AtomicInteger lastProg = new java.util.concurrent.atomic.AtomicInteger(-1);
                 OrchestratorBridge.getInstance().installServer(engine, gameVer, loaderVer, finalRam, job, msg -> {
                     if (msg != null && msg.contains("%")) {
-                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)%").matcher(msg);
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+(\\.\\d+)?)%").matcher(msg);
                         if (m.find()) {
-                            int pct = Integer.parseInt(m.group(1));
-                            int prev = lastProg.get();
-                            if (prev != -1 && pct < 100 && pct < prev + 5) {
-                                return;
-                            }
-                            lastProg.set(pct);
+                            try {
+                                double pVal = Double.parseDouble(m.group(1));
+                                int pct = (int) Math.round(pVal);
+                                int prev = lastProg.get();
+                                if (prev == -1 || pct >= prev + 1 || pct >= 100) {
+                                    lastProg.set(pct);
+                                    mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                                        progressBar.setValue(Math.min(100, Math.max(0, pct)));
+                                    });
+                                }
+                            } catch (Exception ignored) {}
                         }
                     }
                     mainWindow.getGui().getGUIThread().invokeLater(() -> {
@@ -166,13 +212,18 @@ public class InstallServerView implements WorkspaceView {
                 }).get();
 
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    progressBar.setValue(100);
+                    installOnlyBtn.setEnabled(true);
+                    installStartBtn.setEnabled(true);
                     progressLabel.setText("[OK] Server installation completed!");
                     ActivityLogger.ok("Server installation finished successfully!");
                 });
             } catch (Exception e) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    progressLabel.setText("[ERR] Installation failed: " + e.getMessage());
-                    ActivityLogger.err("Installation failed: " + e.getMessage());
+                    installOnlyBtn.setEnabled(true);
+                    installStartBtn.setEnabled(true);
+                    progressLabel.setText("[ERR] Installation stopped: " + e.getMessage());
+                    ActivityLogger.err("Installation stopped: " + e.getMessage());
                 });
             }
         }).start();

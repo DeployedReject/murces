@@ -431,14 +431,32 @@ public class OrchestratorBridge {
                                                   Consumer<DownloadProgressInfo> richProgressCallback) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         long startTime = System.currentTimeMillis();
+        String jobId = "mod-" + modIdOrSlug;
+
+        final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+                jobId,
+                "Download Mod (" + platform + "): " + modIdOrSlug,
+                "Mod",
+                () -> future.cancel(true)
+        );
 
         Consumer<JsonObject> handler = new Consumer<>() {
             @Override
             public void accept(JsonObject json) {
+                if (trackedJob.isCancelled()) {
+                    removeListener(this);
+                    JobTracker.getInstance().unregisterJob(jobId);
+                    future.completeExceptionally(new CancellationException("Mod download cancelled"));
+                    return;
+                }
                 if (json.has("type") && "download".equals(json.get("type").getAsString())) {
                     int status = json.has("status") ? json.get("status").getAsInt() : -1;
                     if (json.has("progress")) {
                         double pct = json.get("progress").getAsDouble();
+                        if (pct >= 0) {
+                            trackedJob.setProgress(pct);
+                            trackedJob.setStatus(String.format("%.1f%%", pct));
+                        }
                         if (progressCallback != null) {
                             progressCallback.accept(pct);
                         }
@@ -454,10 +472,12 @@ public class OrchestratorBridge {
                     }
                     if (status == 3) {
                         removeListener(this);
+                        JobTracker.getInstance().unregisterJob(jobId);
                         future.complete(true);
                     }
                 } else if (json.has("error")) {
                     removeListener(this);
+                    JobTracker.getInstance().unregisterJob(jobId);
                     future.completeExceptionally(new RuntimeException(json.get("error").getAsString()));
                 }
             }
@@ -476,6 +496,7 @@ public class OrchestratorBridge {
                 }
             } catch (Exception e) {
                 removeListener(handler);
+                JobTracker.getInstance().unregisterJob(jobId);
                 future.completeExceptionally(e);
             }
         });
@@ -485,7 +506,29 @@ public class OrchestratorBridge {
 
     public CompletableFuture<Boolean> downloadModDirect(String downloadUrl, String filename, Consumer<DownloadProgressInfo> richProgressCallback) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+        String jobId = "mod-direct-" + filename;
+        File targetTmp = new File("mods", filename + ".tmp");
+        File targetFinal = new File("mods", filename);
+
+        final Thread[] workerThread = new Thread[1];
+        final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+                jobId,
+                "Download Mod: " + filename,
+                "Mod",
+                () -> {
+                    if (workerThread[0] != null) {
+                        workerThread[0].interrupt();
+                    }
+                    if (targetTmp.exists()) {
+                        try { targetTmp.delete(); } catch (Exception ignored) {}
+                    }
+                }
+        );
+        trackedJob.addFileToCleanup(targetTmp);
+
         workerPool.submit(() -> {
+            workerThread[0] = Thread.currentThread();
+            boolean finishedSuccessfully = false;
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create(downloadUrl))
@@ -494,18 +537,25 @@ public class OrchestratorBridge {
                         .build();
                 HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
                 if (resp == null || resp.statusCode() != 200) {
+                    JobTracker.getInstance().unregisterJob(jobId);
                     future.completeExceptionally(new IOException("Failed to download mod file: HTTP " + (resp != null ? resp.statusCode() : "null")));
                     return;
                 }
                 long filesize = resp.headers().firstValueAsLong("content-length").orElse(-1L);
                 long startTime = System.currentTimeMillis();
-                File target = new File("mods", filename);
-                try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(target)) {
+
+                File modsDir = new File("mods");
+                if (!modsDir.exists()) modsDir.mkdirs();
+
+                try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(targetTmp)) {
                     byte[] buf = new byte[8192];
                     int n;
                     long totalRead = 0;
                     long lastCallback = 0;
                     while ((n = in.read(buf)) != -1) {
+                        if (Thread.currentThread().isInterrupted() || trackedJob.isCancelled()) {
+                            throw new InterruptedException("Download cancelled");
+                        }
                         out.write(buf, 0, n);
                         totalRead += n;
                         long now = System.currentTimeMillis();
@@ -514,44 +564,108 @@ public class OrchestratorBridge {
                             double elapsedSec = Math.max(0.001, (now - startTime) / 1000.0);
                             double speedMBps = (totalRead / (1024.0 * 1024.0)) / elapsedSec;
                             int eta = (filesize > totalRead && speedMBps > 0) ? (int) Math.round(((filesize - totalRead) / (1024.0 * 1024.0)) / speedMBps) : 0;
-                            double pct = filesize > 0 ? (totalRead * 100.0) / filesize : 0.0;
+                            double pct = filesize > 0 ? (totalRead * 100.0) / filesize : -1.0;
+                            if (pct >= 0) {
+                                trackedJob.setProgress(pct);
+                                trackedJob.setStatus(String.format("%.1f%% (ETA: %ds @ %.1f MB/s)", pct, eta, speedMBps));
+                            }
                             if (richProgressCallback != null) {
                                 richProgressCallback.accept(new DownloadProgressInfo(pct, totalRead, filesize, speedMBps, eta));
                             }
                         }
                     }
+                    out.flush();
                 }
+
+                // Atomically move temp file to final target
+                try {
+                    Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                } catch (Exception moveEx) {
+                    Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                finishedSuccessfully = true;
+                JobTracker.getInstance().unregisterJob(jobId);
                 future.complete(true);
             } catch (Exception e) {
+                if (!finishedSuccessfully && targetTmp.exists()) {
+                    try { targetTmp.delete(); } catch (Exception ignored) {}
+                }
+                JobTracker.getInstance().unregisterJob(jobId);
                 future.completeExceptionally(e);
             }
         });
         return future;
     }
 
+    private static final java.util.concurrent.atomic.AtomicBoolean serverInstalling = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    public static boolean isServerDownloading() {
+        return serverInstalling.get() || JobTracker.getInstance().hasActiveServerJob();
+    }
+
     public CompletableFuture<Boolean> installServer(String serverType, String gameVersion, String loaderVersion, int ram, int job, Consumer<String> statusCallback) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+        serverInstalling.set(true);
+
+        String jobId = "server-install-" + serverType.toLowerCase();
+        final Thread[] workerThread = new Thread[1];
+        final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+                jobId,
+                "Server Install: " + serverType + " (" + gameVersion + ")",
+                "Server",
+                () -> {
+                    serverInstalling.set(false);
+                    if (workerThread[0] != null) {
+                        workerThread[0].interrupt();
+                    }
+                }
+        );
+        trackedJob.addFileToCleanup(new File("server.jar.tmp"));
+        trackedJob.addFileToCleanup(new File("fabric-installer.jar"));
+        trackedJob.addFileToCleanup(new File("BuildTools.jar"));
+        trackedJob.addFileToCleanup(new File("BuildTools.jar.tmp"));
 
         Consumer<JsonObject> handler = new Consumer<>() {
             @Override
             public void accept(JsonObject json) {
+                if (trackedJob.isCancelled()) {
+                    removeListener(this);
+                    serverInstalling.set(false);
+                    JobTracker.getInstance().unregisterJob(jobId);
+                    future.completeExceptionally(new CancellationException("Server installation was cancelled"));
+                    return;
+                }
                 if (json.has("type") && "download".equals(json.get("type").getAsString())) {
                     double prog = json.has("progress") ? json.get("progress").getAsDouble() : -1.0;
                     String file = json.has("id") ? json.get("id").getAsString() : "server.jar";
-                    if (statusCallback != null && prog >= 0) {
-                        statusCallback.accept(String.format("Downloading %s (%.2f%%)", file, prog));
+                    if (prog >= 0) {
+                        trackedJob.setProgress(prog);
+                        trackedJob.setStatus(String.format("Downloading %s (%.1f%%)", file, prog));
+                    }
+                    if (statusCallback != null) {
+                        if (prog >= 0) {
+                            statusCallback.accept(String.format("Downloading %s (%.2f%%)", file, prog));
+                        } else {
+                            statusCallback.accept(String.format("Downloading %s...", file));
+                        }
                     }
                 } else if (json.has("type") && "server".equals(json.get("type").getAsString())) {
                     int status = json.has("status") ? json.get("status").getAsInt() : -1;
-                    if (statusCallback != null) {
-                        statusCallback.accept("Server job status: " + status);
-                    }
-                    if (status == 3) {
+                    if (status == 2) {
+                        trackedJob.setStatus("Installing/compiling components...");
+                        if (statusCallback != null) {
+                            statusCallback.accept("Installing server components...");
+                        }
+                    } else if (status == 3) {
                         removeListener(this);
+                        serverInstalling.set(false);
+                        JobTracker.getInstance().unregisterJob(jobId);
                         future.complete(true);
                     }
                 } else if (json.has("error")) {
                     removeListener(this);
+                    serverInstalling.set(false);
+                    JobTracker.getInstance().unregisterJob(jobId);
                     future.completeExceptionally(new RuntimeException(json.get("error").getAsString()));
                 }
             }
@@ -560,12 +674,15 @@ public class OrchestratorBridge {
         addListener(handler);
 
         workerPool.submit(() -> {
+            workerThread[0] = Thread.currentThread();
             try {
                 String lVersion = (loaderVersion != null && !loaderVersion.isEmpty()) ? loaderVersion : "latest";
                 ServerHandler sh = new ServerHandler("server", serverType.toLowerCase(), gameVersion, lVersion, ram, job);
                 sh.serverHandler();
             } catch (Exception e) {
+                serverInstalling.set(false);
                 removeListener(handler);
+                JobTracker.getInstance().unregisterJob(jobId);
                 future.completeExceptionally(e);
             }
         });
@@ -595,10 +712,35 @@ public class OrchestratorBridge {
     }
 
     public static boolean isServerInstalled() {
-        return new File("server.jar").exists() ||
-               new File("run.sh").exists() ||
-               new File("sv_start.sh").exists() ||
-               new File("fabric-server-launch.jar").exists();
+        if (isServerDownloading()) {
+            return false;
+        }
+        if (new File("server.jar.tmp").exists() || new File("BuildTools.jar").exists()) {
+            return false;
+        }
+        // Check for Fabric server
+        File fabricLaunch = new File("fabric-server-launch.jar");
+        if (fabricLaunch.exists() && fabricLaunch.length() > 0) {
+            File mcJar = new File("server.jar");
+            if (mcJar.exists() && mcJar.length() > 5_000_000) {
+                return true;
+            }
+        }
+        // Check for Forge server run.sh
+        File runSh = new File("run.sh");
+        if (runSh.exists() && runSh.length() > 0) {
+            return true;
+        }
+        // Check for Vanilla / Paper / Spigot server.jar
+        File sJar = new File("server.jar");
+        if (sJar.exists() && sJar.length() > 5_000_000) {
+            return true;
+        }
+        File svStart = new File("sv_start.sh");
+        if (svStart.exists() && svStart.length() > 0) {
+            return true;
+        }
+        return false;
     }
 
     public static boolean isServerRunning() {
@@ -607,6 +749,8 @@ public class OrchestratorBridge {
         res = runShell("tmux", "has-session", "-t", "mcServer");
         if (res.exitCode == 0) return true;
         res = runShell("pgrep", "-f", "server.jar");
+        if (res.exitCode == 0) return true;
+        res = runShell("pgrep", "-f", "fabric-server-launch.jar");
         return res.exitCode == 0;
     }
 

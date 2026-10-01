@@ -88,7 +88,7 @@ public class Main {
         } else if (type.equals("modding")) {
 
           if (!(request.has("modBrowser") && request.has("modName") && request.has("version")
-              && request.has("loader") && request.has("subType"))) {
+              && (request.has("loader") || request.has("modLoader")) && request.has("subType"))) {
             ErrorHelper.errorJson("Missing One or More Necessary Parameters.");
             return;
           }
@@ -97,7 +97,7 @@ public class Main {
           String subType = request.get("subType").getAsString();
           String modName = request.get("modName").getAsString();
           String version = request.get("version").getAsString();
-          String loader = request.get("loader").getAsString();
+          String loader = request.has("loader") ? request.get("loader").getAsString() : request.get("modLoader").getAsString();
 
           ModAPI handle;
           switch (modBrowser) {

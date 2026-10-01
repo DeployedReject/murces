@@ -37,6 +37,7 @@ public class ModBrowseView implements WorkspaceView {
     private final Panel detailsCard;
     private final Button searchBtn;
     private final Button downloadBtn;
+    private final Button cancelBtn;
     private final Button backBtn;
 
     private final List<OrchestratorBridge.ModResult> currentResults = new ArrayList<>();
@@ -100,10 +101,13 @@ public class ModBrowseView implements WorkspaceView {
         searchPanel.addComponent(searchBtn);
         searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         searchPanel.addComponent(downloadBtn);
+        searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        cancelBtn = new Button("[X] Cancel Download", this::cancelDownload);
+        searchPanel.addComponent(cancelBtn);
         root.addComponent(searchPanel);
 
         // 3. Status Label
-        statusLabel = new Label("Type query, press [S] to search, [D] to download.");
+        statusLabel = new Label("Type query, press [S] to search, [D] to download, [X] to cancel.");
         statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         root.addComponent(statusLabel);
 
@@ -137,8 +141,8 @@ public class ModBrowseView implements WorkspaceView {
 
         pickaxeAnim = new MinecraftPickaxeAnimation();
         pickaxeAnim.setProgress(0.0);
-        pickaxeAnim.setCustomMessage("⛏ Ready to mine mods");
-        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine("Mining & Download Status")));
+        pickaxeAnim.setCustomMessage("Ready to download mods");
+        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine("Download Status")));
 
         detailsCard.setPreferredSize(new TerminalSize(48, 12));
         rightCol.addComponent(detailsCard.withBorder(Borders.singleLine("Mod Details & Version")));
@@ -194,6 +198,7 @@ public class ModBrowseView implements WorkspaceView {
             }
         }));
         hotkeys.put('V', KeyboardNavigationHelper.focus(versionComboBox, () -> MinecraftVersionHelper.cycleVersion(versionComboBox)));
+        hotkeys.put('X', KeyboardNavigationHelper.focus(cancelBtn, this::cancelDownload));
         hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
     }
 
@@ -464,7 +469,7 @@ public class ModBrowseView implements WorkspaceView {
 
         boolean showAnimation = ConfigManager.getInstance().getConfig().isPickaxeAnimation();
         pickaxeAnim.setProgress(0.0);
-        pickaxeAnim.setCustomMessage("Mining " + mod.name + "...");
+        pickaxeAnim.setCustomMessage("Downloading " + mod.name + "...");
 
         stopTicker();
         if (showAnimation) {
@@ -509,7 +514,7 @@ public class ModBrowseView implements WorkspaceView {
                     statusLabel.setText("[OK] " + mod.name + " installed!");
                     statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
                     pickaxeAnim.setProgress(100.0);
-                    pickaxeAnim.setCustomMessage("[OK] " + mod.name + " mined & installed!");
+                    pickaxeAnim.setCustomMessage("[OK] " + mod.name + " downloaded & installed!");
                     mainWindow.invalidate();
                     try {
                         mainWindow.getGui().updateScreen();
@@ -533,6 +538,25 @@ public class ModBrowseView implements WorkspaceView {
         }).start();
     }
 
+    public void cancelDownload() {
+        if (!isDownloading) {
+            ActivityLogger.info("No mod download currently in progress.");
+            return;
+        }
+        ActivityLogger.warn("Cancelling active mod download...");
+        org.codeberg.DeployedReject.tui.backend.JobTracker.getInstance().getActiveJobs().forEach(job -> {
+            if ("Mod".equalsIgnoreCase(job.getType())) {
+                job.cancel();
+            }
+        });
+        isDownloading = false;
+        stopTicker();
+        statusLabel.setText("[CANCELLED] Download cancelled.");
+        statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
+        pickaxeAnim.setCustomMessage("[CANCELLED] Download aborted.");
+        mainWindow.invalidate();
+    }
+
     private volatile long lastProgressUiUpdate = 0;
 
     private void updateProgressUI(String modName, OrchestratorBridge.DownloadProgressInfo info) {
@@ -549,7 +573,7 @@ public class ModBrowseView implements WorkspaceView {
             statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
 
             pickaxeAnim.setProgress(info.percent);
-            pickaxeAnim.setCustomMessage(String.format("Mining %s: %.2f%% (ETA: %s @ %s)",
+            pickaxeAnim.setCustomMessage(String.format("Downloading %s: %.2f%% (ETA: %s @ %s)",
                     modName, info.percent, info.formattedEta(), info.formattedSpeed()));
 
             mainWindow.invalidate();

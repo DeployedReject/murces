@@ -128,10 +128,14 @@ public class ServerControlView implements WorkspaceView {
 
     public void updateStatus() {
         new Thread(() -> {
+            boolean downloading = OrchestratorBridge.isServerDownloading();
             boolean running = OrchestratorBridge.isServerRunning();
             boolean installed = OrchestratorBridge.isServerInstalled();
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                if (running) {
+                if (downloading) {
+                    statusLabel.setText("[INSTALLING...]");
+                    statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+                } else if (running) {
                     statusLabel.setText("[RUNNING] - Port 25565");
                     statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
                 } else if (!installed) {
@@ -146,8 +150,13 @@ public class ServerControlView implements WorkspaceView {
     }
 
     private void onStart() {
+        if (OrchestratorBridge.isServerDownloading()) {
+            ActivityLogger.warn("Cannot start server: installation or download is currently in progress. Please wait for it to complete.");
+            updateStatus();
+            return;
+        }
         if (!OrchestratorBridge.isServerInstalled()) {
-            ActivityLogger.warn("No Minecraft server is installed yet! Please select '[I]nstall Server Engine' first.");
+            ActivityLogger.warn("No complete Minecraft server is installed yet! Please select '[I]nstall Server Engine' first.");
             updateStatus();
             return;
         }
@@ -198,8 +207,13 @@ public class ServerControlView implements WorkspaceView {
     }
 
     private void onRestart() {
+        if (OrchestratorBridge.isServerDownloading()) {
+            ActivityLogger.warn("Cannot restart server: installation or download is currently in progress.");
+            updateStatus();
+            return;
+        }
         if (!OrchestratorBridge.isServerInstalled()) {
-            ActivityLogger.warn("No Minecraft server is installed yet! Please select '[I]nstall Server Engine' first.");
+            ActivityLogger.warn("No complete Minecraft server is installed yet! Please select '[I]nstall Server Engine' first.");
             updateStatus();
             return;
         }

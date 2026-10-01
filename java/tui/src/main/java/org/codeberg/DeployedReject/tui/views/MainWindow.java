@@ -51,6 +51,7 @@ public class MainWindow extends BasicWindow {
     private final ModBrowseView modBrowseView;
     private final ModManageView modManageView;
     private final CustomizationView customizationView;
+    private final JobManagerView jobManagerView;
 
     private WorkspaceView currentView;
     private String lastConsoleOutput = "";
@@ -148,6 +149,7 @@ public class MainWindow extends BasicWindow {
         this.modBrowseView = new ModBrowseView(this);
         this.modManageView = new ModManageView(this);
         this.customizationView = new CustomizationView(this);
+        this.jobManagerView = new JobManagerView(this);
 
         // Apply persistent theme and configuration
         applyConfig(ConfigManager.getInstance().getConfig());
@@ -233,6 +235,7 @@ public class MainWindow extends BasicWindow {
     public void showModBrowse() { showView(modBrowseView); }
     public void showModManage() { showView(modManageView); }
     public void showCustomization() { showView(customizationView); }
+    public void showJobManager() { showView(jobManagerView); }
 
     public MainMenuView getMainMenuView() { return mainMenuView; }
     public ServerControlView getServerControlView() { return serverControlView; }
@@ -243,6 +246,7 @@ public class MainWindow extends BasicWindow {
     public ModBrowseView getModBrowseView() { return modBrowseView; }
     public ModManageView getModManageView() { return modManageView; }
     public CustomizationView getCustomizationView() { return customizationView; }
+    public JobManagerView getJobManagerView() { return jobManagerView; }
 
     public void applyConfig(TuiConfig config) {
         if (config == null) return;
@@ -423,6 +427,13 @@ public class MainWindow extends BasicWindow {
                         if (c == 'Z' && currentView != customizationView) {
                             deliver.set(false);
                             showCustomization();
+                            return;
+                        }
+
+                        // Global Active Tasks shortcut [J]
+                        if (c == 'J' && currentView != jobManagerView) {
+                            deliver.set(false);
+                            showJobManager();
                             return;
                         }
 

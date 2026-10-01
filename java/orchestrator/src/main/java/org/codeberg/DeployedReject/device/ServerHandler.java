@@ -42,6 +42,11 @@ public class ServerHandler {
   public void serverHandler() {
 
     if (job == 1 || job == 0) {
+      JsonObject startMsg = new JsonObject();
+      startMsg.addProperty("status", 2);
+      startMsg.addProperty("type", "server");
+      Communicator.printer(startMsg);
+
       switch (loader) {
         case "fabric":
           fabric();
@@ -60,16 +65,17 @@ public class ServerHandler {
           break;
         default:
           ErrorHelper.errorJson("Server Unsupported or Mistyped");
-          break;
+          return;
       }
     }
     switch (job) {
       case 0:
-        // Download only, nothing else to do. Optionally send a completion status.
-        // No further action needed; the download methods already emit progress and final status.
+        JsonObject comp = new JsonObject();
+        comp.addProperty("status", 3);
+        comp.addProperty("type", "server");
+        Communicator.printer(comp);
         break;
       case 1:
-
         if (loader.equals("forge"))
           spawnServer(true);
         else
@@ -86,9 +92,38 @@ public class ServerHandler {
         vanilla();
         forge();
         response.add("server", list);
+        response.add("serverList", list);
         response.addProperty("type", "server");
         response.addProperty("status", 0);
         Communicator.printer(response);
+        break;
+      case 4:
+        boolean isRunning = false;
+        try {
+          String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
+          isRunning = (Shell.execute(checkCmd).waitFor() == 0);
+        } catch (Exception ignored) {}
+        JsonObject statusResp = new JsonObject();
+        statusResp.addProperty("status", 0);
+        statusResp.addProperty("type", "server");
+        statusResp.addProperty("running", isRunning);
+        Communicator.printer(statusResp);
+        break;
+      case 5:
+        if (loader.equals("forge"))
+          spawnServer(true);
+        else
+          spawnServer();
+        break;
+      case 6:
+        stopServer();
+        try {
+          Thread.sleep(1000);
+        } catch (Exception ignored) {}
+        if (loader.equals("forge"))
+          spawnServer(true);
+        else
+          spawnServer();
         break;
       default:
         ErrorHelper.errorJson("wtf is this job");
@@ -97,6 +132,10 @@ public class ServerHandler {
   }
 
   private void vanilla() {
+    if (job == 3) {
+      list.add("vanilla");
+      return;
+    }
 
     String url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
     HttpRequest findingURL = HttpRequest.newBuilder()
@@ -141,51 +180,89 @@ public class ServerHandler {
 
     downloading = NetworkUtils.attemptI(findingURL);
 
-    if (job == 3) {
-      list.add("vanilla");
-      return;
-
-    }
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
     NetworkUtils.prog(downloading.body(), "server.jar", filesize);
 
   }
 
   private void fabric() {
-
-    String url = "https://meta.fabricmc.net/v2/versions/loader/" + gVersion + "/" + lVersion + "/1.1.1/server/jar";
-
-    HttpRequest downloadRequest = HttpRequest
-        .newBuilder()
-        .uri(URI.create(url))
-        .GET()
-        .build();
-
-    HttpResponse<InputStream> downloading;
-
-    downloading = NetworkUtils.attemptI(downloadRequest);
-
     if (job == 3) {
       list.add("fabric");
       return;
     }
 
-    long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-    NetworkUtils.prog(downloading.body(), "server.jar", filesize);
+    String installerVersion = "1.1.2";
+    try {
+      HttpRequest vReq = HttpRequest.newBuilder().uri(URI.create("https://meta.fabricmc.net/v2/versions/installer")).GET().build();
+      HttpResponse<String> vResp = NetworkUtils.attemptS(vReq);
+      if (vResp != null && vResp.body() != null) {
+        JsonArray arr = JsonParser.parseString(vResp.body()).getAsJsonArray();
+        for (int i = 0; i < arr.size(); i++) {
+          JsonObject inst = arr.get(i).getAsJsonObject();
+          if (inst.has("stable") && inst.get("stable").getAsBoolean()) {
+            installerVersion = inst.get("version").getAsString();
+            break;
+          }
+        }
+      }
+    } catch (Exception ignored) {}
 
+    String installerJar = "fabric-installer.jar";
+    String url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/" + installerVersion + "/fabric-installer-" + installerVersion + ".jar";
+    HttpRequest downloadRequest = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+    HttpResponse<InputStream> downloading = NetworkUtils.attemptI(downloadRequest);
+    if (downloading == null) {
+      ErrorHelper.errorJson("Failed to download Fabric installer");
+      return;
+    }
+
+    long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
+    NetworkUtils.prog(downloading.body(), installerJar, filesize);
+
+    java.util.List<String> commandList = new java.util.ArrayList<>();
+    commandList.add("java");
+    commandList.add("-jar");
+    commandList.add(installerJar);
+    commandList.add("server");
+    commandList.add("-mcversion");
+    commandList.add(gVersion);
+    if (lVersion != null && !lVersion.isEmpty() && !lVersion.equalsIgnoreCase("none") && !lVersion.equalsIgnoreCase("latest")) {
+      commandList.add("-loader");
+      commandList.add(lVersion);
+    }
+    commandList.add("-downloadMinecraft");
+
+    JsonObject response = new JsonObject();
+    response.addProperty("status", 2);
+    response.addProperty("type", "server");
+    Communicator.printer(response);
+
+    try {
+      if (Shell.execute(commandList.toArray(new String[0])).waitFor() != 0) {
+        ErrorHelper.errorJson("Fabric server installer execution failed");
+        return;
+      }
+    } catch (Exception e) {
+      ErrorHelper.errorJson("Fabric installation error: " + e.getMessage());
+      return;
+    } finally {
+      try {
+        Files.deleteIfExists(Paths.get(installerJar));
+      } catch (Exception ignored) {}
+    }
   }
 
   private void spigot() {
+    if (job == 3) {
+      list.add("spigot");
+      return;
+    }
 
     HttpResponse<InputStream> build;
     build = NetworkUtils.attemptI(HttpRequest.newBuilder()
         .uri(URI.create(
             "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"))
         .GET().build());
-    if (job == 3) {
-      list.add("spigot");
-      return;
-    }
 
     long filesize = build.headers().firstValueAsLong("content-length").orElse(-1L);
     NetworkUtils.prog(build.body(), "BuildTools.jar", filesize);
@@ -209,8 +286,6 @@ public class ServerHandler {
         ErrorHelper.errorJson("Build failed");
         return;
       }
-      response.addProperty("status", 3);
-      Communicator.printer(response);
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
@@ -233,6 +308,11 @@ public class ServerHandler {
   }
 
   private void paper() {
+    if (job == 3) {
+      list.add("paper");
+      return;
+    }
+
     String url = "https://api.papermc.io/v2/projects/paper/versions/" + gVersion;
 
     HttpResponse<String> findingURL = NetworkUtils
@@ -247,10 +327,6 @@ public class ServerHandler {
     HttpResponse<InputStream> downloading = NetworkUtils
         .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
 
-    if (job == 3) {
-      list.add("paper");
-      return;
-    }
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
 
     NetworkUtils.prog(downloading.body(), "server.jar", filesize);
@@ -258,6 +334,11 @@ public class ServerHandler {
   }
 
   private void spawnServer() {
+    String targetJar = "server.jar";
+    if ("fabric".equalsIgnoreCase(loader) || Files.exists(Paths.get("fabric-server-launch.jar"))) {
+      targetJar = "fabric-server-launch.jar";
+    }
+
     String[] command = new String[] {
         "tmux",
         "new-session",
@@ -288,7 +369,7 @@ public class ServerHandler {
         "-Dusing.aikars.flags=https://mcflags.emc.gs",
         "-Daikars.new.flags=true",
         "-jar",
-        "server.jar",
+        targetJar,
         "--nogui"
     };
     try {
@@ -307,10 +388,11 @@ public class ServerHandler {
 
       if (Shell.execute(command).waitFor() != 0) {
         ErrorHelper.errorJson("Server Already Started");
-
       } else {
-        // Server start initiated. UI will monitor logs for readiness.
-        // No final completion status sent here.
+        JsonObject serverDone = new JsonObject();
+        serverDone.addProperty("status", 3);
+        serverDone.addProperty("type", "server");
+        Communicator.printer(serverDone);
       }
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
@@ -353,6 +435,11 @@ public class ServerHandler {
   }
 
   private void forge() {
+    if (job == 3) {
+      list.add("forge");
+      return;
+    }
+
     String url = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
     HttpResponse<String> findingURl = NetworkUtils.attemptS(HttpRequest.newBuilder()
         .uri(URI.create(
@@ -368,11 +455,6 @@ public class ServerHandler {
 
     HttpResponse<InputStream> downloading = NetworkUtils
         .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
-
-    if (job == 3) {
-      list.add("forge");
-      return;
-    }
 
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
 
@@ -394,9 +476,6 @@ public class ServerHandler {
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
     }
-
-    response.addProperty("status", 3);
-    Communicator.printer(response);
 
   }
 
@@ -453,14 +532,18 @@ public class ServerHandler {
 
       if (Shell.execute(command).waitFor() != 0) {
         ErrorHelper.errorJson("too tired to write a error message.");
+        return;
       }
 
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
+      return;
     }
 
-    response.addProperty("status", 3);
-    Communicator.printer(response);
+    JsonObject serverDone = new JsonObject();
+    serverDone.addProperty("status", 3);
+    serverDone.addProperty("type", "server");
+    Communicator.printer(serverDone);
 
   }
 }

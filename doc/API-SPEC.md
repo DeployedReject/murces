@@ -96,6 +96,9 @@ The server module manages the download, installation, and background process exe
   - `1` : **Install & Start** (Downloads/compiles and immediately spawns the `tmux` session).
   - `2` : **Stop** (Kills the active `mcServer` tmux session).
   - `3` : **Check Supported Engines** (Returns a list of currently implemented server types).
+  - `4` : **Check Status** (Returns whether the `mcServer` tmux session is currently active).
+  - `5` : **Start Only** (Spawns the `tmux` session for an already installed server without reinstalling).
+  - `6` : **Restart** (Stops the active server session, waits briefly, and launches it again).
 
 **Example (Install & Launch Paper):**
 `{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}`
@@ -105,6 +108,15 @@ The server module manages the download, installation, and background process exe
 
 **Example (Query Supported Engines):**
 `{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}`
+
+**Example (Check Server Running Status):**
+`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 4}`
+
+**Example (Start Existing Server):**
+`{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 5}`
+
+**Example (Restart Server):**
+`{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 6}`
 
 ---
 
@@ -140,15 +152,25 @@ _Flow:_
 
 **4. Server Deployment (`type: "server"`)**
 Servers take time to download (Paper, Fabric, Forge, Vanilla), compile (Spigot), and launch (`tmux`). They utilize the start/stop status codes.
-_Flow (Install & Launch - `job: 1`):_
 
+_Flow (Install Only - `job: 0`):_
+1. `{"status": 2, "type": "server"}` _(Downloading/compiling assets)_
+2. `{"status": 3, "type": "server"}` _(Server installation finished)_
+
+_Flow (Install & Launch - `job: 1`):_
 1. `{"status": 2, "type": "server"}` _(Downloading/compiling assets or executing tmux command)_
-2. `{"status": 3, "type": "server"}` _(Server successfully handed off to background session)_
+2. `{"status": 3, "type": "server"}` _(Server successfully handed off to background tmux session)_
 
 _Flow (Stop Server - `job: 2`):_
-
 1. `{"status": 0, "type": "server"}` _(Emitted immediately upon successfully killing the tmux session)_
 
+_Flow (Check Server Status - `job: 4`):_
+1. `{"status": 0, "type": "server", "running": true}` _(or `false` if no active session)_
+
+_Flow (Start Only - `job: 5` or Restart - `job: 6`):_
+1. `{"status": 2, "type": "server"}` _(Initiating server launch)_
+2. `{"status": 3, "type": "server"}` _(Server successfully running in tmux)_
+
 **5. Supported Engine List (`job: 3`)**
-Returned when the frontend asks for supported loaders. Includes a `serverList` array alongside the `status: 0` confirmation.
-_Example:_ `{"serverList": ["fabric", "spigot", "paper", "vanilla", "forge"], "status": 0}`
+Returned when the frontend asks for supported loaders. Includes `serverList` and `server` arrays alongside the `status: 0` confirmation.
+_Example:_ `{"serverList": ["fabric", "spigot", "paper", "vanilla", "forge"], "server": ["fabric", "spigot", "paper", "vanilla", "forge"], "status": 0, "type": "server"}`

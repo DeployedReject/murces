@@ -19,6 +19,7 @@ public class InstallServerWindow extends BasicWindow {
     private final TextBox loaderVersionBox;
     private final ComboBox<String> ramComboBox;
     private final TextBox outputLog;
+    private final ProgressBar progressBar;
     private final Label progressLabel;
 
     public InstallServerWindow(WindowBasedTextGUI gui) {
@@ -60,12 +61,20 @@ public class InstallServerWindow extends BasicWindow {
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         Button installOnlyBtn = new Button("Install Only", () -> runInstall(0));
         Button installStartBtn = new Button("Start & Install", () -> runInstall(1));
+        Button cancelBtn = new Button("Cancel Install", this::cancelInstallation);
         actionPanel.addComponent(installOnlyBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
         actionPanel.addComponent(installStartBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
+        actionPanel.addComponent(cancelBtn);
         root.addComponent(actionPanel);
 
-        // Progress & Log
+        // Progress bar & Log
+        progressBar = new ProgressBar(0, 100);
+        progressBar.setPreferredSize(new TerminalSize(70, 1));
+        progressBar.setValue(0);
+        root.addComponent(progressBar);
+
         progressLabel = new Label("Ready to install.");
         progressLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(progressLabel);
@@ -113,7 +122,27 @@ public class InstallServerWindow extends BasicWindow {
         }
     }
 
+    private void cancelInstallation() {
+        if (!OrchestratorBridge.isServerDownloading()) {
+            appendLog("[INFO] No server installation currently running.");
+            return;
+        }
+        appendLog("[WARN] Cancelling server installation...");
+        org.codeberg.DeployedReject.tui.backend.JobTracker.getInstance().getActiveJobs().forEach(j -> {
+            if ("Server".equalsIgnoreCase(j.getType())) {
+                j.cancel();
+            }
+        });
+        progressBar.setValue(0);
+        progressLabel.setText("[CANCELLED] Installation cancelled.");
+    }
+
     private void runInstall(int job) {
+        if (OrchestratorBridge.isServerDownloading()) {
+            MessageDialog.showMessageDialog(gui, "Busy", "A server installation is already in progress!", MessageDialogButton.OK);
+            return;
+        }
+
         String engine = engineComboBox.getSelectedItem();
         String gameVer = MinecraftVersionHelper.getSelectedVersion(gameVersionComboBox);
         String loaderVer = loaderVersionBox.getText().trim();
@@ -128,6 +157,7 @@ public class InstallServerWindow extends BasicWindow {
             return;
         }
 
+        progressBar.setValue(0);
         String actionName = (job == 1) ? "Install & Start" : "Install Only";
         progressLabel.setText("[BUSY] Running " + actionName + " for " + engine + " " + gameVer + " (" + ram + "G)...");
         appendLog("[INFO] Starting installation: " + engine + " " + gameVer);
@@ -136,6 +166,16 @@ public class InstallServerWindow extends BasicWindow {
         new Thread(() -> {
             try {
                 OrchestratorBridge.getInstance().installServer(engine, gameVer, loaderVer, ramVal, job, msg -> {
+                    if (msg != null && msg.contains("%")) {
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+(\\.\\d+)?)%").matcher(msg);
+                        if (m.find()) {
+                            try {
+                                double pVal = Double.parseDouble(m.group(1));
+                                int pct = (int) Math.round(pVal);
+                                gui.getGUIThread().invokeLater(() -> progressBar.setValue(Math.min(100, Math.max(0, pct))));
+                            } catch (Exception ignored) {}
+                        }
+                    }
                     gui.getGUIThread().invokeLater(() -> {
                         progressLabel.setText("[BUSY] " + msg);
                         appendLog("[STATUS] " + msg);
@@ -143,6 +183,7 @@ public class InstallServerWindow extends BasicWindow {
                 }).get();
 
                 gui.getGUIThread().invokeLater(() -> {
+                    progressBar.setValue(100);
                     progressLabel.setText("[OK:] Installation completed!");
                     progressLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
                     appendLog("[OK:] Installation finished successfully.");

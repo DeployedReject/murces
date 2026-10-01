@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class KeyboardNavigationHelper {
 
     public static Label createTooltip() {
-        Label tip = new Label("[TIP] [A] Activity Log | [L] Server Console | [TAB] Cycle Focus | [ESC] Un-focus / Back");
+        Label tip = new Label("[TIP] [A] Activity Log | [L] Server Console | [J] Active Tasks | [TAB] Cycle Focus | [ESC] Back");
         tip.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         return tip;
     }
