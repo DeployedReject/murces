@@ -54,7 +54,7 @@ jobs:
       - name: Set up GraalVM JDK
         uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173
         with:
-          java-version: "21"
+          java-version: "25"
           distribution: "graalvm"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
