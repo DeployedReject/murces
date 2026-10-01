@@ -1,165 +1,323 @@
+<div align="center">
+
+```
+  __  __
+ |  \/  |_   _ _ __ ___ ___  ___
+ | |\/| | | | | '__/ __/ _ \/ __|
+ | |  | | |_| | | | (_|  __/\__ \
+ |_|  |_|\__,_|_|  \___\___||___/
+    Minecraft Server Manager v1.0.0
+```
+
 # MurCes
 
-```
-  __  __                                
- |  \/  |_   _ _ __ ___ ___  ___        
- | |\/| | | | | '__/ __/ _ \/ __|       
- | |  | | |_| | | | (_|  __/\__ \       
- |_|  |_|\__,_|_|  \___\___||___/       
-    Minecraft Server Manager v1.0.0     
-```
+**A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux.**
 
-MurCes is a terminal manager for dedicated Minecraft servers on Linux. It combines a terminal interface (TUI) and simple CLI flags to handle server installs, configuration tweaks, mod management, and background session controls without having to run heavy web panels like Pterodactyl or AMP.
+[![Release](https://img.shields.io/github/v/release/DeployedReject/murces?style=for-the-badge&logo=github&color=5865F2)](https://github.com/DeployedReject/murces/releases)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-7952B3?style=for-the-badge)](LICENSE)
+[![Binary](https://img.shields.io/badge/GraalVM-Native%20AOT%20ELF-E86F00?style=for-the-badge&logo=oracle)](https://www.graalvm.org/)
+[![Java](https://img.shields.io/badge/Java-21+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/DeployedReject/murces)
+[![tmux](https://img.shields.io/badge/tmux-Process%20Daemon-1BB954?style=for-the-badge)](https://github.com/tmux/tmux)
 
-It is built in Java using Lanterna and compiled into a standalone native binary with GraalVM Native Image, giving it near-instant startup and small memory overhead for low-resource VPS nodes and older machines.
+<p align="center">
+  <a href="#why-murces">Why MurCes</a> •
+  <a href="#visual-tour--features">Visual Tour</a> •
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#cli-commands">CLI Usage</a> •
+  <a href="#hotkeys--navigation">Hotkeys</a> •
+  <a href="#terminal-rendering--fonts">Fonts</a> •
+  <a href="#decoupled-orchestrator-ipc">Architecture & IPC</a> •
+  <a href="#building-from-source">Build</a>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="assets/main_menu.webp" alt="MurCes Dashboard" width="880" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+</p>
+
+</div>
 
 ---
 
-## Branches
+## Why MurCes?
 
-- **`main`**: Active development branch containing the Lanterna TUI, orchestrator backend, and GraalVM build configuration.
-- **`archived`**: Legacy C prototype and precursor library codebase kept for reference.
+Managing dedicated Minecraft servers on budget VPS nodes or homelabs often forces an uncomfortable compromise:
+
+- **Heavy Web Panels (Pterodactyl, AMP, MineOS)** require Docker daemons, Node.js runtimes, Nginx reverse proxies, MySQL databases, and background web workers—easily eating **500MB–1.5GB of RAM** before your Minecraft server even allocates its heap.
+- **Raw Shell Scripts** are brittle, lack visual status monitoring, don't handle dependency resolution, and make tweaking `server.properties` or installing mods a chore.
+
+**MurCes delivers the sweet spot:**
+
+- **Native Ahead-of-Time (AOT) Binary**: Compiled into a standalone ~30MB Linux executable via **GraalVM Native Image**. Launches in **< 20ms** with less than **25MB resident memory** and zero JVM warmup.
+- **Detached Process Supervision**: Your server runs inside an isolated, background `tmux` session (`mcsv`). If your SSH connection drops or MurCes exits, the server remains completely unaffected.
+- **Modern Terminal Aesthetics**: Designed with 24-bit TrueColor support, background transparency, and themes inspired by LazyVim/Neovim (Catppuccin, Nord, Gruvbox, Tokyo Night, Cyberdream, Rose Pine, Kanagawa).
+- **Built-in Mod Ecosystem**: Query both **Modrinth** and **CurseForge** directly inside the terminal with loader & version filtering, dependency lookups, and one-key atomic downloads.
+- **Safe World State Flushing**: Performs live memory flushing (`save-off` &rarr; `save-all` &rarr; tar archive &rarr; `save-on`) to eliminate backup chunk corruption, with automated retention rotation and optional `rclone` cloud replication.
+- **Zero-Config Port Forwarding**: Built-in Playit.gg integration (`-p`) creates secure public tunnels on demand without touching router NAT tables.
 
 ---
 
-## What It Does
+## Visual Tour & Features
 
-- **Engine Setup**: Installs and sets up Paper, Fabric, Forge, Spigot, or Vanilla across chosen Minecraft versions, automatically accepting the Mojang EULA.
-- **Mod Browser**: Queries Modrinth and CurseForge APIs to find mods matching your server loader (Fabric, Forge, NeoForge, Quilt) and version, downloading `.jar` files straight to `mods/`.
-- **Runtime & Console**: Runs servers inside detached `tmux` sessions. Lets you send in-game console commands directly from the interface and monitor log output.
-- **Network Tunneling**: Optional integration with Playit.gg (`--public` / `-p`) to open servers to friends without manual port forwarding.
-- **Settings Editor**: Searchable editor for `server.properties` with categorized key-value edits.
-- **World Backups**: Safe tar archive snapshots that flush world data first (`save-all`, `save-off`, `save-on`), with retention limits and optional `rclone` cloud sync.
-- **Player Migration**: Utility to transfer playerdata, stats, advancements, and usercache between UUIDs.
+### 1. Server Engine & Version Setup
+
+> Configure and boot server engines with automatic Mojang EULA acceptance and custom RAM allocation flags.
+
+<p align="center">
+  <img src="assets/engine_installer.webp" alt="Server Engine Setup" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Supported Loaders**: Fabric, Paper, Forge, NeoForge, Spigot, and Vanilla.
+- **Dynamic Version Resolver**: Queries live version manifests for both game releases and loader builds.
+- **Heap Allocation**: Fine-tune `-Xms` and `-Xmx` RAM allocations without modifying startup shell scripts.
+
+---
+
+### 2. In-TUI Mod Search & Downloader
+
+> Search, inspect, and install mods from Modrinth and CurseForge without leaving your terminal.
+
+<p align="center">
+  <img src="assets/mod_browser.webp" alt="Mod Browser & Downloader" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Universal Mod Index**: Switch between Modrinth and CurseForge API providers on the fly.
+- **Smart Filtering**: Automatically filters releases by your active server loader (Fabric, Forge, NeoForge, Quilt) and game version.
+- **Interactive Inspector**: Read full mod summaries, descriptions, dependencies, and author metadata.
+- **Atomic Telemetry**: Real-time progress bar downloads into `.tmp` staging before atomic deployment to `mods/`.
+
+---
+
+### 3. Installed Mods Manager
+
+> Audit and maintain your active server mods directory cleanly.
+
+<p align="center">
+  <img src="assets/mod_manager.webp" alt="Installed Mods Manager" width="880" style="border-radius: 6px;" />
+</p>
+
+- Inspect all `.jar` files present in the server's `mods/` directory.
+- Instant single-key mod removal (`[D]elete Mod`) with confirmation safety.
+- Live file system re-indexing (`[R]efresh`).
+
+---
+
+### 4. Searchable `server.properties` Editor
+
+> Tweak server configuration with a keyboard-driven visual inspector.
+
+<p align="center">
+  <img src="assets/server_properties.webp" alt="Server Properties Editor" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Live Fuzzy Filter**: Press `[Q]` to filter across all available properties instantly.
+- **Categorized Sections**: Grouped into Gameplay, World, Network, Security, and Performance.
+- **One-Key Enum Cycling**: Press `[Enter]` on boolean or enum flags (`gamemode`, `difficulty`, `pvp`, `spawn-monsters`) to cycle values immediately.
+- **Safe Persistence**: Built-in validation with `[S]ave`, `[R]eload`, and `Reset [D]efaults` actions.
+
+---
+
+### 5. Themes, Transparency & Glyphs
+
+> Complete visual customization to match your personal terminal setup.
+
+<p align="center">
+  <img src="assets/customization_themes.webp" alt="Themes and Customization" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Curated Theme Palettes**: Catppuccin (Mocha, Macchiato, Frappé, Latte), Tokyo Night, Nord, Gruvbox Dark, Rose Pine, Kanagawa, Cyberdream, Solarized Osaka, and Minecraft Classic.
+- **Terminal Transparency**: Adjustable from `0%` (solid opaque) to `100%` (full terminal background passthrough).
+- **Glyph Engine**: Native Nerd Font icon support with automatic graceful fallback for bare Linux TTYs.
+- **Aesthetic Touches**: Optional 24-bit TrueColor rendering and animated pickaxe dirt-breaking loading spinner.
+
+---
+
+### 6. Active Tasks & Job Telemetry
+
+> Monitor asynchronous background operations in real time.
+
+<p align="center">
+  <img src="assets/active_tasks.webp" alt="Active Tasks & Job Manager" width="880" style="border-radius: 6px;" />
+</p>
+
+- Real-time tracking of non-blocking server installations, engine updates, and mod downloads.
+- Detailed task telemetry showing active step, bytes transferred, and speed.
+- Emergency controls to cancel selected jobs (`[C]`) or terminate all workers (`[K]`).
 
 ---
 
 ## Quickstart
 
-Download the latest `murces.zip` from [Releases](https://github.com/DeployedReject/murces/releases) and extract it into your server folder:
+### 1. Download & Extract
 
-```sh
+Download the latest `murces.zip` release bundle from [GitHub Releases](https://github.com/DeployedReject/murces/releases) into your Minecraft server directory:
+
+```bash
+# Download and unzip the standalone native release
+curl -sSLO https://github.com/DeployedReject/murces/releases/latest/download/murces.zip
 unzip murces.zip
+
+# Grant executable permissions
 chmod +x murces svctrl.sh backup.sh
+
+# Launch the interactive dashboard
 ./murces
 ```
 
-### CLI Subcommands
-You can also run commands directly from the shell without opening the full menu:
+> [!NOTE]
+> The precompiled native release is completely self-contained. It does **not** require a JDK or GraalVM runtime installed on your server.
 
-```sh
-./murces start [-p]    # Start server (-p / --public enables Playit.gg)
-./murces stop          # Stop server
-./murces status        # Check if the server is running
-./murces backup        # Run a world backup
-./murces --test-tui    # Headless test across all interface screens
-./murces --help        # Show help options
-./murces --version     # Print version
+---
+
+## CLI Commands
+
+MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
+
+```bash
+./murces [command] [options]
 ```
 
+| Command               | Description                                                             | Flags                                        |
+| --------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| `./murces`            | Launches the interactive Lanterna TUI dashboard                         | —                                            |
+| `./murces start`      | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_ |
+| `./murces stop`       | Sends graceful `stop` command and terminates the session                | —                                            |
+| `./murces status`     | Checks if the Minecraft server daemon is active                         | —                                            |
+| `./murces backup`     | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | —                                            |
+| `./murces --test-tui` | Runs headless self-test across all TUI screens and exits                | —                                            |
+| `./murces --help`     | Displays available command options and syntax                           | —                                            |
+| `./murces --version`  | Outputs current release version information                             | —                                            |
+
 ---
 
-## Requirements
+## Hotkeys & Navigation
 
-- **OS**: Linux 64-bit (or WSL on Windows 10+)
-- **System packages**: `tmux` (required for background sessions), `curl` or `wget`
-- **Optional**: `rclone` (for cloud sync backups), `playit` (for public tunneling)
-- **Java runtime**: Java 21+ or GraalVM only if compiling from source. The native binary runs standalone without a JDK installed.
+| Keybinding              | Action                                                         |
+| ----------------------- | -------------------------------------------------------------- |
+| `[TAB]` / `[Shift+TAB]` | Cycle focus between Workspace, Activity Log, and Live Console  |
+| `[ESC]` / `[B]`         | Return to previous view / Back to Main Menu                    |
+| `[A]`                   | Toggle / Jump focus directly to **Activity & Diagnostics Log** |
+| `[L]`                   | Toggle / Jump focus directly to **Server Live Console**        |
+| `[J]`                   | Open **Active Tasks & Job Manager**                            |
+| `[S]`                   | Open **Server Control & Console**                              |
+| `[I]`                   | Open **Install Server Engine**                                 |
+| `[C]`                   | Open **Configure Properties** (`server.properties`)            |
+| `[B]`                   | Open **World Backups**                                         |
+| `[P]`                   | Open **Player UUID Migration**                                 |
+| `[D]`                   | Open **Download & Browse Mods**                                |
+| `[M]`                   | Open **Manage Installed Mods**                                 |
+| `[Z]`                   | Open **Customization & Themes**                                |
+| `[E]`                   | Exit MurCes                                                    |
 
 ---
 
-## Fonts & Terminal Rendering
+## System Requirements
 
-MurCes uses [Nerd Font](https://www.nerdfonts.com/) glyphs to provide clean icons for navigation, server status indicators, and mod loading animations.
+| Component                       | Requirement           | Details                                                           |
+| ------------------------------- | --------------------- | ----------------------------------------------------------------- |
+| **Operating System**            | Linux 64-bit (x86_64) | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, and WSL2    |
+| **Terminal Multiplexer**        | `tmux`                | Required for detached background session supervision              |
+| **HTTP Downloader**             | `curl` or `wget`      | Required for dependency and package fetching                      |
+| **Cloud Sync** _(Optional)_     | `rclone`              | Required only if using Google Drive/S3 offsite world backups      |
+| **Public Tunnels** _(Optional)_ | `playit`              | Required only if running public servers without port forwarding   |
+| **Runtime Environment**         | _None_                | The native binary runs out of the box with zero Java dependencies |
 
-### Easy Font Installation (`getnf`)
-To easily install any Nerd Font on Linux or macOS, you can use [**`getnf`**](https://github.com/getnf/getnf), an open-source tool that lets you browse and install fonts in seconds:
+---
 
-```sh
+## Terminal Rendering & Fonts
+
+MurCes features rich icons and glyphs powered by [Nerd Fonts](https://www.nerdfonts.com/).
+
+### Automatic Fallback (Zero Setup Needed)
+
+> **You do not need a Nerd Font to use MurCes.**
+
+If you are connected from a basic terminal emulator, standard Linux virtual console (`/dev/tty*`), or an SSH client without patched font glyphs:
+
+1. MurCes automatically detects terminal capabilities at startup.
+2. It seamlessly downgrades all UI icons to clean, standard ASCII / Unicode glyphs.
+3. No missing glyph boxes (``), character overflow, or corrupted line wraps.
+
+### Manual Overrides
+
+- **In-App**: Press `[Z] Customization & Themes` &rarr; toggle `[G]lyphs` between `Auto-detect`, `Force Nerd Fonts`, or `Basic (Fallback)`.
+- **Environment Variables**:
+  ```bash
+  NO_NERD_FONT=1 ./murces      # Force basic ASCII fallback
+  FORCE_NERD_FONT=1 ./murces   # Force full Nerd Font icons
+  ```
+
+### Installing Nerd Fonts with `getnf`
+
+If you want the full icon experience, install any patched Nerd Font in seconds:
+
+```bash
 # Install getnf
 curl -fsSL https://raw.githubusercontent.com/getnf/getnf/main/install.sh | bash
 
-# Run getnf to pick and install a font (e.g. JetBrainsMono, FiraCode, Hack)
+# Browse and install your preferred font (e.g. JetBrains Mono, Fira Code, Hack)
 getnf
 ```
 
-You can also download fonts directly from [Nerd Fonts Downloads](https://www.nerdfonts.com/font-downloads).
-
-### Automatic Fallback (No Nerd Font Required)
-If you do not have a Nerd Font installed or are running in a basic terminal/TTY, **MurCes automatically detects this and falls back to clean basic text rendering** (ASCII/basic Unicode). Zero missing glyph boxes or broken characters.
-
-You can also control glyph rendering manually:
-- **In-App**: Press `[Z]` or select `[Z] Customization & Themes`, then set `[G]lyphs` to `Auto-detect`, `Force Nerd Fonts`, or `Basic (Fallback)`.
-- **Environment Flags**: Run with `NO_NERD_FONT=1` to force basic fallback mode, or `FORCE_NERD_FONT=1` to force Nerd Fonts.
-
 ---
 
-## Building from Source
+## Decoupled Orchestrator (IPC)
 
-If you want to build the project yourself instead of using the precompiled release:
+MurCes is architected around a decoupled backend engine: **`murces-orchestrator`**.
 
-### 1. Build Orchestrator
-```sh
-cd java/orchestrator
-mvn clean install
-cd ../..
+The orchestrator communicates over standard I/O (`stdin`/`stdout`) via structured JSON IPC messages. This allows you to embed MurCes into custom Discord bots, custom web frontends, CLI automation scripts, or remote administration sidecars.
+
+```mermaid
+flowchart LR
+    subgraph Clients["Frontend Clients"]
+        TUI["MurCes Native TUI\n(Lanterna / GraalVM)"]
+        CLI["CLI Subcommands\n(Bash / Scripts)"]
+        EXT["Custom Integrations\n(Discord Bot, Web UI)"]
+    end
+
+    subgraph Core["Backend Orchestration Layer"]
+        IPC["JSON IPC (stdin / stdout)"]
+        ORCH["murces-orchestrator\n(Lifecycle & Package Engine)"]
+    end
+
+    subgraph Systems["System Services & External APIs"]
+        TMUX["tmux Session ('mcsv')\nMinecraft Daemon"]
+        MODS["Modrinth & CurseForge\nREST APIs"]
+        MOJANG["Mojang Version Manifests\n& Paper/Fabric APIs"]
+        BAK["Safe tar Snapshot Engine\n& rclone Cloud Sync"]
+    end
+
+    TUI <--> IPC
+    CLI <--> IPC
+    EXT <--> IPC
+    IPC <--> ORCH
+    ORCH --> TMUX
+    ORCH --> MODS
+    ORCH --> MOJANG
+    ORCH --> BAK
 ```
 
-### 2. Build TUI (JAR)
-```sh
-cd java/tui
-mvn clean package
-# Produces java/tui/target/murces-tui-0.1.jar
-```
-
-### 3. Build Native Binary (GraalVM)
-```sh
-cd java/tui
-mvn clean package -Pnative
-cp target/murces ../../
-```
-
----
-
-## Using MurCes Orchestrator in Your Own Projects
-
-**MurCes Orchestrator** (`murces-orchestrator`) is designed as a standalone, decoupled backend service. It provides a standardized JSON-based IPC interface over standard I/O (`stdin`/`stdout`), allowing you to build your own custom UIs, web panels, Discord bots, scripts, or remote management tools on top of it.
-
-### Capabilities
-- **Server Lifecycle**: Automated downloading, setup, EULA acceptance, and `tmux` session management for Fabric, Forge, Paper, Spigot, and Vanilla.
-- **Unified Modding**: One consistent API to query and download mods across both Modrinth and CurseForge.
-- **Atomic Operations**: Safe chunked downloads with `.tmp` staging, live progress telemetry, and graceful error handling.
-
-### Running Standalone
-Compile the orchestrator jar:
-```sh
-cd java/orchestrator
-mvn clean package
-# Binary located at java/orchestrator/target/murces-orchestrator-1.0.jar
-```
-
-Run it directly from the terminal or spawn it as a child process:
-```sh
-java -jar java/orchestrator/target/murces-orchestrator-1.0.jar
-```
-
-### Quick IPC Examples
+### IPC Examples
 
 #### Bash / Shell
-Pipe JSON requests directly into stdin:
 
-```sh
-# Query supported server engines
+Pipe JSON payloads straight into standard input:
+
+```bash
+# 1. Query supported server engines
 echo '{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}' | java -jar murces-orchestrator-1.0.jar
 
-# Install and launch Paper 1.20.4 with 4GB RAM
+# 2. Download and boot Paper 1.20.4 with 4GB RAM
 echo '{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}' | java -jar murces-orchestrator-1.0.jar
 
-# Search Modrinth for "sodium"
+# 3. Search Modrinth for "sodium" on Fabric 1.20.4
 echo '{"type": "modding", "modBrowser": "modrinth", "subType": "search", "modName": "sodium", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}' | java -jar murces-orchestrator-1.0.jar
 ```
 
-#### Python Subprocess (Bot or Web Backend)
+#### Python Integration (Bots or Web Backends)
+
 ```python
 import subprocess
 import json
@@ -172,13 +330,13 @@ proc = subprocess.Popen(
     bufsize=1
 )
 
-def send_command(payload):
+def send_ipc(payload):
     proc.stdin.write(json.dumps(payload) + "\n")
     proc.stdin.flush()
     return json.loads(proc.stdout.readline())
 
-# Check server status
-status = send_command({
+# Query live server running state
+response = send_ipc({
     "type": "server",
     "serverType": "none",
     "gameVersion": "none",
@@ -186,26 +344,81 @@ status = send_command({
     "ram": 0,
     "job": 4
 })
-print(f"Server running: {status.get('running')}")
+
+print(f"Server Active: {response.get('running')}")
 ```
 
-For complete documentation on all request parameters, status codes, and response structures, see [`doc/API-SPEC.md`](doc/API-SPEC.md).
+> [!TIP]
+> For detailed IPC payload schemas, job IDs, and response formats, refer to the full specification in [`doc/API-SPEC.md`](doc/API-SPEC.md).
 
 ---
 
-## Configuration
+## Building from Source
 
-If you downloaded the precompiled release (`murces.zip`), you do **not** need to set up an API key or email. The CurseForge API key and contact details are already baked into the release binary during compilation, so mod browsing works out of the box.
+If you prefer to compile MurCes from source rather than using the official native release:
 
-Setting up a `.env` file or environment variables is only needed if you are **building from source** or want to override the defaults with your own developer credentials:
+### Prerequisites
 
-```sh
-curseAPI="YOUR_KEY"
-email="your_email@example.com"
+- JDK 21+
+- Apache Maven 3.9+
+- GraalVM Native Image (`native-image` toolchain installed)
+
+### 1. Compile the Orchestrator
+
+```bash
+cd java/orchestrator
+mvn clean install
+cd ../..
+```
+
+### 2. Build the Java TUI (JAR)
+
+```bash
+cd java/tui
+mvn clean package
+# Artifact generated at java/tui/target/murces-tui-0.1.jar
+cd ../..
+```
+
+### 3. Compile Standalone Native Binary (GraalVM)
+
+```bash
+cd java/tui
+mvn clean package -Pnative
+cp target/murces ../../
+cd ../..
 ```
 
 ---
 
-## Issues & Contributing
+## Configuration & API Keys
 
-If you encounter bugs, broken dependencies, or have suggestions, feel free to open an issue on the [GitHub Issue Tracker](https://github.com/DeployedReject/murces/issues).
+- **Release Binaries**: Precompiled releases (`murces.zip`) have the CurseForge API client credentials pre-configured and baked in. Mod browsing works out of the box with zero configuration required.
+- **Source Builds & Custom Keys**: If you are compiling from source or wish to provide your own developer credentials, create a `.env` file in the root directory:
+
+```ini
+curseAPI="YOUR_CURSEFORGE_API_KEY"
+email="your_developer_email@example.com"
+```
+
+---
+
+## Branches
+
+- **`main`**: Active production branch containing the Lanterna TUI, decoupled orchestrator backend, and GraalVM build configuration.
+- **`archived`**: Historical C prototype and initial proof-of-concept codebase preserved for reference.
+
+---
+
+## Contributing & Community
+
+Contributions, bug reports, and feature proposals are warmly welcome!
+
+- Found a bug? Open an issue on the [GitHub Issue Tracker](https://github.com/DeployedReject/murces/issues).
+- Want to contribute code? Fork the repository, create a topic branch, and submit a Pull Request.
+
+---
+
+## License
+
+MurCes is free and open-source software licensed under the **[GNU General Public License v3.0](LICENSE)**.
