@@ -13,37 +13,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Pinned to actions/checkout v4.2.2 commit SHA
+      # Pinned to actions/checkout v4.2.2
       - name: Check out repository (full history)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
-      - name: Generate Release Tag and Commit Notes
+      - name: Extract Version and Generate Release Notes
         id: notes
         run: |
-          TAG_NAME="v0.1-$(date +'%Y%m%d')-build${{ github.run_number }}"
-          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          # 1. Extract version from java/tui/pom.xml
+          POM_VERSION=$(grep -m 1 '<version>' java/tui/pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
 
+          # Fallback if parsing fails for any reason
+          if [ -z "$POM_VERSION" ]; then
+            POM_VERSION="0.1"
+          fi
+
+          # 2. Construct tag: v<version>-<YYYYMMDD>.<HHMMSS> (UTC)
+          TIMESTAMP=$(date -u +'%Y%m%d.%H%M%S')
+          TAG_NAME="v${POM_VERSION}-${TIMESTAMP}"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "pom_version=$POM_VERSION" >> "$GITHUB_OUTPUT"
+
+          # 3. Collect commits for changelog
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-          echo "### Changes in this Release" > release_notes.md
+          echo "### Release $TAG_NAME" > release_notes.md
           echo "" >> release_notes.md
 
           if [ -n "$PREV_TAG" ]; then
             echo "Commits since **$PREV_TAG**:" >> release_notes.md
-            git log "${PREV_TAG}..HEAD" --pretty=format:"* %s (%h by @%an)" >> release_notes.md
+            git log "${PREV_TAG}..HEAD" --pretty=format:"* %s (%h by %an)" >> release_notes.md
           else
             echo "Commits included in this release:" >> release_notes.md
-            git log -n 20 --pretty=format:"* %s (%h by @%an)" >> release_notes.md
+            git log -n 20 --pretty=format:"* %s (%h by %an)" >> release_notes.md
           fi
           echo "" >> release_notes.md
 
-      # Pinned to graalvm/setup-graalvm v1.4.1 commit SHA
-      - name: Set up GraalVM JDK 25
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276
+      # Pinned to graalvm/setup-graalvm
+      - name: Set up GraalVM JDK
+        uses: graalvm/setup-graalvm@b9b7e9b0682fa0b0805128ff40c42245b736b446
         with:
-          java-version: "25"
+          java-version: "21"
           distribution: "graalvm"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
@@ -66,12 +78,18 @@ jobs:
       - name: Package Release ZIP
         run: |
           mkdir -p dist
+          # Copy compiled native executable
           cp java/tui/target/murces dist/
-          cp c/Shell/svctrl.sh dist/
-          cp c/Shell/backup.sh dist/
-          chmod +x dist/murces dist/*.sh
+
+          # Copy all shell scripts from root directory
+          cp *.sh dist/ 2>/dev/null || true
+
+          # Set executable permissions
+          chmod +x dist/murces dist/*.sh 2>/dev/null || true
+
+          # Bundle all contents of dist into murces.zip
           cd dist
-          zip -r ../murces.zip murces svctrl.sh backup.sh
+          zip -r ../murces.zip .
           cd ..
 
       - name: Create GitHub Release
