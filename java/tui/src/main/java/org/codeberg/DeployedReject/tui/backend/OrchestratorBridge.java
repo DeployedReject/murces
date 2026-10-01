@@ -138,7 +138,7 @@ public class OrchestratorBridge {
     }
 
     public String formattedDate() {
-      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
       return sdf.format(new Date(lastModified));
     }
   }
@@ -970,16 +970,34 @@ public class OrchestratorBridge {
 
   public static List<BackupInfo> listBackups() {
     List<BackupInfo> list = new ArrayList<>();
-    File backupDir = new File("backup");
-    if (!backupDir.exists() || !backupDir.isDirectory()) {
-      return list;
+    List<File> dirs = new ArrayList<>();
+    File d1 = new File("backup");
+    if (d1.exists() && d1.isDirectory()) dirs.add(d1);
+    File d2 = new File("backups");
+    if (d2.exists() && d2.isDirectory() && !d2.equals(d1)) dirs.add(d2);
+    if (dirs.isEmpty()) {
+      dirs.add(new File("."));
     }
-    File[] files = backupDir.listFiles((dir, name) -> name.endsWith(".tar") || name.endsWith(".tar.gz"));
-    if (files != null) {
-      Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-      for (File f : files) {
-        list.add(new BackupInfo(f.getName(), f.length(), f.lastModified()));
+
+    Set<String> seen = new HashSet<>();
+    List<File> allFiles = new ArrayList<>();
+    for (File dir : dirs) {
+      File[] files = dir.listFiles((d, name) -> {
+        String lower = name.toLowerCase();
+        return lower.endsWith(".tar") || lower.endsWith(".tar.gz") || lower.endsWith(".tgz") || lower.endsWith(".zip");
+      });
+      if (files != null) {
+        for (File f : files) {
+          if (f.isFile() && seen.add(f.getName())) {
+            allFiles.add(f);
+          }
+        }
       }
+    }
+
+    allFiles.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+    for (File f : allFiles) {
+      list.add(new BackupInfo(f.getName(), f.length(), f.lastModified()));
     }
     return list;
   }

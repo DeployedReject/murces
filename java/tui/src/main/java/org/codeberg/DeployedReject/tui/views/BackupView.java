@@ -102,27 +102,16 @@ public class BackupView implements WorkspaceView {
 
     private void loadBackups() {
         table.getTableModel().clear();
-        File backupDir = new File("backups");
-        if (!backupDir.exists() || !backupDir.isDirectory()) {
-            backupDir = new File(".");
-        }
-
-        File[] files = backupDir.listFiles((dir, name) -> name.endsWith(".zip") || name.endsWith(".tar.gz"));
-        if (files == null || files.length == 0) {
+        List<OrchestratorBridge.BackupInfo> backups = OrchestratorBridge.listBackups();
+        if (backups.isEmpty()) {
             statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No backup archives found."));
             return;
         }
 
-        Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
-
-        for (File f : files) {
-            long kb = f.length() / 1024;
-            String size = kb > 1024 ? (kb / 1024) + " MB" : kb + " KB";
-            String date = sdf.format(new Date(f.lastModified()));
-            table.getTableModel().addRow(f.getName(), size, date);
+        for (OrchestratorBridge.BackupInfo b : backups) {
+            table.getTableModel().addRow(b.name, b.formattedSize(), b.formattedDate());
         }
-        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Found " + files.length + " backup archive(s)."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Found " + backups.size() + " backup archive(s)."));
     }
 
     private void onRunBackup() {
