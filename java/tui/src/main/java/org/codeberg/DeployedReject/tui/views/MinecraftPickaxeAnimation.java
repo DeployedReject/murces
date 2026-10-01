@@ -80,8 +80,12 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                     }
                 }
 
-                double blockProgress = (effectiveProgress / 100.0) * TOTAL_BLOCKS;
-                int activeBlock = Math.min(TOTAL_BLOCKS - 1, (int) blockProgress);
+                // Compute number of blocks that fit the full available width
+                int blockWidth = 5; // "[██] " is 5 chars
+                int totalBlocks = Math.max(5, (width - 1) / blockWidth);
+
+                double blockProgress = (effectiveProgress / 100.0) * totalBlocks;
+                int activeBlock = Math.min(totalBlocks - 1, (int) blockProgress);
                 double subProgress = blockProgress - activeBlock;
 
                 // Pickaxe swing frames: 0 = high, 1 = hitting, 2 = follow-through
@@ -89,21 +93,26 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                 String[] swingIcons = {toolIcon + " \\", toolIcon + " |", toolIcon + " /"};
                 String swing = swingIcons[Math.abs(currentTick) % 3];
 
-                int blockWidth = 6; // "[██]  " is 6 chars
-
                 // Line 0: Pickaxe swing above active block
                 if (height >= 1) {
                     int pickCol = activeBlock * blockWidth + 1;
-                    graphics.setForegroundColor(DIAMOND_TOOL);
-                    graphics.putString(pickCol, 0, toolIcon);
-                    graphics.setForegroundColor(LazyVimTheme.getAccentColor());
-                    graphics.putString(pickCol + 2, 0, swing.substring(toolIcon.length() + 1));
+                    if (pickCol < width) {
+                        graphics.setForegroundColor(DIAMOND_TOOL);
+                        graphics.putString(pickCol, 0, toolIcon);
+                        graphics.setForegroundColor(LazyVimTheme.getAccentColor());
+                        if (pickCol + 2 < width) {
+                            graphics.putString(pickCol + 2, 0, swing.substring(toolIcon.length() + 1));
+                        }
+                    }
                 }
 
-                // Line 1: Row of dirt blocks
+                // Line 1: Row of dirt blocks filling the entire width
                 if (height >= 2) {
-                    for (int b = 0; b < TOTAL_BLOCKS; b++) {
+                    for (int b = 0; b < totalBlocks; b++) {
                         int col = b * blockWidth;
+                        if (col + 4 > width) {
+                            break;
+                        }
                         if (b < activeBlock) {
                             // Already broken
                             graphics.setForegroundColor(LazyVimTheme.getMutedColor());
@@ -145,7 +154,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                     if (msg != null && !msg.isEmpty()) {
                         display = org.codeberg.DeployedReject.tui.theme.GlyphHelper.apply(msg);
                     } else {
-                        display = String.format("Breaking dirt... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1, TOTAL_BLOCKS);
+                        display = String.format("Breaking dirt... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1, totalBlocks);
                     }
                     if (display.length() > width) {
                         display = display.substring(0, width);

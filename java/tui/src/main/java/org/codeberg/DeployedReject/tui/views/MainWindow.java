@@ -55,6 +55,7 @@ public class MainWindow extends BasicWindow {
     private final JobManagerView jobManagerView;
 
     private WorkspaceView currentView;
+    private TerminalSize lastKnownTermSize = null;
     private String lastConsoleOutput = "";
     private final ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "ConsolePoller");
@@ -172,6 +173,7 @@ public class MainWindow extends BasicWindow {
 
     public void updateLayoutDimensions(TerminalSize termSize) {
         if (termSize == null) return;
+        this.lastKnownTermSize = termSize;
         int cols = termSize.getColumns();
         int rows = termSize.getRows();
 
@@ -218,6 +220,10 @@ public class MainWindow extends BasicWindow {
         workspaceTitleLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Workspace: " + view.getTitle() + " " + GlyphHelper.ICON_SERVER));
         workspaceContainer.removeAllComponents();
         workspaceContainer.addComponent(view.getComponent());
+
+        if (lastKnownTermSize != null) {
+            view.onResized(lastKnownTermSize);
+        }
 
         view.onActivated();
 
