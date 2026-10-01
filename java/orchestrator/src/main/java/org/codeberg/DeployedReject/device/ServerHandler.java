@@ -70,6 +70,9 @@ public class ServerHandler {
     }
     switch (job) {
       case 0:
+        try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
+          eulaWriter.write("eula=true\n");
+        } catch (Exception ignored) {}
         JsonObject comp = new JsonObject();
         comp.addProperty("status", 3);
         comp.addProperty("type", "server");

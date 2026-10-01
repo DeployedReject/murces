@@ -34,7 +34,7 @@
 <br>
 
 <p align="center">
-  <img src="assets/main_menu.webp" alt="MurCes Dashboard" width="880" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+  <img src="assets/demo.gif" alt="MurCes Live Demo" width="880" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
 </p>
 
 </div>
@@ -61,12 +61,25 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ## Visual Tour & Features
 
-### 1. Server Engine & Version Setup
+### 1. Main Dashboard & Workspace
+> Unified server management cockpit with dual-panel activity diagnostics and live console log stream.
+
+<p align="center">
+  <img src="assets/main_menu.png" alt="MurCes Main Menu Dashboard" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Navigation Hub**: Direct keyboard access to engine installers, mod managers, backups, and configs.
+- **Activity & Diagnostics Panel**: Real-time status logs for theme changes, network queries, and download triggers.
+- **Embedded Console**: Immediate visibility into the underlying Minecraft server output.
+
+---
+
+### 2. Server Engine & Version Setup
 
 > Configure and boot server engines with automatic Mojang EULA acceptance and custom RAM allocation flags.
 
 <p align="center">
-  <img src="assets/engine_installer.webp" alt="Server Engine Setup" width="880" style="border-radius: 6px;" />
+  <img src="assets/engine_installer.png" alt="Server Engine Setup" width="880" style="border-radius: 6px;" />
 </p>
 
 - **Supported Loaders**: Fabric, Paper, Forge, NeoForge, Spigot, and Vanilla.
@@ -75,12 +88,12 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 2. In-TUI Mod Search & Downloader
+### 3. In-TUI Mod Search & Downloader
 
 > Search, inspect, and install mods from Modrinth and CurseForge without leaving your terminal.
 
 <p align="center">
-  <img src="assets/mod_browser.webp" alt="Mod Browser & Downloader" width="880" style="border-radius: 6px;" />
+  <img src="assets/mod_browser.png" alt="Mod Browser & Downloader" width="880" style="border-radius: 6px;" />
 </p>
 
 - **Universal Mod Index**: Switch between Modrinth and CurseForge API providers on the fly.
@@ -90,12 +103,12 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 3. Installed Mods Manager
+### 4. Installed Mods Manager
 
 > Audit and maintain your active server mods directory cleanly.
 
 <p align="center">
-  <img src="assets/mod_manager.webp" alt="Installed Mods Manager" width="880" style="border-radius: 6px;" />
+  <img src="assets/mod_manager.png" alt="Installed Mods Manager" width="880" style="border-radius: 6px;" />
 </p>
 
 - Inspect all `.jar` files present in the server's `mods/` directory.
@@ -104,12 +117,12 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 4. Searchable `server.properties` Editor
+### 5. Searchable `server.properties` Editor
 
 > Tweak server configuration with a keyboard-driven visual inspector.
 
 <p align="center">
-  <img src="assets/server_properties.webp" alt="Server Properties Editor" width="880" style="border-radius: 6px;" />
+  <img src="assets/server_properties.png" alt="Server Properties Editor" width="880" style="border-radius: 6px;" />
 </p>
 
 - **Live Fuzzy Filter**: Press `[Q]` to filter across all available properties instantly.
@@ -119,12 +132,12 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 5. Themes, Transparency & Glyphs
+### 6. Themes, Transparency & Glyphs
 
 > Complete visual customization to match your personal terminal setup.
 
 <p align="center">
-  <img src="assets/customization_themes.webp" alt="Themes and Customization" width="880" style="border-radius: 6px;" />
+  <img src="assets/customization_themes.png" alt="Themes and Customization" width="880" style="border-radius: 6px;" />
 </p>
 
 - **Curated Theme Palettes**: Catppuccin (Mocha, Macchiato, Frappé, Latte), Tokyo Night, Nord, Gruvbox Dark, Rose Pine, Kanagawa, Cyberdream, Solarized Osaka, and Minecraft Classic.
@@ -134,12 +147,12 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 6. Active Tasks & Job Telemetry
+### 7. Active Tasks & Job Telemetry
 
 > Monitor asynchronous background operations in real time.
 
 <p align="center">
-  <img src="assets/active_tasks.webp" alt="Active Tasks & Job Manager" width="880" style="border-radius: 6px;" />
+  <img src="assets/active_tasks.png" alt="Active Tasks & Job Manager" width="880" style="border-radius: 6px;" />
 </p>
 
 - Real-time tracking of non-blocking server installations, engine updates, and mod downloads.

@@ -10,13 +10,13 @@ TIMESTAMP=$(date +%T)
 
 print_usage() {
   echo "Usage:
-        $0 start [--public/-p]     Start Minecraft (and Playit)
-        $0 stop                    Stop Minecraft (and Playit)
-        $0 --migrate <old> <new>   Migrate player UUIDs
-        $0 -mc <command>           Send command to Minecraft console
-        $0 -at <session-name>      Attach to a tmux session
-        $0 init-playit             Start playit session only
-        $0 --help                  Show this message"
+        $0 start [--public/-p] [--ram <amount>]  Start Minecraft (and Playit)
+        $0 stop                                  Stop Minecraft (and Playit)
+        $0 --migrate <old> <new>                 Migrate player UUIDs
+        $0 -mc <command>                         Send command to Minecraft console
+        $0 -at <session-name>                    Attach to a tmux session
+        $0 init-playit                           Start playit session only
+        $0 --help                                Show this message"
 
   exit 0
 }
@@ -36,12 +36,14 @@ stop_tmux_mc() {
   if tmux has-session -t "$TXSN_MCSV" 2>/dev/null; then
     echo "svctrl: Stopping minecraft server."
     tmux send-keys -t "$TXSN_MCSV" 'stop' C-m
-    while pgrep -u "$USER" -f "$SV_JARFILE" >/dev/null; do
+    while pgrep -u "$USER" -f "$SV_JARFILE" >/dev/null || pgrep -u "$USER" -f "fabric-server-launch.jar" >/dev/null; do
       echo -n "."
       sleep 1
     done
     echo -e "\nsvctrl: Minecraft server stopped."
-    tmux send-keys -t "$TXSN_MCSV" 'exit' C-m
+    if tmux has-session -t "$TXSN_MCSV" 2>/dev/null; then
+      tmux kill-session -t "$TXSN_MCSV" 2>/dev/null || true
+    fi
     echo "svctrl: tmux session: '$TXSN_MCSV' terminated."
   fi
 }
@@ -97,8 +99,9 @@ migrate_player() {
     return 1
   fi
 
+  echo "eula=true" > eula.txt
   tmux new-session -d -s "$TXSN_MCSV"
-  tmux send-keys -t "$TXSN_MCSV" "./sv_start.sh" C-m
+  tmux send-keys -t "$TXSN_MCSV" "exec ./sv_start.sh" C-m
 
   echo "svctrl: tmux session: '$TXSN_MCSV' restarted."
 
@@ -114,12 +117,46 @@ case $1 in
     fi
   done
 
-  if [[ "$2" == '--public' || "$2" == '-p' ]]; then
+  echo "eula=true" > eula.txt
+
+  PUBLIC=false
+  RAM="4G"
+
+  shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --public|-p)
+        PUBLIC=true
+        shift
+        ;;
+      --ram|-r)
+        RAM="$2"
+        shift 2
+        ;;
+      [0-9]*G|[0-9]*M|[0-9]*)
+        RAM="$1"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [[ "$RAM" =~ ^[0-9]+$ ]]; then
+    RAM="${RAM}G"
+  fi
+
+  if [ "$PUBLIC" = true ]; then
     init_playit
   fi
 
+  if [ -f "user_jvm_args.txt" ]; then
+    sed -i "s/-Xmx[0-9]*[GM]/-Xmx$RAM/g; s/-Xms[0-9]*[GM]/-Xms$RAM/g" user_jvm_args.txt
+  fi
+
   tmux new-session -d -s "$TXSN_MCSV"
-  tmux send-keys -t "$TXSN_MCSV" "./sv_start.sh" C-m
+  tmux send-keys -t "$TXSN_MCSV" "exec ./sv_start.sh $RAM" C-m
   echo "svctrl: tmux session: '$TXSN_MCSV' created."
 
   echo "svctrl: Use 'tmux ls' to list active sessions."

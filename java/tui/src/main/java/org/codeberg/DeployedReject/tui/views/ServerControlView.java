@@ -17,6 +17,7 @@ public class ServerControlView implements WorkspaceView {
     private final Panel root;
     private final Label statusLabel;
     private final CheckBox publicTunnelCheckBox;
+    private final ComboBox<String> ramComboBox;
     private final TextBox commandInput;
     private final Button startBtn;
     private final Button stopBtn;
@@ -41,9 +42,19 @@ public class ServerControlView implements WorkspaceView {
         statusPanel.addComponent(refreshBtn);
         root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
 
-        // 2. Playit Tunnel Checkbox
+        // 2. Launch Options (Playit Tunnel & RAM Allocation)
+        Panel launchOptionsPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
-        root.addComponent(publicTunnelCheckBox);
+        launchOptionsPanel.addComponent(publicTunnelCheckBox);
+        launchOptionsPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
+
+        launchOptionsPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [M]emory (RAM): ")));
+        ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
+        ramComboBox.setPreferredSize(new TerminalSize(8, 1));
+        ramComboBox.setSelectedIndex(1); // 4G default
+        launchOptionsPanel.addComponent(ramComboBox);
+
+        root.addComponent(launchOptionsPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Launch Options"))));
 
         // 3. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -88,10 +99,17 @@ public class ServerControlView implements WorkspaceView {
         hotkeys.put('R', KeyboardNavigationHelper.focus(restartBtn, this::onRestart));
         hotkeys.put('U', KeyboardNavigationHelper.focus(refreshBtn, this::updateStatus));
         hotkeys.put('P', KeyboardNavigationHelper.focus(publicTunnelCheckBox, () -> publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked())));
+        hotkeys.put('M', KeyboardNavigationHelper.focus(ramComboBox, this::cycleRam));
+        hotkeys.put('A', KeyboardNavigationHelper.focus(ramComboBox, this::cycleRam));
         hotkeys.put('D', KeyboardNavigationHelper.focus(sendBtn, this::onSendCommand));
         hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
         hotkeys.put('/', commandInput::takeFocus);
         hotkeys.put('C', commandInput::takeFocus);
+    }
+
+    private void cycleRam() {
+        int next = (ramComboBox.getSelectedIndex() + 1) % ramComboBox.getItemCount();
+        ramComboBox.setSelectedIndex(next);
     }
 
     private void applyButtonStates(boolean installed, boolean running, boolean downloading) {
@@ -208,15 +226,16 @@ public class ServerControlView implements WorkspaceView {
         }
 
         boolean pub = publicTunnelCheckBox.isChecked();
+        String selectedRam = ramComboBox.getSelectedItem();
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [STARTING...]"));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         startBtn.setEnabled(false);
         stopBtn.setEnabled(false);
         restartBtn.setEnabled(false);
-        ActivityLogger.info("Starting server (public=" + pub + ")...");
+        ActivityLogger.info("Starting server (public=" + pub + ", RAM=" + selectedRam + ")...");
 
         new Thread(() -> {
-            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub);
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub, selectedRam);
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 if (res.exitCode == 0) {
                     ActivityLogger.ok(res.output.isEmpty() ? "Server started successfully." : res.output);
@@ -280,7 +299,8 @@ public class ServerControlView implements WorkspaceView {
                 Thread.sleep(1500);
             } catch (InterruptedException ignored) {}
             boolean pub = publicTunnelCheckBox.isChecked();
-            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub);
+            String selectedRam = ramComboBox.getSelectedItem();
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub, selectedRam);
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 if (res.exitCode == 0) {
                     ActivityLogger.ok(res.output.isEmpty() ? "Server restarted." : res.output);

@@ -1,5 +1,26 @@
 #!/bin/bash
-java -Xms4G -Xmx4G \
+echo "eula=true" > eula.txt
+
+RAM="${1:-4G}"
+if [[ "$RAM" =~ ^[0-9]+$ ]]; then
+  RAM="${RAM}G"
+fi
+
+# Immediately terminate the tmux session when the Minecraft server exits or crashes
+trap 'tmux kill-session -t mcsv 2>/dev/null; tmux kill-session -t mcServer 2>/dev/null; tmux kill-session 2>/dev/null || true' EXIT
+
+if [ -f "run.sh" ]; then
+  chmod +x run.sh
+  ./run.sh nogui
+  exit $?
+fi
+
+TARGET_JAR="server.jar"
+if [ -f "fabric-server-launch.jar" ]; then
+  TARGET_JAR="fabric-server-launch.jar"
+fi
+
+java -Xms"$RAM" -Xmx"$RAM" \
   -XX:+UseG1GC \
   -XX:+ParallelRefProcEnabled \
   -XX:MaxGCPauseMillis=200 \
@@ -20,4 +41,6 @@ java -Xms4G -Xmx4G \
   -XX:MaxTenuringThreshold=1 \
   -Dusing.aikars.flags=https://mcflags.emc.gs \
   -Daikars.new.flags=true \
-  -jar server.jar nogui
+  -jar "$TARGET_JAR" nogui
+
+

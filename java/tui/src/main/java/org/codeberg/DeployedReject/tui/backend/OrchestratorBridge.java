@@ -917,6 +917,10 @@ public class OrchestratorBridge {
   }
 
   public static ProcessResult startServer(boolean publicTunnel) {
+    return startServer(publicTunnel, "4G");
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel, String ram) {
     if (!isCommandAvailable("tmux")) {
       return new ProcessResult(1,
           "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
@@ -925,11 +929,16 @@ public class OrchestratorBridge {
       return new ProcessResult(1,
           "[ERROR] 'java' is not found in PATH.\nPlease install Java (e.g. OpenJDK 17/21+) to run Minecraft servers.");
     }
+    try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
+      eulaWriter.write("eula=true\n");
+    } catch (Exception ignored) {}
+
+    String ramArg = (ram != null && !ram.trim().isEmpty()) ? ram.trim() : "4G";
     String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
     if (publicTunnel) {
-      return runShell("bash", script, "start", "--public");
+      return runShell("bash", script, "start", "--public", "--ram", ramArg);
     } else {
-      return runShell("bash", script, "start");
+      return runShell("bash", script, "start", "--ram", ramArg);
     }
   }
 
