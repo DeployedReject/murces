@@ -13,6 +13,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Enhanced Mod Browse & Download View with responsive 2-column layout,
+ * live mod author and full description display with "Read More" dropdown,
+ * description pagination, compatible version picker, Minecraft pickaxe
+ * loading animation, and download finish ETA estimate.
+ */
 public class ModBrowseView implements WorkspaceView {
 
   private final MainWindow mainWindow;
@@ -309,27 +315,23 @@ public class ModBrowseView implements WorkspaceView {
   }
 
   private void relayoutForCurrentMode() {
-    int cols = Math.max(70, currentTermWidth);
-    int rows = Math.max(18, currentTermHeight);
+    int width = Math.max(60, currentTermWidth);
+    int rows = Math.max(20, currentTermHeight);
 
-    // 1. Calculate actual workspace bounds matching MainWindow's 3-pane dashboard
-    int consHeight = Math.max(5, Math.min(16, rows / 4));
-    int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
-    int wsWidth = Math.max(42, cols - actWidth - 6);
-    int wsHeight = Math.max(12, rows - consHeight - 4);
+    // Vertical space budget:
+    // filterPanel (1) + searchPanel (1) + statusLabel (1) + downloadPanel (5) +
+    // backBtn (1) + spacing/margins (2) = 11 rows
+    int middleHeight = Math.max(10, rows - 11);
+    // Inside detailsCard: titleAuthorLabel (2) + versionRow (1) + modeRow (1) +
+    // paginationPanel (1) + border overhead (2) = 7 rows
+    this.descLinesPerPage = Math.max(6, middleHeight - 7);
 
-    // 2. Budget vertical space:
-    // filters(1) + search(1) + status(1) + downloadPanel(5) + backBtn(1) +
-    // margins(1) = 10 rows
-    int downloadPanelHeight = 5; // 3 content rows for pickaxe animation + 2 rows for border
-    int middleHeight = Math.max(5, wsHeight - 10);
-    this.descLinesPerPage = Math.max(3, middleHeight - 6);
+    // Full usable width (minus root borders/padding)
+    int usableWidth = Math.max(60, width - 2);
 
-    int usableWidth = Math.max(38, wsWidth - 2);
-
-    if (usableWidth >= 56) {
-      // Split into two balanced columns
-      int halfWidth = (usableWidth - 3) / 2;
+    if (usableWidth >= 70) {
+      // Equal 50/50 split between list and details
+      int halfWidth = (usableWidth - 3) / 2; // -3 for gap between columns
       int leftWidth = halfWidth;
       int rightWidth = usableWidth - leftWidth - 3;
 
@@ -337,27 +339,24 @@ public class ModBrowseView implements WorkspaceView {
 
       resultsList.setPreferredSize(new TerminalSize(leftWidth, middleHeight));
       detailsCard.setPreferredSize(new TerminalSize(rightWidth, middleHeight));
-      descContentLabel.setPreferredSize(new TerminalSize(Math.max(18, rightWidth - 4), descLinesPerPage));
-
+      descContentLabel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
       pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 4), 3));
       if (downloadPanel != null) {
-        downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 2), downloadPanelHeight));
+        downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 2), 5));
       }
-      searchBox.setPreferredSize(new TerminalSize(Math.max(14, (usableWidth * 25) / 100), 1));
+      searchBox.setPreferredSize(new TerminalSize(Math.max(16, (usableWidth * 25) / 100), 1));
     } else {
-      // Stacked single-column layout for narrower terminals
-      int fullWidth = Math.max(32, usableWidth - 2);
+      int fullWidth = Math.max(34, usableWidth - 4);
       this.descCardWidth = fullWidth;
-      int halfH = Math.max(4, middleHeight / 2);
-      this.descLinesPerPage = Math.max(2, halfH - 3);
+      int halfH = Math.max(5, middleHeight / 2);
+      this.descLinesPerPage = Math.max(4, halfH - 4);
 
       resultsList.setPreferredSize(new TerminalSize(fullWidth, halfH));
-      detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH));
-      descContentLabel.setPreferredSize(new TerminalSize(Math.max(18, fullWidth - 4), descLinesPerPage));
-
+      detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 3));
+      descContentLabel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
       pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 3));
       if (downloadPanel != null) {
-        downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 2), downloadPanelHeight));
+        downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 2), 5));
       }
     }
   }
