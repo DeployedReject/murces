@@ -6,15 +6,16 @@ import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.gui2.AbstractComponent;
 import com.googlecode.lanterna.gui2.ComponentRenderer;
 import com.googlecode.lanterna.gui2.TextGUIGraphics;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 
 /**
- * A Minecraft-themed loading animation that renders a diamond pickaxe breaking
- * a row of dirt blocks through cracking stages and breaking particles.
+ * A Minecraft-themed loading animation rendering an advancing pickaxe on the
+ * same row as the dirt blocks. The pickaxe moves forward across the track as
+ * each block is broken, leaving a cleared tunnel behind it.
  */
 public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickaxeAnimation> {
 
-  private static final int TOTAL_BLOCKS = 5;
   private static final TextColor DIRT_BROWN = new TextColor.RGB(133, 82, 43);
   private static final TextColor CRACK_GRAY = new TextColor.RGB(170, 170, 170);
   private static final TextColor DIAMOND_TOOL = new TextColor.RGB(85, 255, 255);
@@ -52,7 +53,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
     return new ComponentRenderer<>() {
       @Override
       public TerminalSize getPreferredSize(MinecraftPickaxeAnimation component) {
-        return new TerminalSize(36, 3);
+        return new TerminalSize(36, 2);
       }
 
       @Override
@@ -61,7 +62,6 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
         int width = Math.max(30, size.getColumns());
         int height = Math.max(1, size.getRows());
 
-        // Clear background with log background or default
         graphics.setBackgroundColor(LazyVimTheme.getLogBackgroundColor());
         graphics.fill(' ');
 
@@ -73,96 +73,116 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           currentTick = comp.tick;
           msg = comp.customMessage;
           if (comp.progress < 0) {
-            // Indeterminate mode: loop smoothly 0..100
-            effectiveProgress = (currentTick * 4) % 101;
+            effectiveProgress = (currentTick * 3) % 101;
           } else {
             effectiveProgress = Math.max(0, Math.min(100, comp.progress));
           }
         }
 
-        // Compute number of blocks that fit the full available width
-        int blockWidth = 5; // "[██] " is 5 chars
-        int totalBlocks = Math.max(5, (width - 1) / blockWidth);
+        int slotWidth = 5; // "[██] " or " ⛏> "
+        int totalSlots = Math.max(4, width / slotWidth);
+        int totalBlocks = totalSlots - 1; // 1 slot allocated for the advancing pickaxe
 
         double blockProgress = (effectiveProgress / 100.0) * totalBlocks;
         int activeBlock = Math.min(totalBlocks - 1, (int) blockProgress);
         double subProgress = blockProgress - activeBlock;
+        boolean isComplete = (effectiveProgress >= 100.0);
 
-        // Pickaxe swing frames: 0 = high, 1 = hitting, 2 = follow-through
-        String toolIcon = org.codeberg.DeployedReject.tui.theme.GlyphHelper.isNerdFontEnabled()
-            ? org.codeberg.DeployedReject.tui.theme.GlyphHelper.ICON_TOOL
-            : "/";
-        String[] swingIcons = { toolIcon + " \\", toolIcon + " |", toolIcon + " /" };
-        String swing = swingIcons[Math.abs(currentTick) % 3];
+        int pickSlot = isComplete ? (totalBlocks - 1) : activeBlock;
+        int animRow = 0;
 
-        // Line 0: Pickaxe swing above active block
-        if (height >= 1) {
-          int pickCol = activeBlock * blockWidth + 1;
-          if (pickCol < width) {
-            graphics.setForegroundColor(DIAMOND_TOOL);
-            graphics.putString(pickCol, 0, toolIcon);
-            graphics.setForegroundColor(LazyVimTheme.getAccentColor());
-            if (pickCol + 2 < width) {
-              graphics.putString(pickCol + 2, 0, swing.substring(toolIcon.length() + 1));
-            }
-          }
+        String toolIcon = GlyphHelper.isNerdFontEnabled() ? GlyphHelper.ICON_TOOL : "/";
+        int swingFrame = Math.abs(currentTick) % 3;
+        String swingSuffix;
+        TextColor swingColor;
+
+        if (isComplete) {
+          swingSuffix = " ";
+          swingColor = DIAMOND_TOOL;
+        } else if (swingFrame == 0) {
+          swingSuffix = "\\";
+          swingColor = LazyVimTheme.getAccentColor();
+        } else if (swingFrame == 1) {
+          swingSuffix = ">";
+          swingColor = LazyVimTheme.getAccentColor();
+        } else {
+          swingSuffix = "*";
+          swingColor = PARTICLE_GOLD;
         }
 
-        // Line 1: Row of dirt blocks filling the entire width
-        if (height >= 2) {
-          for (int b = 0; b < totalBlocks; b++) {
-            int col = b * blockWidth;
-            if (col + 4 > width) {
-              break;
-            }
-            if (b < activeBlock) {
-              // Already broken
+        // Render slots: Mined Tunnel -> Pickaxe -> Active Block -> Remaining Blocks
+        for (int slot = 0; slot < totalSlots; slot++) {
+          int col = slot * slotWidth;
+          if (col + 4 > width) {
+            break;
+          }
+
+          if (isComplete) {
+            if (slot < totalBlocks - 1) {
               graphics.setForegroundColor(LazyVimTheme.getMutedColor());
-              graphics.putString(col, 1, "[  ]");
-            } else if (b > activeBlock) {
-              // Intact dirt
-              graphics.setForegroundColor(DIRT_BROWN);
-              graphics.putString(col, 1, "[██]");
+              graphics.putString(col, animRow, "  ·  ");
+            } else if (slot == totalBlocks - 1) {
+              graphics.setForegroundColor(DIAMOND_TOOL);
+              graphics.putString(col + 1, animRow, toolIcon);
             } else {
-              // Currently breaking dirt block
+              graphics.setForegroundColor(DIAMOND_TOOL);
+              graphics.putString(col, animRow, "[◆] ");
+            }
+          } else {
+            if (slot < pickSlot) {
+              graphics.setForegroundColor(LazyVimTheme.getMutedColor());
+              graphics.putString(col, animRow, "  ·  ");
+            } else if (slot == pickSlot) {
+              graphics.setForegroundColor(DIAMOND_TOOL);
+              graphics.putString(col + 1, animRow, toolIcon);
+              graphics.setForegroundColor(swingColor);
+              graphics.putString(col + 2, animRow, swingSuffix);
+            } else if (slot == pickSlot + 1) {
               graphics.setForegroundColor(DIRT_BROWN);
-              graphics.putString(col, 1, "[");
-              graphics.putString(col + 3, 1, "]");
+              graphics.putString(col, animRow, "[");
+              graphics.putString(col + 3, animRow, "]");
 
               if (subProgress < 0.25) {
                 graphics.setForegroundColor(DIRT_BROWN);
-                graphics.putString(col + 1, 1, "██");
+                graphics.putString(col + 1, animRow, "██");
               } else if (subProgress < 0.50) {
                 graphics.setForegroundColor(CRACK_GRAY);
-                graphics.putString(col + 1, 1, "▓▓");
+                graphics.putString(col + 1, animRow, "▓▓");
               } else if (subProgress < 0.75) {
                 graphics.setForegroundColor(CRACK_GRAY);
-                graphics.putString(col + 1, 1, "▒▒");
+                graphics.putString(col + 1, animRow, "▒▒");
               } else if (subProgress < 0.95) {
                 graphics.setForegroundColor(CRACK_GRAY);
-                graphics.putString(col + 1, 1, "░░");
+                graphics.putString(col + 1, animRow, "░░");
               } else {
                 graphics.setForegroundColor(PARTICLE_GOLD);
-                graphics.putString(col, 1, "*░ *");
+                graphics.putString(col, animRow, "*░ *");
               }
+            } else {
+              graphics.setForegroundColor(DIRT_BROWN);
+              graphics.putString(col, animRow, "[██]");
             }
           }
         }
 
-        // Line 2: Status label / ETA
-        if (height >= 3) {
+        // Row 1: Status message and progress info
+        if (height >= 2) {
+          int textRow = height - 1;
           graphics.setForegroundColor(LazyVimTheme.getActivePalette().fg);
           String display;
+
           if (msg != null && !msg.isEmpty()) {
-            display = org.codeberg.DeployedReject.tui.theme.GlyphHelper.apply(msg);
+            display = GlyphHelper.apply(msg);
+          } else if (isComplete) {
+            display = String.format("Mining complete! 100.00%% [%d/%d blocks cleared]", totalBlocks, totalBlocks);
           } else {
-            display = String.format("Breaking dirt... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1,
-                totalBlocks);
+            display = String.format("Mining... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1, totalBlocks);
           }
+
           if (display.length() > width) {
             display = display.substring(0, width);
           }
-          graphics.putString(0, 2, display);
+          graphics.putString(0, textRow, display);
         }
       }
     };
