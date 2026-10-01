@@ -8,10 +8,7 @@ import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -51,15 +48,21 @@ public class ModBrowseView implements WorkspaceView {
     private final List<OrchestratorBridge.ModVersionInfo> currentModVersions = new ArrayList<>();
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
     private final Map<String, String> fullDescCache = new HashMap<>();
+    private final Set<String> pendingFetches = Collections.synchronizedSet(new HashSet<>());
 
     private OrchestratorBridge.ModResult selectedMod = null;
     private boolean isDownloading = false;
-    private boolean isFetchingFullDesc = false;
     private int descPageIndex = 0;
     private int currentTermWidth = 80;
+    private int currentTermHeight = 24;
     private int descCardWidth = 46;
     private int descLinesPerPage = 8;
     private ScheduledExecutorService activeTicker = null;
+
+    private Panel midCols;
+    private Panel leftCol;
+    private Panel rightCol;
+    private Panel downloadPanel;
 
     public ModBrowseView(MainWindow mainWindow) {
         this.mainWindow = mainWindow;
@@ -123,17 +126,17 @@ public class ModBrowseView implements WorkspaceView {
         root.addComponent(statusLabel);
 
         // 4. Middle 2-Column Section (filling full workspace area)
-        Panel midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
+        midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
 
         // Left Column: Results List
-        Panel leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
+        leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
         leftCol.addComponent(resultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Results [L]ist (↑/↓)"))));
         midCols.addComponent(leftCol);
 
         midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Right Column: Mod Details, Version Picker, Read More Mode, Description, Pagination, Pickaxe Animation
-        Panel rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
+        // Right Column: Mod Details, Version Picker, Read More Mode, Description, Pagination
+        rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
         detailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
 
         titleAuthorLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: -\n" + GlyphHelper.ICON_USER + " Author: -"));
@@ -154,7 +157,9 @@ public class ModBrowseView implements WorkspaceView {
             if (selectedIndex == 1 && selectedMod != null) {
                 fetchFullDescriptionIfNeeded(selectedMod);
             }
+            relayoutForCurrentMode();
             updateDetailsDisplay();
+            mainWindow.invalidate();
         });
         modeRow.addComponent(descModeCombo);
         detailsCard.addComponent(modeRow);
@@ -177,32 +182,37 @@ public class ModBrowseView implements WorkspaceView {
         paginationPanel.addComponent(nextPageBtn);
         detailsCard.addComponent(paginationPanel);
 
-        pickaxeAnim = new MinecraftPickaxeAnimation();
-        pickaxeAnim.setProgress(0.0);
-        pickaxeAnim.setCustomMessage("Ready to download mods");
-        detailsCard.addComponent(pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TOOL + " Download Status"))));
-
         detailsCard.setPreferredSize(new TerminalSize(48, 12));
         rightCol.addComponent(detailsCard.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Mod Details & Versions"))));
         midCols.addComponent(rightCol);
 
         root.addComponent(midCols);
 
+        // 5. Dedicated Download Progress Bar (always visible at bottom)
+        pickaxeAnim = new MinecraftPickaxeAnimation();
+        pickaxeAnim.setProgress(0.0);
+        pickaxeAnim.setCustomMessage("Ready to download mods");
+        downloadPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+        downloadPanel.addComponent(pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TOOL + " Download Status"))));
+        root.addComponent(downloadPanel);
+
         // Instant arrow-key selection tracking: updates description and compatible versions immediately
         resultsList.setSelectionListener(idx -> {
             if (idx >= 0 && idx < currentResults.size()) {
+                OrchestratorBridge.ModResult mod = currentResults.get(idx);
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    onModSelected(currentResults.get(idx));
+                    onModSelected(mod);
                 });
             } else if (idx < 0) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     selectedMod = null;
                     updateDetailsDisplay();
+                    mainWindow.invalidate();
                 });
             }
         });
 
-        // 5. Footer
+        // 6. Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
@@ -285,37 +295,62 @@ public class ModBrowseView implements WorkspaceView {
     public void onResized(TerminalSize newSize) {
         if (newSize == null) return;
         this.currentTermWidth = newSize.getColumns();
-        int rows = newSize.getRows();
+        this.currentTermHeight = newSize.getRows();
+        relayoutForCurrentMode();
+        updateDetailsDisplay();
+    }
 
-        int actWidth = Math.max(28, Math.min(65, (currentTermWidth * 35) / 100));
-        int wsWidth = Math.max(40, currentTermWidth - actWidth - 6);
+    private void relayoutForCurrentMode() {
+        int width = Math.max(60, currentTermWidth);
+        int rows = Math.max(20, currentTermHeight);
 
-        int middleHeight = Math.max(10, rows - 13);
+        int actWidth = Math.max(28, Math.min(65, (width * 35) / 100));
+        int wsWidth = Math.max(40, width - actWidth - 6);
+
+        // Vertical space budget:
+        // filterPanel (1) + searchPanel (1) + statusLabel (1) + downloadPanel (5) + backBtn (1) + spacing/margins (2) = 11 rows
+        int middleHeight = Math.max(10, rows - 11);
+        boolean isReadMore = (descModeCombo != null && descModeCombo.getSelectedIndex() == 1);
 
         if (wsWidth >= 70) {
-            int leftWidth = Math.max(34, (wsWidth * 42) / 100);
-            int rightWidth = Math.max(38, wsWidth - leftWidth - 3);
+            int leftWidth;
+            int rightWidth;
+            if (isReadMore) {
+                // In Read More mode: make description box significantly bigger (approx 72% width), results list compact
+                leftWidth = Math.max(26, Math.min(32, (wsWidth * 28) / 100));
+                rightWidth = Math.max(42, wsWidth - leftWidth - 3);
+            } else {
+                // In Summary mode: standard 42% / 58% split
+                leftWidth = Math.max(34, (wsWidth * 42) / 100);
+                rightWidth = Math.max(38, wsWidth - leftWidth - 3);
+            }
 
             this.descCardWidth = rightWidth;
-            this.descLinesPerPage = Math.max(5, middleHeight - 11);
+            // Inside detailsCard: titleAuthorLabel (2) + versionRow (1) + modeRow (1) + paginationPanel (1) + borders (2) = 7 rows
+            this.descLinesPerPage = Math.max(6, middleHeight - 7);
 
             resultsList.setPreferredSize(new TerminalSize(leftWidth, middleHeight));
             detailsCard.setPreferredSize(new TerminalSize(rightWidth, middleHeight));
-            descPanel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage + 2));
-            pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, rightWidth - 4), 3));
+            descPanel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
+            pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, wsWidth - 4), 3));
+            if (downloadPanel != null) {
+                downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, wsWidth - 4), 5));
+            }
             searchBox.setPreferredSize(new TerminalSize(Math.max(16, (wsWidth * 25) / 100), 1));
         } else {
             int fullWidth = Math.max(34, wsWidth - 4);
             this.descCardWidth = fullWidth;
             int halfH = Math.max(5, middleHeight / 2);
-            this.descLinesPerPage = Math.max(4, halfH - 6);
+            this.descLinesPerPage = Math.max(4, halfH - 4);
 
             resultsList.setPreferredSize(new TerminalSize(fullWidth, halfH));
-            detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 2));
-            descPanel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage + 2));
+            detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 3));
+            descPanel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
             pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 3));
+            if (downloadPanel != null) {
+                downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 5));
+            }
         }
-        updateDetailsDisplay();
     }
 
     private void onPrevPage() {
@@ -333,7 +368,7 @@ public class ModBrowseView implements WorkspaceView {
     }
 
     private void fetchFullDescriptionIfNeeded(OrchestratorBridge.ModResult mod) {
-        if (mod == null) return;
+        if (mod == null || mod.id == null || mod.id.trim().isEmpty()) return;
         String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
         if ("curseforge".equals(platform)) {
             platform = "curseForge";
@@ -342,29 +377,38 @@ public class ModBrowseView implements WorkspaceView {
         if (fullDescCache.containsKey(cacheKey)) {
             return;
         }
+        if (pendingFetches.contains(cacheKey)) {
+            return;
+        }
 
-        isFetchingFullDesc = true;
+        pendingFetches.add(cacheKey);
         final String targetPlatform = platform;
         final String modId = mod.id;
 
         OrchestratorBridge.getInstance().getModFullDescription(targetPlatform, modId)
                 .thenAccept(fullDesc -> {
+                    pendingFetches.remove(cacheKey);
                     mainWindow.getGui().getGUIThread().invokeLater(() -> {
                         if (fullDesc != null && !fullDesc.trim().isEmpty()) {
                             fullDescCache.put(cacheKey, fullDesc.trim());
+                        } else if (mod.description != null && !mod.description.trim().isEmpty()) {
+                            fullDescCache.put(cacheKey, mod.description.trim() + "\n\n(No additional extended description provided by " + targetPlatform + ")");
                         } else {
                             fullDescCache.put(cacheKey, "No extended description provided by " + targetPlatform + ".");
                         }
-                        isFetchingFullDesc = false;
                         if (selectedMod != null && selectedMod.id.equals(modId)) {
                             updateDetailsDisplay();
                             mainWindow.invalidate();
                         }
                     });
                 }).exceptionally(ex -> {
+                    pendingFetches.remove(cacheKey);
                     mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                        fullDescCache.put(cacheKey, "Failed to load full description: " + ex.getMessage());
-                        isFetchingFullDesc = false;
+                        if (mod.description != null && !mod.description.trim().isEmpty()) {
+                            fullDescCache.put(cacheKey, mod.description.trim() + "\n\n(Extended description failed to load: " + ex.getMessage() + ")");
+                        } else {
+                            fullDescCache.put(cacheKey, "Failed to load full description: " + ex.getMessage());
+                        }
                         if (selectedMod != null && selectedMod.id.equals(modId)) {
                             updateDetailsDisplay();
                             mainWindow.invalidate();
@@ -391,6 +435,9 @@ public class ModBrowseView implements WorkspaceView {
                 descPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the results list to view its description.")));
             }
             pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
+            descPanel.invalidate();
+            detailsCard.invalidate();
+            mainWindow.invalidate();
             return;
         }
 
@@ -399,7 +446,7 @@ public class ModBrowseView implements WorkspaceView {
                 : "Unknown";
         titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: " + selectedMod.name + "\n" + GlyphHelper.ICON_USER + " Author: " + author));
 
-        boolean isFullDescMode = (descModeCombo.getSelectedIndex() == 1);
+        boolean isFullDescMode = (descModeCombo != null && descModeCombo.getSelectedIndex() == 1);
         String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
         if ("curseforge".equals(platform)) {
             platform = "curseForge";
@@ -408,11 +455,14 @@ public class ModBrowseView implements WorkspaceView {
 
         List<String> lines;
         if (isFullDescMode) {
-            if (isFetchingFullDesc && !fullDescCache.containsKey(cacheKey)) {
+            if (pendingFetches.contains(cacheKey)) {
                 Label loadingLbl = new Label(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Fetching full description from " + platform + "..."));
                 loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
                 descPanel.addComponent(loadingLbl);
                 pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
+                descPanel.invalidate();
+                detailsCard.invalidate();
+                mainWindow.invalidate();
                 return;
             }
             String fullDesc = fullDescCache.get(cacheKey);
@@ -422,6 +472,9 @@ public class ModBrowseView implements WorkspaceView {
                 loadingLbl.setForegroundColor(LazyVimTheme.getAccentColor());
                 descPanel.addComponent(loadingLbl);
                 pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
+                descPanel.invalidate();
+                detailsCard.invalidate();
+                mainWindow.invalidate();
                 return;
             }
             int wrapWidth = Math.max(28, descCardWidth - 6);
@@ -438,7 +491,7 @@ public class ModBrowseView implements WorkspaceView {
             lines.add("No description text available.");
         }
 
-        int pageSize = Math.max(4, descLinesPerPage);
+        int pageSize = Math.max(5, descLinesPerPage);
         int totalPages = Math.max(1, (int) Math.ceil((double) lines.size() / pageSize));
         if (descPageIndex >= totalPages) {
             descPageIndex = totalPages - 1;
@@ -458,6 +511,9 @@ public class ModBrowseView implements WorkspaceView {
         }
 
         pageIndicatorLabel.setText(GlyphHelper.apply(String.format(GlyphHelper.ICON_FILE + " Page %d/%d (%d lines)", descPageIndex + 1, totalPages, lines.size())));
+        descPanel.invalidate();
+        detailsCard.invalidate();
+        mainWindow.invalidate();
     }
 
     private List<String> formatAndWrapDescription(String text, int width) {
@@ -475,6 +531,14 @@ public class ModBrowseView implements WorkspaceView {
                 continue;
             }
             result.addAll(wrapText(trimmed, width));
+        }
+        // Remove leading empty lines
+        while (!result.isEmpty() && result.get(0).trim().isEmpty()) {
+            result.remove(0);
+        }
+        // Remove trailing empty lines
+        while (!result.isEmpty() && result.get(result.size() - 1).trim().isEmpty()) {
+            result.remove(result.size() - 1);
         }
         return result;
     }
@@ -505,6 +569,7 @@ public class ModBrowseView implements WorkspaceView {
         if (mod == null) {
             this.selectedMod = null;
             updateDetailsDisplay();
+            mainWindow.invalidate();
             return;
         }
         this.selectedMod = mod;
@@ -513,6 +578,7 @@ public class ModBrowseView implements WorkspaceView {
             fetchFullDescriptionIfNeeded(mod);
         }
         updateDetailsDisplay();
+        mainWindow.invalidate();
 
         // Fetch compatible versions for the chosen game version
         String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
@@ -528,18 +594,22 @@ public class ModBrowseView implements WorkspaceView {
         currentModVersions.clear();
 
         final String finalPlat = platform;
+        final String currentModId = mod.id;
         new Thread(() -> {
             try {
                 List<OrchestratorBridge.ModVersionInfo> versions = OrchestratorBridge.getInstance()
-                        .getModVersions(finalPlat, mod.id, version, loader).get();
+                        .getModVersions(finalPlat, currentModId, version, loader).get();
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     try {
-                        currentModVersions.clear();
-                        currentModVersions.addAll(versions);
-                        for (OrchestratorBridge.ModVersionInfo v : versions) {
-                            if (v != null && v.versionNumber != null) {
-                                modVersionCombo.addItem(v.toString());
+                        if (selectedMod != null && currentModId.equals(selectedMod.id)) {
+                            currentModVersions.clear();
+                            currentModVersions.addAll(versions);
+                            for (OrchestratorBridge.ModVersionInfo v : versions) {
+                                if (v != null && v.versionNumber != null) {
+                                    modVersionCombo.addItem(v.toString());
+                                }
                             }
+                            mainWindow.invalidate();
                         }
                     } catch (Exception ignored) {}
                 });
@@ -593,6 +663,7 @@ public class ModBrowseView implements WorkspaceView {
                                     onDownload();
                                 });
                             }
+                            resultsList.setSelectedIndex(0);
                             if (!mods.isEmpty()) {
                                 onModSelected(mods.get(0));
                             }

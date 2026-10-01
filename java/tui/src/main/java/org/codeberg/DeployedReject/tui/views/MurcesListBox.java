@@ -29,34 +29,47 @@ public class MurcesListBox extends ActionListBox {
 
     public void setSelectionListener(SelectionListener listener) {
         this.selectionListener = listener;
+        if (listener != null && getSelectedIndex() >= 0) {
+            listener.onSelectionChanged(getSelectedIndex());
+        }
+    }
+
+    private void notifySelection(int oldIdx, int newIdx) {
+        if (oldIdx != newIdx && selectionListener != null) {
+            selectionListener.onSelectionChanged(newIdx);
+        }
     }
 
     @Override
     public synchronized MurcesListBox setSelectedIndex(int index) {
         if (getItemCount() == 0) {
+            int old = getSelectedIndex();
             super.clearItems();
-            if (selectionListener != null) {
-                selectionListener.onSelectionChanged(-1);
-            }
+            notifySelection(old, -1);
             return this;
         }
         int clamped = Math.max(0, Math.min(index, getItemCount() - 1));
         int old = getSelectedIndex();
         super.setSelectedIndex(clamped);
         int cur = getSelectedIndex();
-        if (old != cur && selectionListener != null) {
-            selectionListener.onSelectionChanged(cur);
-        }
+        notifySelection(old, cur);
         return this;
     }
 
     @Override
     public synchronized MurcesListBox clearItems() {
+        int old = getSelectedIndex();
         super.clearItems();
-        if (selectionListener != null) {
-            selectionListener.onSelectionChanged(-1);
-        }
+        notifySelection(old, -1);
         return this;
+    }
+
+    @Override
+    protected synchronized void afterEnterFocus(Interactable.FocusChangeDirection direction, Interactable previouslyFocusedElement) {
+        int old = getSelectedIndex();
+        super.afterEnterFocus(direction, previouslyFocusedElement);
+        int cur = getSelectedIndex();
+        notifySelection(old, cur);
     }
 
     @Override
@@ -101,6 +114,14 @@ public class MurcesListBox extends ActionListBox {
 
     @Override
     public synchronized Interactable.Result handleKeyStroke(KeyStroke keyStroke) {
+        int old = getSelectedIndex();
+        Interactable.Result res = internalHandleKeyStroke(keyStroke);
+        int cur = getSelectedIndex();
+        notifySelection(old, cur);
+        return res;
+    }
+
+    private Interactable.Result internalHandleKeyStroke(KeyStroke keyStroke) {
         if (getItemCount() == 0) {
             if (keyStroke instanceof com.googlecode.lanterna.input.MouseAction) {
                 return Interactable.Result.HANDLED;

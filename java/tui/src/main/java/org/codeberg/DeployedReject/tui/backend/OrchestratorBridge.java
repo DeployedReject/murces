@@ -424,13 +424,18 @@ public class OrchestratorBridge {
 
     public CompletableFuture<String> getModFullDescription(String platform, String modIdOrSlug) {
         CompletableFuture<String> future = new CompletableFuture<>();
+        if (modIdOrSlug == null || modIdOrSlug.trim().isEmpty()) {
+            future.complete("");
+            return future;
+        }
         workerPool.submit(() -> {
             try {
+                String cleanId = URLEncoder.encode(modIdOrSlug.trim(), StandardCharsets.UTF_8);
                 if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
-                    String url = "https://api.curseforge.com/v1/mods/" + modIdOrSlug + "/description";
+                    String url = "https://api.curseforge.com/v1/mods/" + cleanId + "/description";
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(url))
-                            .header("x-api-key", curseAPI)
+                            .header("x-api-key", curseAPI != null ? curseAPI : "")
                             .header("Accept", "application/json")
                             .GET()
                             .build();
@@ -444,7 +449,7 @@ public class OrchestratorBridge {
                         }
                     }
                 } else {
-                    String url = "https://api.modrinth.com/v2/project/" + modIdOrSlug;
+                    String url = "https://api.modrinth.com/v2/project/" + cleanId;
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(url))
                             .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
@@ -492,12 +497,29 @@ public class OrchestratorBridge {
     public static String cleanMarkdown(String md) {
         if (md == null) return "";
         String s = md;
+        // Strip markdown images first
         s = s.replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)", "");
+        // Strip empty links left over
+        s = s.replaceAll("\\[\\s*\\]\\([^)]*\\)", "");
+        // Turn links into their display text
         s = s.replaceAll("\\[([^\\]]+)\\]\\([^)]*\\)", "$1");
+        // Strip raw HTML tags
         s = s.replaceAll("<[^>]+>", "");
+        // Clean headings
         s = s.replaceAll("(?m)^#{1,6}\\s*", "◆ ");
+        // Strip bold and italics formatting
         s = s.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
+        s = s.replaceAll("__([^_]+)__", "$1");
         s = s.replaceAll("(?m)^[-*]\\s+", "  • ");
+        // Replace HTML entities
+        s = s.replace("&nbsp;", " ")
+             .replace("&amp;", "&")
+             .replace("&lt;", "<")
+             .replace("&gt;", ">")
+             .replace("&quot;", "\"")
+             .replace("&#39;", "'")
+             .replace("&mdash;", "—")
+             .replace("&ndash;", "–");
         s = s.replaceAll("\n{3,}", "\n\n");
         return s.trim();
     }
