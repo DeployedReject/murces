@@ -1026,6 +1026,25 @@ public class OrchestratorBridge {
     return false;
   }
 
+  public static boolean deleteBackup(String filename) {
+    if (filename == null || filename.trim().isEmpty() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+      return false;
+    }
+    File f1 = new File("backup", filename);
+    if (f1.exists() && f1.isFile()) {
+      return f1.delete();
+    }
+    File f2 = new File("backups", filename);
+    if (f2.exists() && f2.isFile()) {
+      return f2.delete();
+    }
+    File f3 = new File(".", filename);
+    if (f3.exists() && f3.isFile()) {
+      return f3.delete();
+    }
+    return false;
+  }
+
   private static String findScript(String relative1, String relative2) {
     if (new File(relative1).exists())
       return relative1;

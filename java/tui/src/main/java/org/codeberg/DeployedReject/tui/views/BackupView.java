@@ -18,9 +18,12 @@ public class BackupView implements WorkspaceView {
     private final Table<String> table;
     private final Label statusLabel;
     private final Button backupNowBtn;
+    private final Button deleteBtn;
     private final Button refreshBtn;
     private final Button backBtn;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
+    private boolean confirmingDelete = false;
+    private String backupToDelete = null;
 
     public BackupView(MainWindow mainWindow) {
         this.mainWindow = mainWindow;
@@ -29,9 +32,12 @@ public class BackupView implements WorkspaceView {
         // Top Actions
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         backupNowBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [K] Backup Now"), this::onRunBackup);
+        deleteBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [D]elete Backup"), this::onDeleteBackup);
         refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]efresh"), this::loadBackups);
 
         topPanel.addComponent(backupNowBtn);
+        topPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        topPanel.addComponent(deleteBtn);
         topPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         topPanel.addComponent(refreshBtn);
         root.addComponent(topPanel);
@@ -43,6 +49,7 @@ public class BackupView implements WorkspaceView {
         // Table
         table = new Table<>("Archive", "Size", "Date");
         table.setEscapeByArrowKey(false);
+        table.setSelectAction(this::onDeleteBackup);
         table.setPreferredSize(new TerminalSize(42, 6));
         root.addComponent(table.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Backups [L]ist"))));
 
@@ -55,6 +62,7 @@ public class BackupView implements WorkspaceView {
         // Hotkeys
         hotkeys.put('L', table::takeFocus);
         hotkeys.put('K', KeyboardNavigationHelper.focus(backupNowBtn, this::onRunBackup));
+        hotkeys.put('D', KeyboardNavigationHelper.focus(deleteBtn, this::onDeleteBackup));
         hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::loadBackups));
         hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
 
@@ -101,10 +109,13 @@ public class BackupView implements WorkspaceView {
     }
 
     private void loadBackups() {
+        confirmingDelete = false;
+        backupToDelete = null;
         table.getTableModel().clear();
         List<OrchestratorBridge.BackupInfo> backups = OrchestratorBridge.listBackups();
         if (backups.isEmpty()) {
             statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No backup archives found."));
+            statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
             return;
         }
 
@@ -112,6 +123,46 @@ public class BackupView implements WorkspaceView {
             table.getTableModel().addRow(b.name, b.formattedSize(), b.formattedDate());
         }
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Found " + backups.size() + " backup archive(s)."));
+        statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+    }
+
+    private void onDeleteBackup() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= table.getTableModel().getRowCount()) {
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Select a backup from the list first!"));
+            statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+            ActivityLogger.warn("Please select a backup archive before deleting.");
+            return;
+        }
+
+        String archiveName = table.getTableModel().getCell(0, selectedRow);
+        if (archiveName == null || archiveName.trim().isEmpty()) {
+            return;
+        }
+
+        if (!confirmingDelete || !archiveName.equals(backupToDelete)) {
+            confirmingDelete = true;
+            backupToDelete = archiveName;
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [CONFIRM] Press [D] again to delete: " + archiveName));
+            statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
+            ActivityLogger.warn("Confirm delete requested for backup: " + archiveName + " (press [D] to confirm)");
+            return;
+        }
+
+        // Confirmed deletion
+        confirmingDelete = false;
+        backupToDelete = null;
+        boolean deleted = OrchestratorBridge.deleteBackup(archiveName);
+        if (deleted) {
+            ActivityLogger.ok("Backup '" + archiveName + "' deleted successfully.");
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Deleted: " + archiveName));
+            statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+            loadBackups();
+        } else {
+            ActivityLogger.err("Could not delete backup file: " + archiveName);
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Could not delete backup file."));
+            statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
+        }
     }
 
     private void onRunBackup() {
