@@ -93,9 +93,9 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                 String[] swingIcons = {toolIcon + " \\", toolIcon + " |", toolIcon + " /"};
                 String swing = swingIcons[Math.abs(currentTick) % 3];
 
-                // Line 0: Pickaxe swing above block (fixed position at start)
+                // Line 0: Pickaxe swing above active block
                 if (height >= 1) {
-                    int pickCol = 0; // always start at column 0
+                    int pickCol = activeBlock * blockWidth + 1;
                     if (pickCol < width) {
                         graphics.setForegroundColor(DIAMOND_TOOL);
                         graphics.putString(pickCol, 0, toolIcon);
