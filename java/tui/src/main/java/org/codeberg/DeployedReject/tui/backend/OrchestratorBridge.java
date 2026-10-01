@@ -422,6 +422,86 @@ public class OrchestratorBridge {
         return future;
     }
 
+    public CompletableFuture<String> getModFullDescription(String platform, String modIdOrSlug) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        workerPool.submit(() -> {
+            try {
+                if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+                    String url = "https://api.curseforge.com/v1/mods/" + modIdOrSlug + "/description";
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .header("x-api-key", curseAPI)
+                            .header("Accept", "application/json")
+                            .GET()
+                            .build();
+                    HttpResponse<String> resp = NetworkUtils.attemptS(req);
+                    if (resp != null && resp.statusCode() == 200) {
+                        JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+                        if (root.has("data") && !root.get("data").isJsonNull()) {
+                            String rawHtml = root.get("data").getAsString();
+                            future.complete(cleanHtml(rawHtml));
+                            return;
+                        }
+                    }
+                } else {
+                    String url = "https://api.modrinth.com/v2/project/" + modIdOrSlug;
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+                            .GET()
+                            .build();
+                    HttpResponse<String> resp = NetworkUtils.attemptS(req);
+                    if (resp != null && resp.statusCode() == 200) {
+                        JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+                        if (root.has("body") && !root.get("body").isJsonNull()) {
+                            String body = root.get("body").getAsString();
+                            future.complete(cleanMarkdown(body));
+                            return;
+                        }
+                    }
+                }
+                future.complete("");
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    public static String cleanHtml(String html) {
+        if (html == null) return "";
+        String s = html;
+        s = s.replaceAll("(?i)<br\\s*/?>", "\n");
+        s = s.replaceAll("(?i)</p>", "\n\n");
+        s = s.replaceAll("(?i)</li>", "\n");
+        s = s.replaceAll("(?i)<li[^>]*>", "  • ");
+        s = s.replaceAll("(?i)</h[1-6]>", "\n\n");
+        s = s.replaceAll("<[^>]+>", "");
+        s = s.replace("&nbsp;", " ")
+             .replace("&amp;", "&")
+             .replace("&lt;", "<")
+             .replace("&gt;", ">")
+             .replace("&quot;", "\"")
+             .replace("&#39;", "'")
+             .replace("&mdash;", "—")
+             .replace("&ndash;", "–");
+        s = s.replaceAll("\n{3,}", "\n\n");
+        return s.trim();
+    }
+
+    public static String cleanMarkdown(String md) {
+        if (md == null) return "";
+        String s = md;
+        s = s.replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)", "");
+        s = s.replaceAll("\\[([^\\]]+)\\]\\([^)]*\\)", "$1");
+        s = s.replaceAll("<[^>]+>", "");
+        s = s.replaceAll("(?m)^#{1,6}\\s*", "◆ ");
+        s = s.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
+        s = s.replaceAll("(?m)^[-*]\\s+", "  • ");
+        s = s.replaceAll("\n{3,}", "\n\n");
+        return s.trim();
+    }
+
     public CompletableFuture<Boolean> downloadMod(String platform, String modIdOrSlug, String version, String loader, Consumer<Double> progressCallback) {
         return downloadMod(platform, modIdOrSlug, version, loader, progressCallback, null);
     }

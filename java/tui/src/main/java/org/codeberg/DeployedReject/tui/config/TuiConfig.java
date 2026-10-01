@@ -10,6 +10,7 @@ public class TuiConfig {
     private boolean trueColor = true;
     private boolean enforceMinSize = true;
     private boolean pickaxeAnimation = true;
+    private String nerdFontMode = "auto"; // "auto", "enabled", "disabled"
 
     public TuiConfig() {}
 
@@ -51,5 +52,13 @@ public class TuiConfig {
 
     public void setPickaxeAnimation(boolean pickaxeAnimation) {
         this.pickaxeAnimation = pickaxeAnimation;
+    }
+
+    public String getNerdFontMode() {
+        return nerdFontMode != null && !nerdFontMode.trim().isEmpty() ? nerdFontMode : "auto";
+    }
+
+    public void setNerdFontMode(String nerdFontMode) {
+        this.nerdFontMode = nerdFontMode;
     }
 }

@@ -4,6 +4,7 @@ import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 
 import java.util.HashMap;
@@ -13,7 +14,7 @@ import java.util.Map;
 /**
  * Dedicated customization workspace view allowing users to select LazyVim themes,
  * adjust background transparency levels, toggle 24-bit TrueColor, minimum size enforcement,
- * and Minecraft pickaxe loading animations.
+ * Minecraft pickaxe loading animations, and Nerd Font glyph fallback settings.
  */
 public class CustomizationView implements WorkspaceView {
 
@@ -22,6 +23,7 @@ public class CustomizationView implements WorkspaceView {
     private final Label header;
     private final ComboBox<String> themeCombo;
     private final ComboBox<String> transparencyCombo;
+    private final ComboBox<String> nerdFontCombo;
     private final CheckBox trueColorCheck;
     private final CheckBox minSizeCheck;
     private final CheckBox animationCheck;
@@ -40,7 +42,7 @@ public class CustomizationView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        header = new Label("Theme & Interface Customization");
+        header = new Label(GlyphHelper.apply("󰏘 Theme & Interface Customization"));
         header.setForegroundColor(LazyVimTheme.getAccentColor());
         root.addComponent(header);
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
@@ -50,7 +52,7 @@ public class CustomizationView implements WorkspaceView {
         Panel formPanel = new Panel(new GridLayout(2));
 
         // 1. Theme
-        formPanel.addComponent(new Label("[T]heme: "));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 [T]heme: ")));
         themeCombo = new ComboBox<>();
         List<String> themeNames = LazyVimTheme.getAvailableThemeNames();
         for (String t : themeNames) {
@@ -59,16 +61,21 @@ public class CustomizationView implements WorkspaceView {
         formPanel.addComponent(themeCombo);
 
         // 2. Transparency
-        formPanel.addComponent(new Label("Trans[p]arency: "));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 Trans[p]arency: ")));
         transparencyCombo = new ComboBox<>();
         for (String opt : TRANSPARENCY_OPTIONS) {
             transparencyCombo.addItem(opt);
         }
         formPanel.addComponent(transparencyCombo);
 
-        root.addComponent(formPanel.withBorder(Borders.singleLine("Appearance Settings")));
+        // 3. Nerd Font Glyphs
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰏘 [G]lyphs: ")));
+        nerdFontCombo = new ComboBox<>("Auto-detect", "Force Nerd Fonts", "Basic (Fallback)");
+        formPanel.addComponent(nerdFontCombo);
 
-        // 3. Toggles
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰏘 Appearance Settings"))));
+
+        // 4. Toggles
         Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
         trueColorCheck = new CheckBox("Enable 24-bit TrueColor (ANSI RGB)");
         minSizeCheck = new CheckBox("Enforce Minimum Screen Size (>= 70x18)");
@@ -78,17 +85,17 @@ public class CustomizationView implements WorkspaceView {
         togglePanel.addComponent(minSizeCheck);
         togglePanel.addComponent(animationCheck);
 
-        root.addComponent(togglePanel.withBorder(Borders.singleLine("Options & Animations")));
+        root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰒓 Options & Animations"))));
 
-        statusLabel = new Label("[OK:] Ready.");
+        statusLabel = new Label(GlyphHelper.apply("󰄬 [OK] Ready."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         root.addComponent(statusLabel);
 
         // 5. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        Button saveBtn = new Button("[S]ave & Apply", this::onSaveAndApply);
-        Button resetBtn = new Button("[R]eset Defaults", this::onResetDefaults);
-        Button backBtn = new Button("[B]ack", mainWindow::showMainMenu);
+        Button saveBtn = new Button(GlyphHelper.apply("󰆓 [S]ave & Apply"), this::onSaveAndApply);
+        Button resetBtn = new Button(GlyphHelper.apply("󰁯 [R]eset Defaults"), this::onResetDefaults);
+        Button backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack"), mainWindow::showMainMenu);
 
         actionPanel.addComponent(saveBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -104,6 +111,7 @@ public class CustomizationView implements WorkspaceView {
         hotkeys.put('B', mainWindow::showMainMenu);
         hotkeys.put('T', themeCombo::takeFocus);
         hotkeys.put('P', transparencyCombo::takeFocus);
+        hotkeys.put('G', nerdFontCombo::takeFocus);
 
         loadCurrentConfig();
     }
@@ -128,6 +136,12 @@ public class CustomizationView implements WorkspaceView {
         else if (currentTrans <= 75) transparencyCombo.setSelectedIndex(3);
         else transparencyCombo.setSelectedIndex(4);
 
+        // Nerd Font Glyphs
+        String mode = config.getNerdFontMode();
+        if ("enabled".equalsIgnoreCase(mode)) nerdFontCombo.setSelectedIndex(1);
+        else if ("disabled".equalsIgnoreCase(mode)) nerdFontCombo.setSelectedIndex(2);
+        else nerdFontCombo.setSelectedIndex(0);
+
         // Toggles
         trueColorCheck.setChecked(config.isTrueColor());
         minSizeCheck.setChecked(config.isEnforceMinSize());
@@ -151,6 +165,12 @@ public class CustomizationView implements WorkspaceView {
         }
         config.setTransparencyPercent(transPercent);
 
+        int gIdx = nerdFontCombo.getSelectedIndex();
+        if (gIdx == 1) config.setNerdFontMode("enabled");
+        else if (gIdx == 2) config.setNerdFontMode("disabled");
+        else config.setNerdFontMode("auto");
+        GlyphHelper.invalidateCache();
+
         config.setTrueColor(trueColorCheck.isChecked());
         config.setEnforceMinSize(minSizeCheck.isChecked());
         config.setPickaxeAnimation(animationCheck.isChecked());
@@ -159,7 +179,7 @@ public class CustomizationView implements WorkspaceView {
 
         mainWindow.applyConfig(config);
         header.setForegroundColor(LazyVimTheme.getAccentColor());
-        statusLabel.setText("[OK:] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
+        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)"));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         ActivityLogger.ok("Applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
     }
@@ -167,17 +187,18 @@ public class CustomizationView implements WorkspaceView {
     private void onResetDefaults() {
         TuiConfig def = new TuiConfig();
         ConfigManager.getInstance().setConfig(def);
+        GlyphHelper.invalidateCache();
         loadCurrentConfig();
         mainWindow.applyConfig(def);
         header.setForegroundColor(LazyVimTheme.getAccentColor());
-        statusLabel.setText("[OK:] Reset to default configuration (Gruvbox Dark).");
+        statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Reset to default configuration (Gruvbox Dark)."));
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         ActivityLogger.ok("Reset configuration to default Gruvbox Dark.");
     }
 
     @Override
     public String getTitle() {
-        return "Customization & Themes";
+        return GlyphHelper.apply("󰏘 Customization & Themes");
     }
 
     @Override
@@ -202,9 +223,10 @@ public class CustomizationView implements WorkspaceView {
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         int wsWidth = Math.max(44, cols - actWidth - 6);
 
-        int comboWidth = Math.max(24, Math.min(42, wsWidth - 20));
+        int comboWidth = Math.max(28, wsWidth - 20);
         themeCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
         transparencyCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
+        nerdFontCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
     }
 
     @Override

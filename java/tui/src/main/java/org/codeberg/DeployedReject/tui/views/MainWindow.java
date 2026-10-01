@@ -11,6 +11,7 @@ import com.googlecode.lanterna.input.MouseActionType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
@@ -68,7 +69,7 @@ public class MainWindow extends BasicWindow {
 
         // Too small warning panel overlay
         tooSmallPanel = new Panel(new LinearLayout(Direction.VERTICAL));
-        Label warnTitle = new Label("⚠️  TERMINAL WINDOW TOO SMALL");
+        Label warnTitle = new Label(GlyphHelper.apply("󰀦  TERMINAL WINDOW TOO SMALL"));
         warnTitle.setForegroundColor(LazyVimTheme.getErrorColor());
         tooSmallPanel.addComponent(warnTitle);
         tooSmallSizeLabel = new Label("Current: 0x0 | Required: >= 70x18");
@@ -90,7 +91,7 @@ public class MainWindow extends BasicWindow {
 
         // Center Workspace Pane
         Panel workspaceOuter = new Panel(new LinearLayout(Direction.VERTICAL));
-        workspaceTitleLabel = new Label("=== Workspace: Main Menu ===");
+        workspaceTitleLabel = new Label(GlyphHelper.apply("󰒋 Workspace: Main Menu 󰒋"));
         workspaceTitleLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         workspaceOuter.addComponent(workspaceTitleLabel);
 
@@ -98,12 +99,12 @@ public class MainWindow extends BasicWindow {
         workspaceContainer.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow));
         workspaceOuter.addComponent(workspaceContainer);
 
-        workspaceBordered = workspaceOuter.withBorder(Borders.singleLine("Workspace / Menu"));
+        workspaceBordered = workspaceOuter.withBorder(Borders.singleLine(GlyphHelper.apply("󰒋 Workspace")));
         workspaceBordered.setLayoutData(BorderLayout.Location.CENTER);
         midPanel.addComponent(workspaceBordered);
 
         activityLogView = new ColoredLogView(false);
-        activityBordered = activityLogView.withBorder(Borders.singleLine("Activity & Diagnostics [A]"));
+        activityBordered = activityLogView.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Activity & Diagnostics [A]")));
         activityBordered.setLayoutData(BorderLayout.Location.RIGHT);
         midPanel.addComponent(activityBordered);
 
@@ -112,7 +113,7 @@ public class MainWindow extends BasicWindow {
         // 3. Bottom Pane: Server Console (Location.BOTTOM)
         consoleLogView = new ColoredLogView(true);
         consoleLogView.setContent("[Server not started - Start server from Server Control [S] to view live output]");
-        consoleBordered = consoleLogView.withBorder(Borders.singleLine("Server Console [L]"));
+        consoleBordered = consoleLogView.withBorder(Borders.singleLine(GlyphHelper.apply(" Server Console (Live Output) [L]")));
         consoleBordered.setLayoutData(BorderLayout.Location.BOTTOM);
         root.addComponent(consoleBordered);
 
@@ -214,7 +215,7 @@ public class MainWindow extends BasicWindow {
             currentView.onDeactivated();
         }
         currentView = view;
-        workspaceTitleLabel.setText("=== Workspace: " + view.getTitle() + " ===");
+        workspaceTitleLabel.setText(GlyphHelper.apply("󰒋 Workspace: " + view.getTitle() + " 󰒋"));
         workspaceContainer.removeAllComponents();
         workspaceContainer.addComponent(view.getComponent());
 

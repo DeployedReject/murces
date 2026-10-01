@@ -68,6 +68,32 @@ You can also run commands directly from the shell without opening the full menu:
 
 ---
 
+## Fonts & Terminal Rendering
+
+MurCes uses [Nerd Font](https://www.nerdfonts.com/) glyphs to provide clean icons for navigation, server status indicators, and mod loading animations.
+
+### Easy Font Installation (`getnf`)
+To easily install any Nerd Font on Linux or macOS, you can use [**`getnf`**](https://github.com/getnf/getnf), an open-source tool that lets you browse and install fonts in seconds:
+
+```sh
+# Install getnf
+curl -fsSL https://raw.githubusercontent.com/getnf/getnf/main/install.sh | bash
+
+# Run getnf to pick and install a font (e.g. JetBrainsMono, FiraCode, Hack)
+getnf
+```
+
+You can also download fonts directly from [Nerd Fonts Downloads](https://www.nerdfonts.com/font-downloads).
+
+### Automatic Fallback (No Nerd Font Required)
+If you do not have a Nerd Font installed or are running in a basic terminal/TTY, **MurCes automatically detects this and falls back to clean basic text rendering** (ASCII/basic Unicode). Zero missing glyph boxes or broken characters.
+
+You can also control glyph rendering manually:
+- **In-App**: Press `[Z]` or select `[Z] Customization & Themes`, then set `[G]lyphs` to `Auto-detect`, `Force Nerd Fonts`, or `Basic (Fallback)`.
+- **Environment Flags**: Run with `NO_NERD_FONT=1` to force basic fallback mode, or `FORCE_NERD_FONT=1` to force Nerd Fonts.
+
+---
+
 ## Building from Source
 
 If you want to build the project yourself instead of using the precompiled release:

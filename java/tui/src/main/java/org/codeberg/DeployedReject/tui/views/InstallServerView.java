@@ -3,6 +3,7 @@ package org.codeberg.DeployedReject.tui.views;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.HashMap;
@@ -31,32 +32,32 @@ public class InstallServerView implements WorkspaceView {
         // Options form
         Panel formPanel = new Panel(new GridLayout(2));
 
-        formPanel.addComponent(new Label("[E]ngine:"));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰒋 [E]ngine:")));
         engineComboBox = new ComboBox<>("Fabric", "Paper", "Spigot", "Vanilla", "Forge");
         engineComboBox.setPreferredSize(new TerminalSize(16, 1));
         formPanel.addComponent(engineComboBox);
 
-        formPanel.addComponent(new Label("Game [V]ersion:"));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰏗 Game [V]ersion:")));
         gameVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(16, 1));
         formPanel.addComponent(gameVersionComboBox);
 
-        formPanel.addComponent(new Label("Loader [L] Version:"));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰒓 Loader [L] Version:")));
         loaderVersionBox = new TextBox(new TerminalSize(16, 1), "0.16.5");
         formPanel.addComponent(loaderVersionBox);
 
-        formPanel.addComponent(new Label("[R]AM Allocation:"));
+        formPanel.addComponent(new Label(GlyphHelper.apply("󰋊 [R]AM Allocation:")));
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
         ramComboBox.setSelectedIndex(1); // 4G default
         formPanel.addComponent(ramComboBox);
 
-        root.addComponent(formPanel.withBorder(Borders.singleLine("Server Configuration")));
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰒓 Server Configuration"))));
 
         // Action buttons
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        installOnlyBtn = new Button("[I]nstall Only", () -> runInstall(0));
-        installStartBtn = new Button("[S]tart & Install", () -> runInstall(1));
-        cancelBtn = new Button("[X] Cancel Installation", this::cancelInstallation);
+        installOnlyBtn = new Button(GlyphHelper.apply("󰏗 [I]nstall Only"), () -> runInstall(0));
+        installStartBtn = new Button(GlyphHelper.apply("󰐊 [S]tart & Install"), () -> runInstall(1));
+        cancelBtn = new Button(GlyphHelper.apply("󰅖 [X] Cancel Installation"), this::cancelInstallation);
         actionPanel.addComponent(installOnlyBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(installStartBtn);
@@ -78,7 +79,7 @@ public class InstallServerView implements WorkspaceView {
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Footer
-        backBtn = new Button("[B]ack to Main Menu", mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -94,7 +95,7 @@ public class InstallServerView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return "Install Server Engine";
+        return GlyphHelper.apply("󰒓 Install Server Engine");
     }
 
     @Override
@@ -215,14 +216,14 @@ public class InstallServerView implements WorkspaceView {
                     progressBar.setValue(100);
                     installOnlyBtn.setEnabled(true);
                     installStartBtn.setEnabled(true);
-                    progressLabel.setText("[OK] Server installation completed!");
+                    progressLabel.setText(GlyphHelper.apply("󰄬 [OK] Server installation completed!"));
                     ActivityLogger.ok("Server installation finished successfully!");
                 });
             } catch (Exception e) {
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     installOnlyBtn.setEnabled(true);
                     installStartBtn.setEnabled(true);
-                    progressLabel.setText("[ERR] Installation stopped: " + e.getMessage());
+                    progressLabel.setText(GlyphHelper.apply("󰅖 [ERR] Installation stopped: " + e.getMessage()));
                     ActivityLogger.err("Installation stopped: " + e.getMessage());
                 });
             }

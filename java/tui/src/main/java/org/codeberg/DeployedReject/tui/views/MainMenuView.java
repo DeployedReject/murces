@@ -2,6 +2,7 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.HashMap;
@@ -41,25 +42,25 @@ public class MainMenuView implements WorkspaceView {
         root.addComponent(bannerLabel);
 
         String splash = SPLASHES[new Random().nextInt(SPLASHES.length)];
-        Label splashLabel = new Label(" * " + splash + " * ");
+        Label splashLabel = new Label(" ★ " + splash + " ★ ");
         splashLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(splashLabel);
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        menuList = new MurcesListBox(new TerminalSize(44, 10));
-        menuList.addItem("1. [S]erver Control & Console", mainWindow::showServerControl);
-        menuList.addItem("2. [I]nstall Server Engine", mainWindow::showInstallServer);
-        menuList.addItem("3. [C]onfigure Properties", mainWindow::showConfigServer);
-        menuList.addItem("4. [B]ackups (World)", mainWindow::showBackup);
-        menuList.addItem("5. [P]layer UUID Migration", mainWindow::showMigratePlayer);
-        menuList.addItem("6. [D]ownload & Browse Mods", mainWindow::showModBrowse);
-        menuList.addItem("7. [M]anage Installed Mods", mainWindow::showModManage);
-        menuList.addItem("8. [Z] Customization & Themes", mainWindow::showCustomization);
-        menuList.addItem("9. [J] Active Tasks & Job Manager", mainWindow::showJobManager);
-        menuList.addItem("10. [E]xit Murces", mainWindow::exit);
+        menuList = new MurcesListBox(new TerminalSize(48, 10));
+        menuList.addItem(GlyphHelper.apply("1.  󰒋 [S]erver Control & Console"), mainWindow::showServerControl);
+        menuList.addItem(GlyphHelper.apply("2.  󰒓 [I]nstall Server Engine"), mainWindow::showInstallServer);
+        menuList.addItem(GlyphHelper.apply("3.  󰋊 [C]onfigure Properties"), mainWindow::showConfigServer);
+        menuList.addItem(GlyphHelper.apply("4.  󰈚 [B]ackups (World)"), mainWindow::showBackup);
+        menuList.addItem(GlyphHelper.apply("5.  󰑖 [P]layer UUID Migration"), mainWindow::showMigratePlayer);
+        menuList.addItem(GlyphHelper.apply("6.  󰏗 [D]ownload & Browse Mods"), mainWindow::showModBrowse);
+        menuList.addItem(GlyphHelper.apply("7.  󰉋 [M]anage Installed Mods"), mainWindow::showModManage);
+        menuList.addItem(GlyphHelper.apply("8.  󰃨 [Z] Customization & Themes"), mainWindow::showCustomization);
+        menuList.addItem(GlyphHelper.apply("9.  󰓅 [J] Active Tasks & Job Manager"), mainWindow::showJobManager);
+        menuList.addItem(GlyphHelper.apply("10. 󰅖 [E]xit Murces"), mainWindow::exit);
 
-        root.addComponent(menuList.withBorder(Borders.singleLine("Main Navigation (Enter to select)")));
+        root.addComponent(menuList.withBorder(Borders.singleLine(GlyphHelper.apply("󰍜 Main Navigation (Enter to select)"))));
 
         // Hotkeys
         Runnable openSvCtrlItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(0); mainWindow.showServerControl(); };
@@ -120,10 +121,12 @@ public class MainMenuView implements WorkspaceView {
     public void onResized(TerminalSize newSize) {
         if (newSize == null) return;
         int cols = newSize.getColumns();
+        int rows = newSize.getRows();
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         int wsWidth = Math.max(44, cols - actWidth - 6);
 
-        int listWidth = Math.min(68, wsWidth - 4);
-        menuList.setPreferredSize(new TerminalSize(listWidth, 10));
+        int listWidth = Math.max(48, wsWidth - 4);
+        int listHeight = Math.max(10, Math.min(12, rows - 14));
+        menuList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     }
 }

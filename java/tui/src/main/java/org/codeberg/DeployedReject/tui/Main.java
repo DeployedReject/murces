@@ -108,6 +108,8 @@ public class Main {
             gui.updateScreen();
             mw.showCustomization();
             gui.updateScreen();
+            mw.showJobManager();
+            gui.updateScreen();
             mw.showMainMenu();
             gui.updateScreen();
 

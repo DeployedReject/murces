@@ -2,12 +2,13 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.gui2.Interactable;
 import com.googlecode.lanterna.gui2.Label;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 public class KeyboardNavigationHelper {
 
     public static Label createTooltip() {
-        Label tip = new Label("[TIP] [A] Activity Log | [L] Server Console | [J] Active Tasks | [TAB] Cycle Focus | [ESC] Back");
+        Label tip = new Label(GlyphHelper.apply("󰋽 [TIP] 󰈚 [A] Activity Log │  [L] Server Console │ 󰓅 [J] Active Tasks │ 󰌒 [TAB] Cycle Focus │ 󰁯 [ESC] Back"));
         tip.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         return tip;
     }

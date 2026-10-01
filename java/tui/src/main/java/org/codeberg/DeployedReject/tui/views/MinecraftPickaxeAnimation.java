@@ -85,7 +85,8 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                 double subProgress = blockProgress - activeBlock;
 
                 // Pickaxe swing frames: 0 = high, 1 = hitting, 2 = follow-through
-                String[] swingIcons = {"⛏ \\", "⛏ |", "⛏ /"};
+                String toolIcon = org.codeberg.DeployedReject.tui.theme.GlyphHelper.isNerdFontEnabled() ? "󰚌" : "/";
+                String[] swingIcons = {toolIcon + " \\", toolIcon + " |", toolIcon + " /"};
                 String swing = swingIcons[Math.abs(currentTick) % 3];
 
                 int blockWidth = 6; // "[██]  " is 6 chars
@@ -94,9 +95,9 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                 if (height >= 1) {
                     int pickCol = activeBlock * blockWidth + 1;
                     graphics.setForegroundColor(DIAMOND_TOOL);
-                    graphics.putString(pickCol, 0, "⛏");
+                    graphics.putString(pickCol, 0, toolIcon);
                     graphics.setForegroundColor(LazyVimTheme.getAccentColor());
-                    graphics.putString(pickCol + 2, 0, swing.substring(2));
+                    graphics.putString(pickCol + 2, 0, swing.substring(toolIcon.length() + 1));
                 }
 
                 // Line 1: Row of dirt blocks
@@ -142,7 +143,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
                     graphics.setForegroundColor(LazyVimTheme.getActivePalette().fg);
                     String display;
                     if (msg != null && !msg.isEmpty()) {
-                        display = msg;
+                        display = org.codeberg.DeployedReject.tui.theme.GlyphHelper.apply(msg);
                     } else {
                         display = String.format("Breaking dirt... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1, TOTAL_BLOCKS);
                     }

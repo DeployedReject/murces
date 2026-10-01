@@ -3,6 +3,7 @@ package org.codeberg.DeployedReject.tui.views;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.backend.JobTracker;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
@@ -30,11 +31,11 @@ public class JobManagerView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        Label headerLabel = new Label("Active background jobs (Server downloads/installs, Mod downloads).");
+        Label headerLabel = new Label(GlyphHelper.apply("󰓅 Active background jobs (Server downloads/installs, Mod downloads)."));
         headerLabel.setForegroundColor(LazyVimTheme.getAccentColor());
         root.addComponent(headerLabel);
 
-        Label helpLabel = new Label("Select a job using Arrow Keys and press [C] to abort and delete partial files.");
+        Label helpLabel = new Label(GlyphHelper.apply("󰋽 Select a job using Arrow Keys and press [C] to abort and delete partial files."));
         helpLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
         root.addComponent(helpLabel);
 
@@ -45,23 +46,23 @@ public class JobManagerView implements WorkspaceView {
         jobListBox.setSelectionListener(idx -> {
             mainWindow.getGui().getGUIThread().invokeLater(this::updateSelectedDetails);
         });
-        root.addComponent(jobListBox.withBorder(Borders.singleLine("Running Tasks [L]ist (↑/↓)")));
+        root.addComponent(jobListBox.withBorder(Borders.singleLine(GlyphHelper.apply("󰓅 Running Tasks [L]ist (↑/↓)"))));
 
         // Details Panel
         detailsLabel = new Label("No active jobs running.");
         detailsLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
         Panel detailsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
         detailsPanel.addComponent(detailsLabel);
-        root.addComponent(detailsPanel.withBorder(Borders.singleLine("Task Details")));
+        root.addComponent(detailsPanel.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Task Details"))));
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        cancelBtn = new Button("[C]ancel Selected Job", this::onCancelSelected);
-        cancelAllBtn = new Button("[K]ill All Jobs", this::onCancelAll);
-        refreshBtn = new Button("[R]efresh", this::refreshJobs);
-        backBtn = new Button("[B]ack to Main Menu", mainWindow::showMainMenu);
+        cancelBtn = new Button(GlyphHelper.apply("󰅖 [C]ancel Selected Job"), this::onCancelSelected);
+        cancelAllBtn = new Button(GlyphHelper.apply("󰅖 [K]ill All Jobs"), this::onCancelAll);
+        refreshBtn = new Button(GlyphHelper.apply("󰑪 [R]efresh"), this::refreshJobs);
+        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
 
         actionPanel.addComponent(cancelBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -93,7 +94,7 @@ public class JobManagerView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return "Active Tasks & Job Manager";
+        return GlyphHelper.apply("󰓅 Active Tasks & Job Manager");
     }
 
     @Override
@@ -120,9 +121,10 @@ public class JobManagerView implements WorkspaceView {
     public void onResized(TerminalSize newSize) {
         if (newSize == null) return;
         int cols = newSize.getColumns();
+        int rows = newSize.getRows();
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         int wsWidth = Math.max(44, cols - actWidth - 6);
-        jobListBox.setPreferredSize(new TerminalSize(Math.max(28, wsWidth - 6), Math.max(5, Math.min(10, newSize.getRows() - 16))));
+        jobListBox.setPreferredSize(new TerminalSize(Math.max(38, wsWidth - 4), Math.max(6, rows - 16)));
     }
 
     public synchronized void refreshJobs() {
@@ -131,16 +133,16 @@ public class JobManagerView implements WorkspaceView {
 
         jobListBox.clearItems();
         if (currentJobs.isEmpty()) {
-            jobListBox.addItem("[No active background tasks running]", () -> {});
+            jobListBox.addItem(GlyphHelper.apply("󰒋 [No active background tasks running]"), () -> {});
             detailsLabel.setText("No background jobs currently running.\nStart a server installation or mod download to see it here.");
             detailsLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
         } else {
             for (JobTracker.TrackedJob job : currentJobs) {
-                String line = String.format("[%s] %s - %s",
+                String line = String.format("󰑖 [%s] %s │ %s",
                         job.getType(),
                         job.getName(),
                         job.getStatus() != null ? job.getStatus() : "Running");
-                jobListBox.addItem(line, this::onCancelSelected);
+                jobListBox.addItem(GlyphHelper.apply(line), this::onCancelSelected);
             }
             updateSelectedDetails();
         }

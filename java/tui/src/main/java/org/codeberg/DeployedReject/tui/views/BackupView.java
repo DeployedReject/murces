@@ -4,6 +4,7 @@ import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import com.googlecode.lanterna.gui2.table.Table;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.io.File;
@@ -27,15 +28,15 @@ public class BackupView implements WorkspaceView {
 
         // Top Actions
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        backupNowBtn = new Button("[K] Backup Now", this::onRunBackup);
-        refreshBtn = new Button("[R]efresh", this::loadBackups);
+        backupNowBtn = new Button(GlyphHelper.apply("󰚰 [K] Backup Now"), this::onRunBackup);
+        refreshBtn = new Button(GlyphHelper.apply("󰑪 [R]efresh"), this::loadBackups);
 
         topPanel.addComponent(backupNowBtn);
         topPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         topPanel.addComponent(refreshBtn);
         root.addComponent(topPanel);
 
-        statusLabel = new Label("Ready.");
+        statusLabel = new Label(GlyphHelper.apply("󰄬 Ready."));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
@@ -43,12 +44,12 @@ public class BackupView implements WorkspaceView {
         table = new Table<>("Archive", "Size", "Date");
         table.setEscapeByArrowKey(false);
         table.setPreferredSize(new TerminalSize(42, 6));
-        root.addComponent(table.withBorder(Borders.singleLine("Backups [L]ist")));
+        root.addComponent(table.withBorder(Borders.singleLine(GlyphHelper.apply("󰈚 Backups [L]ist"))));
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Footer
-        backBtn = new Button("[B]ack to Main Menu", mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -62,7 +63,7 @@ public class BackupView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return "World Backups";
+        return GlyphHelper.apply("󰒋 World Backups");
     }
 
     @Override
@@ -89,8 +90,8 @@ public class BackupView implements WorkspaceView {
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         int wsWidth = Math.max(44, cols - actWidth - 6);
 
-        int tblWidth = Math.min(74, wsWidth - 4);
-        int tblHeight = Math.max(6, Math.min(14, rows - 16));
+        int tblWidth = Math.max(38, wsWidth - 4);
+        int tblHeight = Math.max(6, rows - 16);
         table.setPreferredSize(new TerminalSize(tblWidth, tblHeight));
     }
 
@@ -108,7 +109,7 @@ public class BackupView implements WorkspaceView {
 
         File[] files = backupDir.listFiles((dir, name) -> name.endsWith(".zip") || name.endsWith(".tar.gz"));
         if (files == null || files.length == 0) {
-            statusLabel.setText("No backup archives found.");
+            statusLabel.setText(GlyphHelper.apply("󰒋 No backup archives found."));
             return;
         }
 
@@ -121,11 +122,11 @@ public class BackupView implements WorkspaceView {
             String date = sdf.format(new Date(f.lastModified()));
             table.getTableModel().addRow(f.getName(), size, date);
         }
-        statusLabel.setText("Found " + files.length + " backup archive(s).");
+        statusLabel.setText(GlyphHelper.apply("󰒋 Found " + files.length + " backup archive(s)."));
     }
 
     private void onRunBackup() {
-        statusLabel.setText("[BUSY] Creating world backup...");
+        statusLabel.setText(GlyphHelper.apply("󰑖 [BUSY] Creating world backup..."));
         ActivityLogger.info("Starting world backup process...");
 
         new Thread(() -> {
@@ -133,10 +134,10 @@ public class BackupView implements WorkspaceView {
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 loadBackups();
                 if (res.exitCode == 0) {
-                    statusLabel.setText("[OK] Backup created!");
+                    statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Backup created!"));
                     ActivityLogger.ok(res.output.isEmpty() ? "World backup completed successfully." : res.output);
                 } else {
-                    statusLabel.setText("[ERR] Backup failed (code " + res.exitCode + ")");
+                    statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Backup failed (code " + res.exitCode + ")"));
                     ActivityLogger.err("Backup failed: " + res.output);
                 }
             });

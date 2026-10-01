@@ -3,6 +3,7 @@ package org.codeberg.DeployedReject.tui.views;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
+import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.io.File;
@@ -29,15 +30,15 @@ public class ModManageView implements WorkspaceView {
 
         // Top actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        deleteBtn = new Button("[D]elete Mod", this::onDeleteMod);
-        refreshBtn = new Button("[R]efresh", this::loadMods);
+        deleteBtn = new Button(GlyphHelper.apply("󰅖 [D]elete Mod"), this::onDeleteMod);
+        refreshBtn = new Button(GlyphHelper.apply("󰑪 [R]efresh"), this::loadMods);
 
         actionPanel.addComponent(deleteBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(refreshBtn);
         root.addComponent(actionPanel);
 
-        statusLabel = new Label("Use Arrow keys to browse installed mods.");
+        statusLabel = new Label(GlyphHelper.apply("󰋽 Use Arrow keys to browse installed mods."));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
@@ -51,12 +52,12 @@ public class ModManageView implements WorkspaceView {
                 statusLabel.setText("Selected: " + selectedModFile);
             }
         });
-        root.addComponent(modsList.withBorder(Borders.singleLine("Installed Mods [L]ist (mods/)")));
+        root.addComponent(modsList.withBorder(Borders.singleLine(GlyphHelper.apply("󰏗 Installed Mods [L]ist (mods/)"))));
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
         // Footer
-        backBtn = new Button("[B]ack to Main Menu", mainWindow::showMainMenu);
+        backBtn = new Button(GlyphHelper.apply("󰁯 [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
         // Hotkeys
@@ -70,7 +71,7 @@ public class ModManageView implements WorkspaceView {
 
     @Override
     public String getTitle() {
-        return "Manage Installed Mods";
+        return GlyphHelper.apply("󰏗 Manage Installed Mods");
     }
 
     @Override
@@ -97,8 +98,8 @@ public class ModManageView implements WorkspaceView {
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         int wsWidth = Math.max(44, cols - actWidth - 6);
 
-        int listWidth = Math.min(72, wsWidth - 4);
-        int listHeight = Math.max(7, Math.min(14, rows - 16));
+        int listWidth = Math.max(38, wsWidth - 4);
+        int listHeight = Math.max(7, rows - 16);
         modsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     }
 
@@ -113,16 +114,16 @@ public class ModManageView implements WorkspaceView {
         selectedModFile = null;
         List<String> mods = OrchestratorBridge.listInstalledMods();
         if (mods.isEmpty()) {
-            statusLabel.setText("No mods installed in ./mods directory.");
+            statusLabel.setText(GlyphHelper.apply("󰒋 No mods installed in ./mods directory."));
             statusLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
             return;
         }
 
-        statusLabel.setText("Loaded " + mods.size() + " installed mod(s).");
+        statusLabel.setText(GlyphHelper.apply("󰄬 Loaded " + mods.size() + " installed mod(s)."));
         statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
 
         for (String m : mods) {
-            modsList.addItem(m, () -> {
+            modsList.addItem(GlyphHelper.apply("󰏗 " + m), () -> {
                 selectedModFile = m;
                 confirmingDelete = false;
                 statusLabel.setText("Selected: " + m);
@@ -139,7 +140,7 @@ public class ModManageView implements WorkspaceView {
         }
 
         if (selectedModFile == null) {
-            statusLabel.setText("[WARN] Select a mod from the list first!");
+            statusLabel.setText(GlyphHelper.apply("󰀦 [WARN] Select a mod from the list first!"));
             statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
             ActivityLogger.warn("Please select a mod file before deleting.");
             return;
@@ -147,7 +148,7 @@ public class ModManageView implements WorkspaceView {
 
         if (!confirmingDelete) {
             confirmingDelete = true;
-            statusLabel.setText("[CONFIRM] Press [D] again to delete: " + selectedModFile);
+            statusLabel.setText(GlyphHelper.apply("󰀦 [CONFIRM] Press [D] again to delete: " + selectedModFile));
             statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
             ActivityLogger.warn("Confirm delete requested for mod: " + selectedModFile + " (press [D] to confirm)");
             return;
@@ -158,12 +159,12 @@ public class ModManageView implements WorkspaceView {
         File f = new File("mods", selectedModFile);
         if (f.exists() && f.delete()) {
             ActivityLogger.ok("Mod '" + selectedModFile + "' deleted successfully.");
-            statusLabel.setText("[OK] Deleted: " + selectedModFile);
+            statusLabel.setText(GlyphHelper.apply("󰄬 [OK] Deleted: " + selectedModFile));
             statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
             loadMods();
         } else {
             ActivityLogger.err("Could not delete mod file: " + selectedModFile);
-            statusLabel.setText("[ERR] Could not delete mod file.");
+            statusLabel.setText(GlyphHelper.apply("󰅖 [ERR] Could not delete mod file."));
             statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
         }
     }
