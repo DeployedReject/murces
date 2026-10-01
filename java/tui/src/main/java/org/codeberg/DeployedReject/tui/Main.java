@@ -47,7 +47,7 @@ public class Main {
                 break;
             case "--version":
             case "-v":
-                System.out.println("murces v0.1 (native-image compatibility build)");
+                System.out.println("murces v1.0 (native-image compatibility build)");
                 break;
             case "--test-tui":
                 runSelfTest();
