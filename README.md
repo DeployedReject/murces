@@ -6,7 +6,7 @@
  | |\/| | | | | '__/ __/ _ \/ __|       
  | |  | | |_| | | | (_|  __/\__ \       
  |_|  |_|\__,_|_|  \___\___||___/       
-    Minecraft Server Manager v0.1       
+    Minecraft Server Manager v1.0.0     
 ```
 
 MurCes is a terminal manager for dedicated Minecraft servers on Linux. It combines a terminal interface (TUI) and simple CLI flags to handle server installs, configuration tweaks, mod management, and background session controls without having to run heavy web panels like Pterodactyl or AMP.

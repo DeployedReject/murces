@@ -355,7 +355,7 @@ public class OrchestratorBridge {
                     String url = "https://api.modrinth.com/v2/project/" + modIdOrSlug + "/version?loaders=" + encLoader + "&game_versions=" + encVersion;
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(url))
-                            .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
+                            .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
                             .GET()
                             .build();
                     HttpResponse<String> resp = NetworkUtils.attemptS(req);
@@ -532,7 +532,7 @@ public class OrchestratorBridge {
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create(downloadUrl))
-                        .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
+                        .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
                         .GET()
                         .build();
                 HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
@@ -772,7 +772,22 @@ public class OrchestratorBridge {
         return "[Server running - Waiting for console output...]";
     }
 
+    public static boolean isCommandAvailable(String cmd) {
+        try {
+            Process p = new ProcessBuilder("which", cmd).start();
+            return p.waitFor() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static ProcessResult startServer(boolean publicTunnel) {
+        if (!isCommandAvailable("tmux")) {
+            return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
+        }
+        if (!isCommandAvailable("java")) {
+            return new ProcessResult(1, "[ERROR] 'java' is not found in PATH.\nPlease install Java (e.g. OpenJDK 17/21+) to run Minecraft servers.");
+        }
         String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
         if (publicTunnel) {
             return runShell("bash", script, "start", "--public");
@@ -782,11 +797,17 @@ public class OrchestratorBridge {
     }
 
     public static ProcessResult stopServer() {
+        if (!isCommandAvailable("tmux")) {
+            return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+        }
         String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
         return runShell("bash", script, "stop");
     }
 
     public static ProcessResult sendConsoleCommand(String cmd) {
+        if (!isCommandAvailable("tmux")) {
+            return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+        }
         String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
         return runShell("bash", script, "-mc", cmd);
     }

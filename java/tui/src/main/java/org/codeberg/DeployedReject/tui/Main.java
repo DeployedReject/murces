@@ -47,7 +47,7 @@ public class Main {
                 break;
             case "--version":
             case "-v":
-                System.out.println("murces v1.0 (native-image compatibility build)");
+                System.out.println("murces v1.0.0 (production release)");
                 break;
             case "--test-tui":
                 runSelfTest();
@@ -173,6 +173,14 @@ public class Main {
                 OrchestratorBridge.getInstance().stopOrchestrator();
             }, "MurcesShutdown");
             Runtime.getRuntime().addShutdownHook(shutdownHook);
+
+            if (!OrchestratorBridge.isCommandAvailable("tmux")) {
+                ActivityLogger.warn("[WARN] 'tmux' is not found in PATH! Background server execution requires tmux.");
+                ActivityLogger.warn("[WARN] Install tmux via: sudo apt install tmux (or brew install tmux / pacman -S tmux)");
+            }
+            if (!OrchestratorBridge.isCommandAvailable("java")) {
+                ActivityLogger.warn("[WARN] 'java' is not found in PATH! Minecraft server execution requires Java 17/21+.");
+            }
 
             gui.addWindowAndWait(new MainWindow(gui));
 

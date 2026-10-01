@@ -333,7 +333,25 @@ public class ServerHandler {
 
   }
 
+  private boolean checkCommand(String cmd) {
+    try {
+      Process p = new ProcessBuilder("which", cmd).start();
+      return p.waitFor() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   private void spawnServer() {
+    if (!checkCommand("tmux")) {
+      ErrorHelper.errorJson("tmux is not installed. Please install tmux (e.g., sudo apt install tmux).");
+      return;
+    }
+    if (!checkCommand("java")) {
+      ErrorHelper.errorJson("java is not found in PATH. Please install Java.");
+      return;
+    }
+
     String targetJar = "server.jar";
     if ("fabric".equalsIgnoreCase(loader) || Files.exists(Paths.get("fabric-server-launch.jar"))) {
       targetJar = "fabric-server-launch.jar";
@@ -447,20 +465,39 @@ public class ServerHandler {
         .GET().build());
 
     JsonObject result = JsonParser.parseString(findingURl.body()).getAsJsonObject();
+    JsonObject promos = result.has("promos") ? result.getAsJsonObject("promos") : null;
+    if (promos == null) {
+      ErrorHelper.errorJson("No Forge promotions found.");
+      return;
+    }
 
-    String iVersion = result.get("promos").getAsJsonObject().get(gVersion + "-recommended").getAsString();
+    String iVersion = null;
+    if (promos.has(gVersion + "-recommended")) {
+      iVersion = promos.get(gVersion + "-recommended").getAsString();
+    } else if (promos.has(gVersion + "-latest")) {
+      iVersion = promos.get(gVersion + "-latest").getAsString();
+    } else {
+      ErrorHelper.errorJson("No Forge version found for " + gVersion);
+      return;
+    }
 
+    String installerName = "forge-" + gVersion + "-" + iVersion + "-installer.jar";
     url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + gVersion + "-" + iVersion + "/forge-"
         + gVersion + "-" + iVersion + "-installer.jar";
 
     HttpResponse<InputStream> downloading = NetworkUtils
         .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
 
+    if (downloading == null) {
+      ErrorHelper.errorJson("Failed to download Forge installer");
+      return;
+    }
+
     long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
 
-    NetworkUtils.prog(downloading.body(), "forge-" + gVersion + "-" + iVersion + "-installer.jar", filesize);
+    NetworkUtils.prog(downloading.body(), installerName, filesize);
 
-    String[] command = new String[] { "java", "-jar", "forge-" + gVersion + "-" + iVersion + "-installer.jar",
+    String[] command = new String[] { "java", "-jar", installerName,
         "--installServer" };
 
     JsonObject response = new JsonObject();
@@ -475,11 +512,23 @@ public class ServerHandler {
       }
     } catch (Exception e) {
       ErrorHelper.errorJson(e.toString());
+    } finally {
+      try {
+        Files.deleteIfExists(Paths.get(installerName));
+      } catch (Exception ignored) {}
     }
 
   }
 
   private void spawnServer(boolean x) {
+    if (!checkCommand("tmux")) {
+      ErrorHelper.errorJson("tmux is not installed. Please install tmux (e.g., sudo apt install tmux).");
+      return;
+    }
+    if (!checkCommand("java")) {
+      ErrorHelper.errorJson("java is not found in PATH. Please install Java.");
+      return;
+    }
 
     JsonObject response = new JsonObject();
     response.addProperty("status", 2);

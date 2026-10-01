@@ -63,7 +63,7 @@ public class Modrinth implements ModAPI {
     HttpRequest downloading = HttpRequest
         .newBuilder()
         .uri(URI.create(url))
-        .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
+        .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
         .GET()
         .build();
     HttpResponse<String> result = NetworkUtils.attemptS(downloading);
@@ -119,7 +119,7 @@ public class Modrinth implements ModAPI {
     HttpRequest searching = HttpRequest
         .newBuilder()
         .uri(URI.create(url))
-        .header("User-Agent", "DeployedReject/MurCes/0.1 (" + email + ")")
+        .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
         .GET()
         .build();
 

@@ -26,7 +26,7 @@ public class MainMenuWindow extends BasicWindow {
             " | |\\/| | | | | '__/ __/ _ \\/ __|       \n" +
             " | |  | | |_| | | | (_|  __/\\__ \\       \n" +
             " |_|  |_|\\__,_|_|  \\___\\___||___/       \n" +
-            "    Minecraft Server Manager v0.1       ";
+            "    Minecraft Server Manager v1.0.0     ";
 
     private final WindowBasedTextGUI gui;
     private final TextBox logBox;
