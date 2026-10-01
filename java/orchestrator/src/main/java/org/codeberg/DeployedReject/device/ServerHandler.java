@@ -320,24 +320,35 @@ public class ServerHandler {
 
   private void stopServer() {
 
-    String[] command = new String[] {
-        "tmux", "kill-session", "-t", "mcServer"
-    };
+        // Verify that the tmux session exists before attempting to kill it
+        String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
+        try {
+            if (Shell.execute(checkCmd).waitFor() != 0) {
+                // Session does not exist – nothing to stop
+                ErrorHelper.errorJson("Server session not found; nothing to stop");
+                return;
+            }
+        } catch (Exception e) {
+            ErrorHelper.errorJson(e.toString());
+            return;
+        }
 
-    try {
-      if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Could Not Stop Server");
-        return;
-      }
-
-      JsonObject response = new JsonObject();
-      response.addProperty("status", 0);
-      response.addProperty("type", "server");
-      Communicator.printer(response);
-
-    } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
-    }
+        // Attempt to kill the session gracefully
+        String[] command = new String[] {
+            "tmux", "kill-session", "-t", "mcServer"
+        };
+        try {
+            if (Shell.execute(command).waitFor() != 0) {
+                ErrorHelper.errorJson("Could Not Stop Server");
+                return;
+            }
+            JsonObject response = new JsonObject();
+            response.addProperty("status", 0);
+            response.addProperty("type", "server");
+            Communicator.printer(response);
+        } catch (Exception e) {
+            ErrorHelper.errorJson(e.toString());
+        }
 
   }
 
