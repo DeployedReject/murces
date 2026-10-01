@@ -52,7 +52,7 @@ jobs:
 
       # Pinned to graalvm/setup-graalvm v1.3.7
       - name: Set up GraalVM JDK
-        uses: graalvm/setup-graalvm@c25257ef51db8f6dcf776510ea4b4f3b5bc1a5f6
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173
         with:
           java-version: "21"
           distribution: "graalvm"
