@@ -53,7 +53,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
     return new ComponentRenderer<>() {
       @Override
       public TerminalSize getPreferredSize(MinecraftPickaxeAnimation component) {
-        return new TerminalSize(36, 2);
+        return new TerminalSize(36, 3);
       }
 
       @Override
@@ -89,9 +89,12 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
         boolean isComplete = (effectiveProgress >= 100.0);
 
         int pickSlot = isComplete ? (totalBlocks - 1) : activeBlock;
-        int animRow = 0;
 
-        String toolIcon = GlyphHelper.isNerdFontEnabled() ? GlyphHelper.ICON_TOOL : "/";
+        // Add 1 row of padding from the ceiling whenever height permits
+        int animRow = (height >= 3) ? 1 : 0;
+
+        // Actual Unicode pickaxe character (⛏ = \u26CF)
+        String toolIcon = GlyphHelper.isNerdFontEnabled() ? "⛏" : "/";
         int swingFrame = Math.abs(currentTick) % 3;
         String swingSuffix;
         TextColor swingColor;
@@ -165,7 +168,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           }
         }
 
-        // Row 1: Status message and progress info
+        // Row height - 1: Status message and progress info
         if (height >= 2) {
           int textRow = height - 1;
           graphics.setForegroundColor(LazyVimTheme.getActivePalette().fg);
