@@ -91,8 +91,8 @@
                             <fallback>false</fallback>
                             <buildArgs>
                                 <buildArg>-march=compatibility</buildArg>
-                                <buildArg>-Os</buildArg>
                                 <buildArg>--gc=serial</buildArg>
+                                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                             </buildArgs>
                         </configuration>

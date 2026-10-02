@@ -59,8 +59,8 @@
               <buildArgs>
                 <buildArg>-H:IncludeResources=config.properties</buildArg>
                 <buildArg>-march=compatibility</buildArg>
-                <buildArg>-Os</buildArg>
                 <buildArg>--gc=serial</buildArg>
+                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                 <buildArg>-H:+StripDebugInfo</buildArg>
               </buildArgs>
             </configuration>
