@@ -4,7 +4,7 @@ import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.backend.JobTracker;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.*;
@@ -28,11 +28,11 @@ public class JobManagerView implements WorkspaceView {
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
         Label headerLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_TASKS + " Active background jobs (Server downloads/installs, Mod downloads)."));
-        headerLabel.setForegroundColor(LazyVimTheme.getAccentColor());
+        headerLabel.setForegroundColor(Themes.getAccentColor());
         root.addComponent(headerLabel);
 
         Label helpLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a job using Arrow Keys and press [C] to abort and delete partial files."));
-        helpLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
+        helpLabel.setForegroundColor(Themes.getLogWarnColor());
         root.addComponent(helpLabel);
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -159,7 +159,7 @@ public class JobManagerView implements WorkspaceView {
                     job.getStatus(),
                     job.getProgress());
             detailsLabel.setText(text);
-            detailsLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
+            detailsLabel.setForegroundColor(Themes.getLogWarnColor());
         }
     }
 

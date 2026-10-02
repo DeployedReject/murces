@@ -7,7 +7,7 @@ import com.googlecode.lanterna.gui2.AbstractComponent;
 import com.googlecode.lanterna.gui2.ComponentRenderer;
 import com.googlecode.lanterna.gui2.TextGUIGraphics;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 
 public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickaxeAnimation> {
 
@@ -57,7 +57,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
         int width = Math.max(30, size.getColumns());
         int height = Math.max(1, size.getRows());
 
-        graphics.setBackgroundColor(LazyVimTheme.getLogBackgroundColor());
+        graphics.setBackgroundColor(Themes.getLogBackgroundColor());
         graphics.fill(' ');
 
         double effectiveProgress;
@@ -97,10 +97,10 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           swingColor = DIAMOND_TOOL;
         } else if (swingFrame == 0) {
           swingSuffix = "\\";
-          swingColor = LazyVimTheme.getAccentColor();
+          swingColor = Themes.getAccentColor();
         } else if (swingFrame == 1) {
           swingSuffix = ">";
-          swingColor = LazyVimTheme.getAccentColor();
+          swingColor = Themes.getAccentColor();
         } else {
           swingSuffix = "*";
           swingColor = PARTICLE_GOLD;
@@ -114,7 +114,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
 
           if (isComplete) {
             if (slot < totalBlocks - 1) {
-              graphics.setForegroundColor(LazyVimTheme.getMutedColor());
+              graphics.setForegroundColor(Themes.getMutedColor());
               graphics.putString(col, animRow, "  ·  ");
             } else if (slot == totalBlocks - 1) {
               graphics.setForegroundColor(DIAMOND_TOOL);
@@ -125,7 +125,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
             }
           } else {
             if (slot < pickSlot) {
-              graphics.setForegroundColor(LazyVimTheme.getMutedColor());
+              graphics.setForegroundColor(Themes.getMutedColor());
               graphics.putString(col, animRow, "  ·  ");
             } else if (slot == pickSlot) {
               graphics.setForegroundColor(DIAMOND_TOOL);
@@ -162,7 +162,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
 
         if (height >= 2) {
           int textRow = height - 1;
-          graphics.setForegroundColor(LazyVimTheme.getActivePalette().fg);
+          graphics.setForegroundColor(Themes.getActivePalette().fg);
           String display;
 
           if (msg != null && !msg.isEmpty()) {

@@ -12,7 +12,7 @@ import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.*;
@@ -62,10 +62,10 @@ public class MainWindow extends BasicWindow {
 
         tooSmallPanel = new Panel(new LinearLayout(Direction.VERTICAL));
         Label warnTitle = new Label(GlyphHelper.apply(GlyphHelper.ICON_WARN + "  TERMINAL WINDOW TOO SMALL"));
-        warnTitle.setForegroundColor(LazyVimTheme.getErrorColor());
+        warnTitle.setForegroundColor(Themes.getErrorColor());
         tooSmallPanel.addComponent(warnTitle);
         tooSmallSizeLabel = new Label("Current: 0x0 | Required: >= 70x18");
-        tooSmallSizeLabel.setForegroundColor(LazyVimTheme.getWarningColor());
+        tooSmallSizeLabel.setForegroundColor(Themes.getWarningColor());
         tooSmallPanel.addComponent(tooSmallSizeLabel);
         tooSmallPanel.addComponent(new Label("Please enlarge or maximize your terminal window."));
         tooSmallBordered = tooSmallPanel.withBorder(Borders.doubleLine("Display Warning"));
@@ -233,14 +233,14 @@ public class MainWindow extends BasicWindow {
 
     public void applyConfig(TuiConfig config) {
         if (config == null) return;
-        com.googlecode.lanterna.graphics.Theme theme = LazyVimTheme.createTheme(
+        com.googlecode.lanterna.graphics.Theme theme = Themes.createTheme(
                 config.getTheme(),
                 config.getTransparencyPercent(),
                 config.isTrueColor()
         );
         gui.setTheme(theme);
         setTheme(theme);
-        workspaceTitleLabel.setForegroundColor(LazyVimTheme.getAccentColor());
+        workspaceTitleLabel.setForegroundColor(Themes.getAccentColor());
         activityBordered.invalidate();
         consoleBordered.invalidate();
         workspaceBordered.invalidate();

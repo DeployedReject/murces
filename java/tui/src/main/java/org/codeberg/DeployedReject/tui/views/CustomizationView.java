@@ -5,7 +5,7 @@ import com.googlecode.lanterna.gui2.*;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +38,7 @@ public class CustomizationView implements WorkspaceView {
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
         header = new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Theme & Interface Customization"));
-        header.setForegroundColor(LazyVimTheme.getAccentColor());
+        header.setForegroundColor(Themes.getAccentColor());
         root.addComponent(header);
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
@@ -47,7 +47,7 @@ public class CustomizationView implements WorkspaceView {
 
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [T]heme: ")));
         themeCombo = new ComboBox<>();
-        List<String> themeNames = LazyVimTheme.getAvailableThemeNames();
+        List<String> themeNames = Themes.getAvailableThemeNames();
         for (String t : themeNames) {
             themeCombo.addItem(t);
         }
@@ -78,7 +78,7 @@ public class CustomizationView implements WorkspaceView {
         root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Options & Animations"))));
 
         statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
-        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+        statusLabel.setForegroundColor(Themes.getLogSuccessColor());
         root.addComponent(statusLabel);
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -162,9 +162,9 @@ public class CustomizationView implements WorkspaceView {
         ConfigManager.getInstance().save();
 
         mainWindow.applyConfig(config);
-        header.setForegroundColor(LazyVimTheme.getAccentColor());
+        header.setForegroundColor(Themes.getAccentColor());
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Saved and applied theme: " + config.getTheme() + " (" + transPercent + "% trans)"));
-        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+        statusLabel.setForegroundColor(Themes.getLogSuccessColor());
         ActivityLogger.ok("Applied theme: " + config.getTheme() + " (" + transPercent + "% trans)");
     }
 
@@ -174,9 +174,9 @@ public class CustomizationView implements WorkspaceView {
         GlyphHelper.invalidateCache();
         loadCurrentConfig();
         mainWindow.applyConfig(def);
-        header.setForegroundColor(LazyVimTheme.getAccentColor());
+        header.setForegroundColor(Themes.getAccentColor());
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Reset to default configuration (Gruvbox Dark)."));
-        statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
+        statusLabel.setForegroundColor(Themes.getLogSuccessColor());
         ActivityLogger.ok("Reset configuration to default Gruvbox Dark.");
     }
 

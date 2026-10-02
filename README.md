@@ -52,7 +52,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 - **Native Ahead-of-Time (AOT) Binary**: Compiled into a standalone ~30MB Linux executable via **GraalVM Native Image**. Launches in **< 20ms** with less than **25MB resident memory** and zero JVM warmup.
 - **Detached Process Supervision**: Your server runs inside an isolated, background `tmux` session (`mcsv`). If your SSH connection drops or MurCes exits, the server remains completely unaffected.
-- **Modern Terminal Aesthetics**: Designed with 24-bit TrueColor support, background transparency, and themes inspired by LazyVim/Neovim (Catppuccin, Nord, Gruvbox, Tokyo Night, Cyberdream, Rose Pine, Kanagawa).
+- **Modern Terminal Aesthetics**: Designed with 24-bit TrueColor support, background transparency, and popular developer themes (Catppuccin, Nord, Gruvbox, Tokyo Night, Cyberdream, Rose Pine, Kanagawa).
 - **Built-in Mod Ecosystem**: Query both **Modrinth** and **CurseForge** directly inside the terminal with loader & version filtering, dependency lookups, and one-key atomic downloads.
 - **Safe World State Flushing**: Performs live memory flushing (`save-off` &rarr; `save-all` &rarr; tar archive &rarr; `save-on`) to eliminate backup chunk corruption, with automated retention rotation and optional `rclone` cloud replication.
 - **Zero-Config Port Forwarding**: Built-in Playit.gg integration (`-p`) creates secure public tunnels on demand without touching router NAT tables.

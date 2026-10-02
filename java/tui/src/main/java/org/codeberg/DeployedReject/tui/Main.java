@@ -12,7 +12,7 @@ import com.googlecode.lanterna.terminal.virtual.DefaultVirtualTerminal;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 import org.codeberg.DeployedReject.tui.views.*;
 
@@ -84,7 +84,7 @@ public class Main {
 
             TuiConfig config = ConfigManager.getInstance().getConfig();
             MultiWindowTextGUI gui = new MultiWindowTextGUI(screen);
-            gui.setTheme(LazyVimTheme.createTheme(config.getTheme(), config.getTransparencyPercent(), config.isTrueColor()));
+            gui.setTheme(Themes.createTheme(config.getTheme(), config.getTransparencyPercent(), config.isTrueColor()));
 
             System.out.println("[TEST] Instantiating MainWindow (Unified 3-Pane Dashboard)...");
             MainWindow mw = new MainWindow(gui);
@@ -147,7 +147,7 @@ public class Main {
             TuiConfig config = ConfigManager.getInstance().getConfig();
             gui = new MultiWindowTextGUI(virtualScreen);
             gui.setBlockingIO(false);
-            gui.setTheme(LazyVimTheme.createTheme(config.getTheme(), config.getTransparencyPercent(), config.isTrueColor()));
+            gui.setTheme(Themes.createTheme(config.getTheme(), config.getTransparencyPercent(), config.isTrueColor()));
 
             TerminalResizeHelper.setup(virtualScreen, gui, terminal);
 

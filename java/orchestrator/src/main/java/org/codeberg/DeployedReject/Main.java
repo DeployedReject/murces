@@ -3,7 +3,6 @@ package org.codeberg.DeployedReject;
 import java.util.Properties;
 import java.util.Scanner;
 import com.google.gson.JsonObject;
-import java.lang.System;
 import java.net.http.HttpClient;
 import java.nio.file.Paths;
 import java.nio.file.Files;
@@ -36,7 +35,6 @@ public class Main {
     Properties env = new Properties();
     try (InputStream envStream = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
       env.load(envStream);
-      env.getProperty("curseAPI");
     } catch (Exception e) {
       ErrorHelper.errorJson("I probably forgot to load .env" + e.toString());
     }

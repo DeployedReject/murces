@@ -10,7 +10,7 @@ import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.input.MouseAction;
 import com.googlecode.lanterna.input.MouseActionType;
-import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
+import org.codeberg.DeployedReject.tui.theme.Themes;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.ArrayList;
@@ -154,7 +154,7 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                 int width = Math.max(10, size.getColumns());
                 int height = Math.max(1, size.getRows());
 
-                TextColor logBg = LazyVimTheme.getLogBackgroundColor();
+                TextColor logBg = Themes.getLogBackgroundColor();
                 component.lastRenderHeight = height;
 
                 graphics.setBackgroundColor(logBg);
@@ -192,10 +192,10 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                     boolean isScrolledUp = effectiveOffset > 0;
                     graphics.setBackgroundColor(logBg);
 
-                    graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getLogWarnColor() : LazyVimTheme.getLogMutedColor());
+                    graphics.setForegroundColor(isScrolledUp ? Themes.getLogWarnColor() : Themes.getLogMutedColor());
                     graphics.putString(barCol, 0, "▲");
 
-                    graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getLogMutedColor() : LazyVimTheme.getLogSuccessColor());
+                    graphics.setForegroundColor(isScrolledUp ? Themes.getLogMutedColor() : Themes.getLogSuccessColor());
                     graphics.putString(barCol, height - 1, "▼");
 
                     if (height > 2) {
@@ -206,10 +206,10 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                         for (int y = 1; y < height - 1; y++) {
                             graphics.setBackgroundColor(logBg);
                             if (y == thumbY) {
-                                graphics.setForegroundColor(isFocused ? LazyVimTheme.getLogSuccessColor() : (isScrolledUp ? LazyVimTheme.getLogWarnColor() : LazyVimTheme.getLogProgColor()));
+                                graphics.setForegroundColor(isFocused ? Themes.getLogSuccessColor() : (isScrolledUp ? Themes.getLogWarnColor() : Themes.getLogProgColor()));
                                 graphics.putString(barCol, y, "█");
                             } else {
-                                graphics.setForegroundColor(LazyVimTheme.getLogMutedColor());
+                                graphics.setForegroundColor(Themes.getLogMutedColor());
                                 graphics.putString(barCol, y, "░");
                             }
                         }
@@ -264,28 +264,28 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
     }
 
     private TextColor getColorForLine(String line) {
-        if (line == null || line.isEmpty()) return LazyVimTheme.getLogTextColor();
+        if (line == null || line.isEmpty()) return Themes.getLogTextColor();
         String upper = line.toUpperCase();
 
         if (upper.contains("ERROR") || upper.contains("FATAL") || upper.contains("EXCEPTION") ||
             upper.startsWith("[ERR") || upper.startsWith("ERR:") || upper.contains("FAILED")) {
-            return LazyVimTheme.getLogErrorColor();
+            return Themes.getLogErrorColor();
         } else if (upper.contains("WARN") || upper.startsWith("[WRN") || upper.startsWith("WRN:")) {
-            return LazyVimTheme.getLogWarnColor();
+            return Themes.getLogWarnColor();
         } else if (upper.contains("SUCCESS") || upper.contains("DONE (") || upper.startsWith("[OK") ||
                    upper.startsWith("OK:") || upper.contains("INSTALLED") || upper.contains("COMPLETED")) {
-            return LazyVimTheme.getLogSuccessColor();
+            return Themes.getLogSuccessColor();
         } else if (upper.contains("[PROG") || upper.contains("[BUSY") || upper.contains("DOWNLOADING") ||
                    upper.contains("PERCENT") || upper.contains("ETA:") || upper.contains("PREPARING START REGION")) {
-            return LazyVimTheme.getLogProgColor();
+            return Themes.getLogProgColor();
         } else if (upper.contains("INFO") || upper.contains("[INFO") || upper.startsWith("INFO:") ||
                    upper.contains("STARTING MINECRAFT SERVER") || upper.contains("[STATUS")) {
-            return LazyVimTheme.getLogInfoColor();
+            return Themes.getLogInfoColor();
         } else if (upper.contains("[SERVER NOT STARTED") || upper.contains("[SERVER STOPPED") ||
                    upper.contains("STOPPING SERVER")) {
-            return LazyVimTheme.getLogMutedColor();
+            return Themes.getLogMutedColor();
         }
-        return LazyVimTheme.getLogTextColor();
+        return Themes.getLogTextColor();
     }
 
     private static List<String> wrapLine(String text, int width) {

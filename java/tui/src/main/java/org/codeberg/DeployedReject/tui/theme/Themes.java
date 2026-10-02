@@ -4,13 +4,12 @@ import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.graphics.SimpleTheme;
 import com.googlecode.lanterna.graphics.Theme;
 import com.googlecode.lanterna.gui2.Border;
-import com.googlecode.lanterna.gui2.Button;
 import com.googlecode.lanterna.gui2.Panel;
 import com.googlecode.lanterna.gui2.Window;
 
 import java.util.*;
 
-public class LazyVimTheme {
+public class Themes {
 
     public static final String RANDOM_THEME = "Random (Every time)";
 

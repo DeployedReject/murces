@@ -16,7 +16,7 @@ import org.codeberg.DeployedReject.utils.Communicator;
 
 public class Modrinth implements ModAPI {
   private String type;
-  private String modName = "mods";
+  private String modName;
   private String version;
   private String loader;
   private String email;
