@@ -72,7 +72,8 @@ public class ServerHandler {
       case 0:
         try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
           eulaWriter.write("eula=true\n");
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         JsonObject comp = new JsonObject();
         comp.addProperty("status", 3);
         comp.addProperty("type", "server");
@@ -105,7 +106,8 @@ public class ServerHandler {
         try {
           String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
           isRunning = (Shell.execute(checkCmd).waitFor() == 0);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         JsonObject statusResp = new JsonObject();
         statusResp.addProperty("status", 0);
         statusResp.addProperty("type", "server");
@@ -122,7 +124,8 @@ public class ServerHandler {
         stopServer();
         try {
           Thread.sleep(1000);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         if (loader.equals("forge"))
           spawnServer(true);
         else
@@ -189,6 +192,12 @@ public class ServerHandler {
   }
 
   private void fabric() {
+
+    if (!checkCommand("java")) {
+      ErrorHelper.errorJson("java is not found in PATH. Please install a compatible Java. Recommended: SDKMAN!");
+      return;
+    }
+
     if (job == 3) {
       list.add("fabric");
       return;
@@ -196,7 +205,8 @@ public class ServerHandler {
 
     String installerVersion = "1.1.2";
     try {
-      HttpRequest vReq = HttpRequest.newBuilder().uri(URI.create("https://meta.fabricmc.net/v2/versions/installer")).GET().build();
+      HttpRequest vReq = HttpRequest.newBuilder().uri(URI.create("https://meta.fabricmc.net/v2/versions/installer"))
+          .GET().build();
       HttpResponse<String> vResp = NetworkUtils.attemptS(vReq);
       if (vResp != null && vResp.body() != null) {
         JsonArray arr = JsonParser.parseString(vResp.body()).getAsJsonArray();
@@ -208,10 +218,12 @@ public class ServerHandler {
           }
         }
       }
-    } catch (Exception ignored) {}
+    } catch (Exception ignored) {
+    }
 
     String installerJar = "fabric-installer.jar";
-    String url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/" + installerVersion + "/fabric-installer-" + installerVersion + ".jar";
+    String url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/" + installerVersion + "/fabric-installer-"
+        + installerVersion + ".jar";
     HttpRequest downloadRequest = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
     HttpResponse<InputStream> downloading = NetworkUtils.attemptI(downloadRequest);
     if (downloading == null) {
@@ -229,7 +241,8 @@ public class ServerHandler {
     commandList.add("server");
     commandList.add("-mcversion");
     commandList.add(gVersion);
-    if (lVersion != null && !lVersion.isEmpty() && !lVersion.equalsIgnoreCase("none") && !lVersion.equalsIgnoreCase("latest")) {
+    if (lVersion != null && !lVersion.isEmpty() && !lVersion.equalsIgnoreCase("none")
+        && !lVersion.equalsIgnoreCase("latest")) {
       commandList.add("-loader");
       commandList.add(lVersion);
     }
@@ -251,7 +264,8 @@ public class ServerHandler {
     } finally {
       try {
         Files.deleteIfExists(Paths.get(installerJar));
-      } catch (Exception ignored) {}
+      } catch (Exception ignored) {
+      }
     }
   }
 
@@ -316,24 +330,43 @@ public class ServerHandler {
       return;
     }
 
-    String url = "https://api.papermc.io/v2/projects/paper/versions/" + gVersion;
+    String url = "https://api.papermc.io/v3/projects/paper/versions/" + gVersion + "/builds/latest";
+    HttpResponse<String> findingURL = NetworkUtils.attemptS(HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .GET()
+        .build());
 
-    HttpResponse<String> findingURL = NetworkUtils
-        .attemptS(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
-    int build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().size() - 1;
+    if (findingURL == null || findingURL.body() == null) {
+      ErrorHelper.errorJson("Failed to fetch Paper build information");
+      return;
+    }
 
-    build = JsonParser.parseString(findingURL.body()).getAsJsonObject().get("builds").getAsJsonArray().get(build)
-        .getAsInt();
+    try {
+      JsonObject jsonObj = JsonParser.parseString(findingURL.body()).getAsJsonObject();
+      JsonObject downloads = jsonObj.getAsJsonObject("downloads");
+      if (downloads == null || !downloads.has("server:default")) {
+        ErrorHelper.errorJson("No server download found for Paper version " + gVersion);
+        return;
+      }
+      JsonObject serverDefault = downloads.getAsJsonObject("server:default");
+      String downloadUrl = serverDefault.get("url").getAsString();
 
-    url += "/builds/" + build + "/downloads/paper-" + gVersion + "-" + build + ".jar";
+      HttpRequest downloadRequest = HttpRequest.newBuilder()
+          .uri(URI.create(downloadUrl))
+          .GET()
+          .build();
 
-    HttpResponse<InputStream> downloading = NetworkUtils
-        .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
+      HttpResponse<InputStream> downloading = NetworkUtils.attemptI(downloadRequest);
+      if (downloading == null) {
+        ErrorHelper.errorJson("Failed to download Paper server");
+        return;
+      }
 
-    long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
-
-    NetworkUtils.prog(downloading.body(), "server.jar", filesize);
-
+      long filesize = downloading.headers().firstValueAsLong("content-length").orElse(-1L);
+      NetworkUtils.prog(downloading.body(), "server.jar", filesize);
+    } catch (Exception e) {
+      ErrorHelper.errorJson("Error downloading Paper: " + e.getMessage());
+    }
   }
 
   private boolean checkCommand(String cmd) {
@@ -351,7 +384,7 @@ public class ServerHandler {
       return;
     }
     if (!checkCommand("java")) {
-      ErrorHelper.errorJson("java is not found in PATH. Please install Java.");
+      ErrorHelper.errorJson("java is not found in PATH. Please install Java. Recommended SDKMAN!");
       return;
     }
 
@@ -423,33 +456,33 @@ public class ServerHandler {
 
   private void stopServer() {
 
-        String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
-        try {
-            if (Shell.execute(checkCmd).waitFor() != 0) {
+    String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
+    try {
+      if (Shell.execute(checkCmd).waitFor() != 0) {
 
-                ErrorHelper.errorJson("Server session not found; nothing to stop");
-                return;
-            }
-        } catch (Exception e) {
-            ErrorHelper.errorJson(e.toString());
-            return;
-        }
+        ErrorHelper.errorJson("Server session not found; nothing to stop");
+        return;
+      }
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+      return;
+    }
 
-        String[] command = new String[] {
-            "tmux", "kill-session", "-t", "mcServer"
-        };
-        try {
-            if (Shell.execute(command).waitFor() != 0) {
-                ErrorHelper.errorJson("Could Not Stop Server");
-                return;
-            }
-            JsonObject response = new JsonObject();
-            response.addProperty("status", 0);
-            response.addProperty("type", "server");
-            Communicator.printer(response);
-        } catch (Exception e) {
-            ErrorHelper.errorJson(e.toString());
-        }
+    String[] command = new String[] {
+        "tmux", "kill-session", "-t", "mcServer"
+    };
+    try {
+      if (Shell.execute(command).waitFor() != 0) {
+        ErrorHelper.errorJson("Could Not Stop Server");
+        return;
+      }
+      JsonObject response = new JsonObject();
+      response.addProperty("status", 0);
+      response.addProperty("type", "server");
+      Communicator.printer(response);
+    } catch (Exception e) {
+      ErrorHelper.errorJson(e.toString());
+    }
 
   }
 
@@ -516,7 +549,8 @@ public class ServerHandler {
     } finally {
       try {
         Files.deleteIfExists(Paths.get(installerName));
-      } catch (Exception ignored) {}
+      } catch (Exception ignored) {
+      }
     }
 
   }
