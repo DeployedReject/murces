@@ -1,11 +1,11 @@
 <div align="center">
 
 ```
-  __  __                                
- |  \/  |_   _ _ __ ___ ___  ___        
- | |\/| | | | | '__/ __/ _ \/ __|       
- | |  | | |_| | | | (_|  __/\__ \       
- |_|  |_|\__,_|_|  \___\___||___/       
+  __  __
+ |  \/  |_   _ _ __ ___ ___  ___
+ | |\/| | | | | '__/ __/ _ \/ __|
+ | |  | | |_| | | | (_|  __/\__ \
+ |_|  |_|\__,_|_|  \___\___||___/
     Minecraft Server Manager v1.0.0
 ```
 
@@ -50,7 +50,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 **MurCes delivers the sweet spot:**
 
-- **Native Ahead-of-Time (AOT) Binary**: Compiled into a standalone ~30MB Linux executable via **GraalVM Native Image**. Launches in **< 20ms** with less than **25MB resident memory** and zero JVM warmup.
+- **Native Ahead-of-Time (AOT) Binary**: Compiled into a standalone ~30MB Linux executable via **GraalVM Native Image**. Launches in **< 20ms** with less than **40MB resident memory** and zero JVM warmup.
 - **Detached Process Supervision**: Your server runs inside an isolated, background `tmux` session (`mcsv`). If your SSH connection drops or MurCes exits, the server remains completely unaffected.
 - **Modern Terminal Aesthetics**: Designed with 24-bit TrueColor support, background transparency, and popular developer themes (Catppuccin, Nord, Gruvbox, Tokyo Night, Cyberdream, Rose Pine, Kanagawa).
 - **Built-in Mod Ecosystem**: Query both **Modrinth** and **CurseForge** directly inside the terminal with loader & version filtering, dependency lookups, and one-key atomic downloads.
@@ -62,6 +62,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 ## Visual Tour & Features
 
 ### 1. Main Dashboard & Workspace
+
 > Unified server management cockpit with dual-panel activity diagnostics and live console log stream.
 
 <p align="center">
@@ -164,6 +165,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 `backup.sh` handles automated save flushing, tar archiving, snapshot rotation, and cloud synchronization via `rclone`.
 
 1. **Install rclone**:
+
    ```bash
    sudo apt install rclone
    # or: curl https://rclone.org/install.sh | sudo bash
@@ -171,6 +173,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 2. **Configure the Google Drive remote**:
    Run the interactive configuration wizard:
+
    ```bash
    rclone config
    ```
@@ -182,12 +185,14 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
    - Complete browser authentication when prompted.
 
 3. **Verify the connection**:
+
    ```bash
    rclone lsd minecraftdrive:
    ```
 
 4. **Customize `backup.sh` settings** (optional):
    Edit the parameters at the top of `backup.sh`:
+
    ```bash
    SOURCE_FOLDER="world"   # World directory to archive
    TARGET_FOLDER="backup"  # Local storage folder for .tar snapshots
@@ -321,15 +326,15 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 
 ## System Requirements
 
-| Component                       | Requirement           | Details                                                           |
-| ------------------------------- | --------------------- | ----------------------------------------------------------------- |
-| **Operating System**            | Linux 64-bit (x86_64) | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, and WSL2    |
-| **Terminal Multiplexer**        | `tmux`                | Required for detached background session supervision              |
-| **HTTP Downloader**             | `curl` or `wget`      | Required for dependency and package fetching                      |
+| Component                       | Requirement                                     | Details                                                           |
+| ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| **Operating System**            | Linux 64-bit (x86_64)                           | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, and WSL2    |
+| **Terminal Multiplexer**        | `tmux`                                          | Required for detached background session supervision              |
+| **HTTP Downloader**             | `curl` or `wget`                                | Required for dependency and package fetching                      |
 | **Terminal Font**               | [Nerd Font](https://www.nerdfonts.com/) (v3.0+) | Required for icons, navigation glyphs, and status indicators      |
-| **Cloud Sync** _(Optional)_     | `rclone`              | Required only if using Google Drive/S3 offsite world backups      |
-| **Public Tunnels** _(Optional)_ | `playit`              | Required only if running public servers without port forwarding   |
-| **Runtime Environment**         | _None_                | The native binary runs out of the box with zero Java dependencies |
+| **Cloud Sync** _(Optional)_     | `rclone`                                        | Required only if using Google Drive/S3 offsite world backups      |
+| **Public Tunnels** _(Optional)_ | `playit`                                        | Required only if running public servers without port forwarding   |
+| **Runtime Environment**         | _None_                                          | The native binary runs out of the box with zero Java dependencies |
 
 ---
 
