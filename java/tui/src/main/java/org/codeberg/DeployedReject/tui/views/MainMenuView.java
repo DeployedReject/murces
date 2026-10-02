@@ -25,8 +25,9 @@ public class MainMenuView implements WorkspaceView {
     private static final String BANNER =
             "  __  __                                \n" +
             " |  \\/  |_   _ _ __ ___ ___  ___        \n" +
-            " | |\\/| | | | | '__/ __/ _ \\/ __|  v1.0.0\n" +
-            " |_|  |_|\\__,_|_|  \\___\\___||___/       ";
+            " | |\\/| | | | | '__/ __/ _ \\/ __|       \n" +
+            " | |  | | |_| | | | (_|  __/\\__ \\       \n" +
+            " |_|  |_|\\__,_|_|  \\___\\___||___/  v1.0.0";
 
     private final MainWindow mainWindow;
     private final Panel root;
