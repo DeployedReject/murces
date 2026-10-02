@@ -29,7 +29,6 @@ public class BackupView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // Top Actions
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         backupNowBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [K] Backup Now"), this::onRunBackup);
         deleteBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [D]elete Backup"), this::onDeleteBackup);
@@ -46,7 +45,6 @@ public class BackupView implements WorkspaceView {
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
-        // Table
         table = new Table<>("Archive", "Size", "Date");
         table.setEscapeByArrowKey(false);
         table.setSelectAction(this::onDeleteBackup);
@@ -55,11 +53,9 @@ public class BackupView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Hotkeys
         hotkeys.put('L', table::takeFocus);
         hotkeys.put('K', KeyboardNavigationHelper.focus(backupNowBtn, this::onRunBackup));
         hotkeys.put('D', KeyboardNavigationHelper.focus(deleteBtn, this::onDeleteBackup));
@@ -149,7 +145,6 @@ public class BackupView implements WorkspaceView {
             return;
         }
 
-        // Confirmed deletion
         confirmingDelete = false;
         backupToDelete = null;
         boolean deleted = OrchestratorBridge.deleteBackup(archiveName);

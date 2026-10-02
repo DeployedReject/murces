@@ -11,11 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Dedicated customization workspace view allowing users to select LazyVim themes,
- * adjust background transparency levels, toggle 24-bit TrueColor, minimum size enforcement,
- * Minecraft pickaxe loading animations, and Nerd Font glyph fallback settings.
- */
 public class CustomizationView implements WorkspaceView {
 
     private final MainWindow mainWindow;
@@ -48,10 +43,8 @@ public class CustomizationView implements WorkspaceView {
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Form layout
         Panel formPanel = new Panel(new GridLayout(2));
 
-        // 1. Theme
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [T]heme: ")));
         themeCombo = new ComboBox<>();
         List<String> themeNames = LazyVimTheme.getAvailableThemeNames();
@@ -60,7 +53,6 @@ public class CustomizationView implements WorkspaceView {
         }
         formPanel.addComponent(themeCombo);
 
-        // 2. Transparency
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Trans[p]arency: ")));
         transparencyCombo = new ComboBox<>();
         for (String opt : TRANSPARENCY_OPTIONS) {
@@ -68,14 +60,12 @@ public class CustomizationView implements WorkspaceView {
         }
         formPanel.addComponent(transparencyCombo);
 
-        // 3. Nerd Font Glyphs
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [G]lyphs: ")));
         nerdFontCombo = new ComboBox<>("Auto-detect", "Force Nerd Fonts", "Basic (Fallback)");
         formPanel.addComponent(nerdFontCombo);
 
         root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance Settings"))));
 
-        // 4. Toggles
         Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
         trueColorCheck = new CheckBox("Enable 24-bit TrueColor (ANSI RGB)");
         minSizeCheck = new CheckBox("Enforce Minimum Screen Size (>= 70x18)");
@@ -91,7 +81,6 @@ public class CustomizationView implements WorkspaceView {
         statusLabel.setForegroundColor(LazyVimTheme.getLogSuccessColor());
         root.addComponent(statusLabel);
 
-        // 5. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         Button saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave & Apply"), this::onSaveAndApply);
         Button resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
@@ -105,7 +94,6 @@ public class CustomizationView implements WorkspaceView {
 
         root.addComponent(actionPanel);
 
-        // Hotkeys
         hotkeys.put('S', this::onSaveAndApply);
         hotkeys.put('R', this::onResetDefaults);
         hotkeys.put('B', mainWindow::showMainMenu);
@@ -119,7 +107,6 @@ public class CustomizationView implements WorkspaceView {
     private void loadCurrentConfig() {
         TuiConfig config = ConfigManager.getInstance().getConfig();
 
-        // Theme
         String currentTheme = config.getTheme();
         for (int i = 0; i < themeCombo.getItemCount(); i++) {
             if (themeCombo.getItem(i).equalsIgnoreCase(currentTheme)) {
@@ -128,7 +115,6 @@ public class CustomizationView implements WorkspaceView {
             }
         }
 
-        // Transparency
         int currentTrans = config.getTransparencyPercent();
         if (currentTrans <= 0) transparencyCombo.setSelectedIndex(0);
         else if (currentTrans <= 25) transparencyCombo.setSelectedIndex(1);
@@ -136,13 +122,11 @@ public class CustomizationView implements WorkspaceView {
         else if (currentTrans <= 75) transparencyCombo.setSelectedIndex(3);
         else transparencyCombo.setSelectedIndex(4);
 
-        // Nerd Font Glyphs
         String mode = config.getNerdFontMode();
         if ("enabled".equalsIgnoreCase(mode)) nerdFontCombo.setSelectedIndex(1);
         else if ("disabled".equalsIgnoreCase(mode)) nerdFontCombo.setSelectedIndex(2);
         else nerdFontCombo.setSelectedIndex(0);
 
-        // Toggles
         trueColorCheck.setChecked(config.isTrueColor());
         minSizeCheck.setChecked(config.isEnforceMinSize());
         animationCheck.setChecked(config.isPickaxeAnimation());

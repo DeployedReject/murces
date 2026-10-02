@@ -1,16 +1,13 @@
 package org.codeberg.DeployedReject.tui.config;
 
-/**
- * Data model for persistent TUI preferences and customization options.
- */
 public class TuiConfig {
 
     private String theme = "Gruvbox Dark";
-    private int transparencyPercent = 0; // 0, 25, 50, 75, 100
+    private int transparencyPercent = 0;
     private boolean trueColor = true;
     private boolean enforceMinSize = true;
     private boolean pickaxeAnimation = true;
-    private String nerdFontMode = "auto"; // "auto", "enabled", "disabled"
+    private String nerdFontMode = "auto";
 
     public TuiConfig() {}
 

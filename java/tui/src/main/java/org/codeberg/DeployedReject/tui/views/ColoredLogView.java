@@ -17,11 +17,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * A custom high-performance Lanterna component that renders color-coded,
- * automatically word-wrapped log streams with interactive mouse wheel / arrow scrolling
- * and visual scrollbar tracking.
- */
 public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView> {
 
     private static final int MAX_HISTORY = 400;
@@ -162,14 +157,11 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                 TextColor logBg = LazyVimTheme.getLogBackgroundColor();
                 component.lastRenderHeight = height;
 
-                // Clear background with theme log background (or transparent DEFAULT)
                 graphics.setBackgroundColor(logBg);
                 graphics.fill(' ');
 
-                // Leave 2 characters on right edge for scrollbar track
                 int contentWidth = Math.max(6, width - 2);
 
-                // Wrap and colorize lines
                 List<LineEntry> wrapped = new ArrayList<>();
                 synchronized (component) {
                     for (String raw : component.rawLines) {
@@ -194,18 +186,15 @@ public class ColoredLogView extends AbstractInteractableComponent<ColoredLogView
                     graphics.putString(0, i, entry.text);
                 }
 
-                // Render scrollbar track along column (width - 1) if history exceeds viewport
                 if (wrapped.size() > height) {
                     int barCol = width - 1;
                     boolean isFocused = component.isFocused();
                     boolean isScrolledUp = effectiveOffset > 0;
                     graphics.setBackgroundColor(logBg);
 
-                    // Top indicator / arrow
                     graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getLogWarnColor() : LazyVimTheme.getLogMutedColor());
                     graphics.putString(barCol, 0, "▲");
 
-                    // Bottom indicator / arrow
                     graphics.setForegroundColor(isScrolledUp ? LazyVimTheme.getLogMutedColor() : LazyVimTheme.getLogSuccessColor());
                     graphics.putString(barCol, height - 1, "▼");
 

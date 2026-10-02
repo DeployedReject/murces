@@ -9,20 +9,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Central registry to track, observe, and cancel long-running background jobs
- * such as server installations and mod downloads. Automatically manages
- * cleanup of temporary and partial files upon cancellation or failure.
- */
 public class JobTracker {
 
     public static class TrackedJob {
         private final String id;
         private final String name;
-        private final String type; // "Server", "Mod", etc.
+        private final String type;
         private final long startTime;
         private volatile String status;
-        private volatile double progress; // 0.0 to 100.0, or negative for indeterminate
+        private volatile double progress;
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
         private final Set<File> filesToCleanup = new CopyOnWriteArraySet<>();
         private final Runnable cancelAction;
@@ -61,7 +56,7 @@ public class JobTracker {
                         cancelAction.run();
                     } catch (Exception ignored) {}
                 }
-                // Cleanup all registered temporary files
+
                 for (File file : filesToCleanup) {
                     try {
                         if (file != null && file.exists()) {

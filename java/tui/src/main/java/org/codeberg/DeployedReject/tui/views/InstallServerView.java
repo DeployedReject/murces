@@ -29,7 +29,6 @@ public class InstallServerView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // Options form
         Panel formPanel = new Panel(new GridLayout(2));
 
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " [E]ngine:")));
@@ -48,12 +47,11 @@ public class InstallServerView implements WorkspaceView {
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
-        ramComboBox.setSelectedIndex(1); // 4G default
+        ramComboBox.setSelectedIndex(1);
         formPanel.addComponent(ramComboBox);
 
         root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration"))));
 
-        // Action buttons
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         installOnlyBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " [I]nstall Only"), () -> runInstall(0));
         installStartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart & Install"), () -> runInstall(1));
@@ -65,24 +63,20 @@ public class InstallServerView implements WorkspaceView {
         actionPanel.addComponent(cancelBtn);
         root.addComponent(actionPanel);
 
-        // Progress bar
         progressBar = new ProgressBar(0, 100);
         progressBar.setPreferredSize(new TerminalSize(36, 1));
         progressBar.setValue(0);
         root.addComponent(progressBar);
 
-        // Progress label
         progressLabel = new Label("Ready to install.");
         progressLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(progressLabel);
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Hotkeys
         hotkeys.put('I', KeyboardNavigationHelper.focus(installOnlyBtn, () -> runInstall(0)));
         hotkeys.put('S', KeyboardNavigationHelper.focus(installStartBtn, () -> runInstall(1)));
         hotkeys.put('X', KeyboardNavigationHelper.focus(cancelBtn, this::cancelInstallation));

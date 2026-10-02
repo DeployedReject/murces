@@ -10,9 +10,6 @@ import com.googlecode.lanterna.gui2.Window;
 
 import java.util.*;
 
-/**
- * 24-bit TrueColor LazyVim and popular editor themes with configurable transparency.
- */
 public class LazyVimTheme {
 
     public static final String RANDOM_THEME = "Random (Every time)";
@@ -54,172 +51,161 @@ public class LazyVimTheme {
     private static volatile int activeTransparency = 0;
 
     static {
-        // 1. Tokyo Night (LazyVim default)
+
         register(new ThemePalette("Tokyo Night",
-                new TextColor.RGB(26, 27, 38),     // #1a1b26
-                new TextColor.RGB(36, 40, 59),     // #24283b
-                new TextColor.RGB(192, 202, 245),  // #c0caf5
-                new TextColor.RGB(51, 70, 124),    // #33467c
-                new TextColor.RGB(122, 162, 247),  // #7aa2f7
-                new TextColor.RGB(158, 206, 106),  // #9ece6a
-                new TextColor.RGB(224, 175, 104),  // #e0af68
-                new TextColor.RGB(247, 118, 142),  // #f7768e
-                new TextColor.RGB(122, 162, 247),  // #7aa2f7 (vibrant Tokyo blue border)
-                new TextColor.RGB(86, 95, 137)     // #565f89
+                new TextColor.RGB(26, 27, 38),
+                new TextColor.RGB(36, 40, 59),
+                new TextColor.RGB(192, 202, 245),
+                new TextColor.RGB(51, 70, 124),
+                new TextColor.RGB(122, 162, 247),
+                new TextColor.RGB(158, 206, 106),
+                new TextColor.RGB(224, 175, 104),
+                new TextColor.RGB(247, 118, 142),
+                new TextColor.RGB(122, 162, 247),
+                new TextColor.RGB(86, 95, 137)
         ));
 
-        // 2. Catppuccin Mocha
         register(new ThemePalette("Catppuccin Mocha",
-                new TextColor.RGB(30, 30, 46),     // #1e1e2e
-                new TextColor.RGB(49, 50, 68),     // #313244
-                new TextColor.RGB(205, 214, 244),  // #cdd6f4
-                new TextColor.RGB(69, 71, 90),     // #45475a
-                new TextColor.RGB(203, 166, 247),  // #cba6f7
-                new TextColor.RGB(166, 227, 161),  // #a6e3a1
-                new TextColor.RGB(249, 226, 175),  // #f9e2af
-                new TextColor.RGB(243, 139, 168),  // #f38ba8
-                new TextColor.RGB(203, 166, 247),  // #cba6f7 (vibrant mauve border)
-                new TextColor.RGB(108, 112, 134)   // #6c7086
+                new TextColor.RGB(30, 30, 46),
+                new TextColor.RGB(49, 50, 68),
+                new TextColor.RGB(205, 214, 244),
+                new TextColor.RGB(69, 71, 90),
+                new TextColor.RGB(203, 166, 247),
+                new TextColor.RGB(166, 227, 161),
+                new TextColor.RGB(249, 226, 175),
+                new TextColor.RGB(243, 139, 168),
+                new TextColor.RGB(203, 166, 247),
+                new TextColor.RGB(108, 112, 134)
         ));
 
-        // 3. Catppuccin Macchiato
         register(new ThemePalette("Catppuccin Macchiato",
-                new TextColor.RGB(36, 39, 58),     // #24273a
-                new TextColor.RGB(54, 58, 79),     // #363a4f
-                new TextColor.RGB(202, 211, 245),  // #cad3f5
-                new TextColor.RGB(73, 77, 100),    // #494d64
-                new TextColor.RGB(198, 160, 246),  // #c6a0f6
-                new TextColor.RGB(166, 218, 149),  // #a6da95
-                new TextColor.RGB(238, 212, 159),  // #eed49f
-                new TextColor.RGB(237, 135, 150),  // #ed8796
-                new TextColor.RGB(198, 160, 246),  // #c6a0f6 (vibrant mauve border)
-                new TextColor.RGB(110, 115, 141)   // #6e738d
+                new TextColor.RGB(36, 39, 58),
+                new TextColor.RGB(54, 58, 79),
+                new TextColor.RGB(202, 211, 245),
+                new TextColor.RGB(73, 77, 100),
+                new TextColor.RGB(198, 160, 246),
+                new TextColor.RGB(166, 218, 149),
+                new TextColor.RGB(238, 212, 159),
+                new TextColor.RGB(237, 135, 150),
+                new TextColor.RGB(198, 160, 246),
+                new TextColor.RGB(110, 115, 141)
         ));
 
-        // 4. Catppuccin Frappé
         register(new ThemePalette("Catppuccin Frappé",
-                new TextColor.RGB(48, 52, 70),     // #303446
-                new TextColor.RGB(65, 69, 89),     // #414559
-                new TextColor.RGB(198, 208, 245),  // #c6d0f5
-                new TextColor.RGB(81, 87, 109),    // #51576d
-                new TextColor.RGB(202, 158, 230),  // #ca9ee6
-                new TextColor.RGB(166, 209, 137),  // #a6d189
-                new TextColor.RGB(229, 200, 144),  // #e5c890
-                new TextColor.RGB(231, 130, 132),  // #e78284
-                new TextColor.RGB(202, 158, 230),  // #ca9ee6 (vibrant mauve border)
-                new TextColor.RGB(115, 121, 148)   // #737994
+                new TextColor.RGB(48, 52, 70),
+                new TextColor.RGB(65, 69, 89),
+                new TextColor.RGB(198, 208, 245),
+                new TextColor.RGB(81, 87, 109),
+                new TextColor.RGB(202, 158, 230),
+                new TextColor.RGB(166, 209, 137),
+                new TextColor.RGB(229, 200, 144),
+                new TextColor.RGB(231, 130, 132),
+                new TextColor.RGB(202, 158, 230),
+                new TextColor.RGB(115, 121, 148)
         ));
 
-        // 5. Catppuccin Latte (Light)
         register(new ThemePalette("Catppuccin Latte",
-                new TextColor.RGB(239, 241, 245),  // #eff1f5
-                new TextColor.RGB(230, 233, 239),  // #e6e9ef
-                new TextColor.RGB(76, 79, 105),    // #4c4f69
-                new TextColor.RGB(204, 208, 218),  // #ccd0da
-                new TextColor.RGB(136, 57, 239),   // #8839ef
-                new TextColor.RGB(64, 160, 43),    // #40a02b
-                new TextColor.RGB(223, 142, 29),   // #df8e1d
-                new TextColor.RGB(210, 15, 57),    // #d20f39
-                new TextColor.RGB(136, 57, 239),   // #8839ef (vibrant purple border)
-                new TextColor.RGB(140, 143, 161)   // #8c8fa1
+                new TextColor.RGB(239, 241, 245),
+                new TextColor.RGB(230, 233, 239),
+                new TextColor.RGB(76, 79, 105),
+                new TextColor.RGB(204, 208, 218),
+                new TextColor.RGB(136, 57, 239),
+                new TextColor.RGB(64, 160, 43),
+                new TextColor.RGB(223, 142, 29),
+                new TextColor.RGB(210, 15, 57),
+                new TextColor.RGB(136, 57, 239),
+                new TextColor.RGB(140, 143, 161)
         ));
 
-        // 6. Gruvbox Dark
         register(new ThemePalette("Gruvbox Dark",
-                new TextColor.RGB(40, 40, 40),     // #282828
-                new TextColor.RGB(60, 56, 54),     // #3c3836
-                new TextColor.RGB(235, 219, 178),  // #ebdbb2
-                new TextColor.RGB(80, 73, 69),     // #504945
-                new TextColor.RGB(250, 189, 47),   // #fabd2f
-                new TextColor.RGB(184, 187, 38),   // #b8bb26
-                new TextColor.RGB(254, 128, 25),   // #fe8019
-                new TextColor.RGB(251, 73, 52),    // #fb4934
-                new TextColor.RGB(250, 189, 47),   // #fabd2f (vibrant gold border)
-                new TextColor.RGB(146, 131, 116)   // #928374
+                new TextColor.RGB(40, 40, 40),
+                new TextColor.RGB(60, 56, 54),
+                new TextColor.RGB(235, 219, 178),
+                new TextColor.RGB(80, 73, 69),
+                new TextColor.RGB(250, 189, 47),
+                new TextColor.RGB(184, 187, 38),
+                new TextColor.RGB(254, 128, 25),
+                new TextColor.RGB(251, 73, 52),
+                new TextColor.RGB(250, 189, 47),
+                new TextColor.RGB(146, 131, 116)
         ));
 
-        // 7. Nord
         register(new ThemePalette("Nord",
-                new TextColor.RGB(46, 52, 64),     // #2e3440
-                new TextColor.RGB(59, 66, 82),     // #3b4252
-                new TextColor.RGB(236, 239, 244),  // #eceff4
-                new TextColor.RGB(67, 76, 94),     // #434c5e
-                new TextColor.RGB(136, 192, 208),  // #88c0d0
-                new TextColor.RGB(163, 190, 140),  // #a3be8c
-                new TextColor.RGB(235, 203, 139),  // #ebcb8b
-                new TextColor.RGB(191, 97, 106),   // #bf616a
-                new TextColor.RGB(136, 192, 208),  // #88c0d0 (vibrant Nord frost blue border)
-                new TextColor.RGB(123, 136, 161)   // #7b88a1
+                new TextColor.RGB(46, 52, 64),
+                new TextColor.RGB(59, 66, 82),
+                new TextColor.RGB(236, 239, 244),
+                new TextColor.RGB(67, 76, 94),
+                new TextColor.RGB(136, 192, 208),
+                new TextColor.RGB(163, 190, 140),
+                new TextColor.RGB(235, 203, 139),
+                new TextColor.RGB(191, 97, 106),
+                new TextColor.RGB(136, 192, 208),
+                new TextColor.RGB(123, 136, 161)
         ));
 
-        // 8. Kanagawa
         register(new ThemePalette("Kanagawa",
-                new TextColor.RGB(31, 31, 40),     // #1f1f28
-                new TextColor.RGB(42, 42, 55),     // #2a2a37
-                new TextColor.RGB(220, 215, 186),  // #dcd7ba
-                new TextColor.RGB(45, 79, 103),    // #2d4f67
-                new TextColor.RGB(126, 156, 216),  // #7e9cd8
-                new TextColor.RGB(118, 148, 106),  // #76946a
-                new TextColor.RGB(192, 163, 110),  // #c0a36e
-                new TextColor.RGB(195, 64, 67),    // #c34043
-                new TextColor.RGB(126, 156, 216),  // #7e9cd8 (vibrant wave blue border)
-                new TextColor.RGB(114, 113, 105)   // #727169
+                new TextColor.RGB(31, 31, 40),
+                new TextColor.RGB(42, 42, 55),
+                new TextColor.RGB(220, 215, 186),
+                new TextColor.RGB(45, 79, 103),
+                new TextColor.RGB(126, 156, 216),
+                new TextColor.RGB(118, 148, 106),
+                new TextColor.RGB(192, 163, 110),
+                new TextColor.RGB(195, 64, 67),
+                new TextColor.RGB(126, 156, 216),
+                new TextColor.RGB(114, 113, 105)
         ));
 
-        // 9. Rose Pine
         register(new ThemePalette("Rose Pine",
-                new TextColor.RGB(25, 23, 36),     // #191724
-                new TextColor.RGB(38, 35, 58),     // #26233a
-                new TextColor.RGB(224, 222, 244),  // #e0def4
-                new TextColor.RGB(64, 61, 82),     // #403d52
-                new TextColor.RGB(235, 188, 186),  // #ebbcba
-                new TextColor.RGB(49, 116, 143),   // #31748f
-                new TextColor.RGB(246, 193, 119),  // #f6c177
-                new TextColor.RGB(235, 111, 146),  // #eb6f92
-                new TextColor.RGB(235, 188, 186),  // #ebbcba (vibrant rose border)
-                new TextColor.RGB(144, 140, 170)   // #908caa
+                new TextColor.RGB(25, 23, 36),
+                new TextColor.RGB(38, 35, 58),
+                new TextColor.RGB(224, 222, 244),
+                new TextColor.RGB(64, 61, 82),
+                new TextColor.RGB(235, 188, 186),
+                new TextColor.RGB(49, 116, 143),
+                new TextColor.RGB(246, 193, 119),
+                new TextColor.RGB(235, 111, 146),
+                new TextColor.RGB(235, 188, 186),
+                new TextColor.RGB(144, 140, 170)
         ));
 
-        // 10. Solarized Osaka
         register(new ThemePalette("Solarized Osaka",
-                new TextColor.RGB(0, 43, 54),      // #002b36
-                new TextColor.RGB(7, 54, 66),      // #073642
-                new TextColor.RGB(131, 148, 150),  // #839496
-                new TextColor.RGB(14, 75, 90),     // #0e4b5a
-                new TextColor.RGB(42, 161, 152),   // #2aa198
-                new TextColor.RGB(133, 153, 0),    // #859900
-                new TextColor.RGB(181, 137, 0),    // #b58900
-                new TextColor.RGB(220, 50, 47),    // #dc322f
-                new TextColor.RGB(42, 161, 152),   // #2aa198 (vibrant cyan border)
-                new TextColor.RGB(101, 123, 131)   // #657b83
+                new TextColor.RGB(0, 43, 54),
+                new TextColor.RGB(7, 54, 66),
+                new TextColor.RGB(131, 148, 150),
+                new TextColor.RGB(14, 75, 90),
+                new TextColor.RGB(42, 161, 152),
+                new TextColor.RGB(133, 153, 0),
+                new TextColor.RGB(181, 137, 0),
+                new TextColor.RGB(220, 50, 47),
+                new TextColor.RGB(42, 161, 152),
+                new TextColor.RGB(101, 123, 131)
         ));
 
-        // 11. Cyberdream
         register(new ThemePalette("Cyberdream",
-                new TextColor.RGB(22, 24, 26),     // #16181a
-                new TextColor.RGB(30, 33, 36),     // #1e2124
-                new TextColor.RGB(255, 255, 255),  // #ffffff
-                new TextColor.RGB(60, 64, 72),     // #3c4048
-                new TextColor.RGB(255, 94, 160),   // #ff5ea0
-                new TextColor.RGB(94, 255, 108),   // #5eff6c
-                new TextColor.RGB(241, 255, 94),   // #f1ff5e
-                new TextColor.RGB(255, 110, 94),   // #ff6e5e
-                new TextColor.RGB(255, 94, 160),   // #ff5ea0 (vibrant neon pink border)
-                new TextColor.RGB(123, 132, 150)   // #7b8496
+                new TextColor.RGB(22, 24, 26),
+                new TextColor.RGB(30, 33, 36),
+                new TextColor.RGB(255, 255, 255),
+                new TextColor.RGB(60, 64, 72),
+                new TextColor.RGB(255, 94, 160),
+                new TextColor.RGB(94, 255, 108),
+                new TextColor.RGB(241, 255, 94),
+                new TextColor.RGB(255, 110, 94),
+                new TextColor.RGB(255, 94, 160),
+                new TextColor.RGB(123, 132, 150)
         ));
 
-        // 12. Minecraft Classic
         register(new ThemePalette("Minecraft Classic",
-                new TextColor.RGB(27, 18, 12),     // Dirt dark
-                new TextColor.RGB(58, 36, 20),     // Dirt lighter
-                new TextColor.RGB(224, 224, 224),  // Stone white
-                new TextColor.RGB(92, 60, 36),     // Wood selection
-                new TextColor.RGB(85, 255, 255),   // Diamond cyan
-                new TextColor.RGB(85, 255, 85),    // Emerald green
-                new TextColor.RGB(255, 170, 0),    // Gold yellow
-                new TextColor.RGB(255, 85, 85),    // Redstone red
-                new TextColor.RGB(85, 255, 255),   // Diamond cyan border
-                new TextColor.RGB(170, 170, 170)   // Stone gray
+                new TextColor.RGB(27, 18, 12),
+                new TextColor.RGB(58, 36, 20),
+                new TextColor.RGB(224, 224, 224),
+                new TextColor.RGB(92, 60, 36),
+                new TextColor.RGB(85, 255, 255),
+                new TextColor.RGB(85, 255, 85),
+                new TextColor.RGB(255, 170, 0),
+                new TextColor.RGB(255, 85, 85),
+                new TextColor.RGB(85, 255, 255),
+                new TextColor.RGB(170, 170, 170)
         ));
 
         activePalette = PALETTES.get("Gruvbox Dark");
@@ -257,7 +243,6 @@ public class LazyVimTheme {
         TextColor muted = trueColor ? p.muted : TextColor.ANSI.BLACK_BRIGHT;
         TextColor border = trueColor ? p.border : TextColor.ANSI.WHITE;
 
-        // Background transparency mapping
         TextColor baseBg;
         if (activeTransparency == 0) {
             baseBg = trueColor ? p.bg : TextColor.ANSI.BLACK;
@@ -272,7 +257,6 @@ public class LazyVimTheme {
                 .setPreLight(fg, selection)
                 .setInsensitive(muted, baseBg);
 
-        // Fill all panels, windows, and borders with uniform baseBg - eliminates half-filled boxes!
         theme.addOverride(Panel.class, fg, baseBg);
         theme.addOverride(Window.class, fg, baseBg);
         theme.addOverride(Border.class, border, baseBg);
@@ -308,7 +292,6 @@ public class LazyVimTheme {
         return getActivePalette().border;
     }
 
-    // High-contrast, vibrant dedicated console log colors (immune to muddy theme palettes)
     public static final TextColor LOG_BG = new TextColor.RGB(16, 16, 18);
     public static final TextColor LOG_FG_NORMAL = new TextColor.RGB(240, 240, 245);
     public static final TextColor LOG_SUCCESS = new TextColor.RGB(85, 255, 85);

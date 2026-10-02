@@ -13,12 +13,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Enhanced Mod Browse & Download View with responsive 2-column layout,
- * live mod author and full description display with "Read More" dropdown,
- * description pagination, compatible version picker, Minecraft pickaxe
- * loading animation, and download finish ETA estimate.
- */
 public class ModBrowseView implements WorkspaceView {
 
   private final MainWindow mainWindow;
@@ -68,7 +62,6 @@ public class ModBrowseView implements WorkspaceView {
     this.mainWindow = mainWindow;
     this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-    // 1. Top Filters row
     Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [P]lat:")));
     platformBox = new ComboBox<>("Modrinth", "CurseForge");
@@ -86,14 +79,12 @@ public class ModBrowseView implements WorkspaceView {
 
     root.addComponent(filterPanel);
 
-    // 2. Search Bar row
     Panel searchPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     searchPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Query: ")));
     searchBox = new TextBox(new TerminalSize(16, 1), "jei");
     searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
     downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
 
-    // Results list
     resultsList = new MurcesListBox(new TerminalSize(38, 10));
 
     searchBox.setInputFilter((interactable, keyStroke) -> {
@@ -120,16 +111,13 @@ public class ModBrowseView implements WorkspaceView {
     searchPanel.addComponent(cancelBtn);
     root.addComponent(searchPanel);
 
-    // 3. Status Label
     statusLabel = new Label(
         GlyphHelper.apply(GlyphHelper.ICON_INFO + " Type query, press [S] to search, [D] to download, [X] to cancel."));
     statusLabel.setForegroundColor(LazyVimTheme.getLogWarnColor());
     root.addComponent(statusLabel);
 
-    // 4. Middle 2-Column Section (filling full workspace area)
     midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
 
-    // Left Column: Results List
     leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
     leftCol.addComponent(
         resultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Results [L]ist (↑/↓)"))));
@@ -137,8 +125,6 @@ public class ModBrowseView implements WorkspaceView {
 
     midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-    // Right Column: Mod Details, Version Picker, Read More Mode, Description,
-    // Pagination
     rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
     detailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
 
@@ -166,7 +152,7 @@ public class ModBrowseView implements WorkspaceView {
       updateDetailsDisplay();
       mainWindow.invalidate();
     });
-    // Make descModeCombo non-focusable — purely a toggle via M hotkey
+
     descModeCombo.setInputFilter((interactable, keyStroke) -> false);
     modeRow.addComponent(descModeCombo);
     detailsCard.addComponent(modeRow);
@@ -177,7 +163,6 @@ public class ModBrowseView implements WorkspaceView {
     detailsCard.addComponent(
         descContentLabel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Description"))));
 
-    // Pagination controls for long descriptions
     paginationPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     prevPageBtn = new Button(GlyphHelper.apply("◀ Prev ([)"), this::onPrevPage);
     pageIndicatorLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
@@ -198,7 +183,6 @@ public class ModBrowseView implements WorkspaceView {
 
     root.addComponent(midCols);
 
-    // 5. Dedicated Download Progress Bar (always visible at bottom)
     pickaxeAnim = new MinecraftPickaxeAnimation();
     pickaxeAnim.setProgress(0.0);
     pickaxeAnim.setCustomMessage("Ready to download mods");
@@ -207,8 +191,6 @@ public class ModBrowseView implements WorkspaceView {
         pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TOOL + " Download Status"))));
     root.addComponent(downloadPanel);
 
-    // Instant arrow-key selection tracking: updates description and compatible
-    // versions immediately
     resultsList.setSelectionListener(idx -> {
       if (idx >= 0 && idx < currentResults.size()) {
         OrchestratorBridge.ModResult mod = currentResults.get(idx);
@@ -224,11 +206,9 @@ public class ModBrowseView implements WorkspaceView {
       }
     });
 
-    // 6. Footer
     backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
     root.addComponent(backBtn);
 
-    // Hotkeys
     hotkeys.put('L', () -> {
       if (resultsList.getItemCount() > 0) {
         resultsList.takeFocus();
@@ -318,20 +298,15 @@ public class ModBrowseView implements WorkspaceView {
     int width = Math.max(60, currentTermWidth);
     int rows = Math.max(20, currentTermHeight);
 
-    // Vertical space budget:
-    // filterPanel (1) + searchPanel (1) + statusLabel (1) + downloadPanel (5) +
-    // backBtn (1) + spacing/margins (2) = 11 rows
     int middleHeight = Math.max(10, rows - 11);
-    // Inside detailsCard: titleAuthorLabel (2) + versionRow (1) + modeRow (1) +
-    // paginationPanel (1) + border overhead (2) = 7 rows
+
     this.descLinesPerPage = Math.max(6, middleHeight - 7);
 
-    // Full usable width (minus root borders/padding)
     int usableWidth = Math.max(60, width - 2);
 
     if (usableWidth >= 70) {
-      // Equal 50/50 split between list and details
-      int halfWidth = (usableWidth - 3) / 2; // -3 for gap between columns
+
+      int halfWidth = (usableWidth - 3) / 2;
       int leftWidth = halfWidth;
       int rightWidth = usableWidth - leftWidth - 3;
 
@@ -512,7 +487,6 @@ public class ModBrowseView implements WorkspaceView {
     int startIdx = descPageIndex * pageSize;
     int endIdx = Math.min(lines.size(), startIdx + pageSize);
 
-    // Build a single multiline string for the description label
     StringBuilder sb = new StringBuilder();
     for (int i = startIdx; i < endIdx; i++) {
       if (i > startIdx) {
@@ -521,7 +495,7 @@ public class ModBrowseView implements WorkspaceView {
       String line = lines.get(i);
       sb.append(line.isEmpty() ? " " : line);
     }
-    // Pad remaining lines with empty space so the label fills the allocated area
+
     for (int i = endIdx - startIdx; i < pageSize; i++) {
       sb.append('\n');
       sb.append(' ');
@@ -552,11 +526,11 @@ public class ModBrowseView implements WorkspaceView {
       }
       result.addAll(wrapText(trimmed, width));
     }
-    // Remove leading empty lines
+
     while (!result.isEmpty() && result.get(0).trim().isEmpty()) {
       result.remove(0);
     }
-    // Remove trailing empty lines
+
     while (!result.isEmpty() && result.get(result.size() - 1).trim().isEmpty()) {
       result.remove(result.size() - 1);
     }
@@ -600,7 +574,6 @@ public class ModBrowseView implements WorkspaceView {
     updateDetailsDisplay();
     mainWindow.invalidate();
 
-    // Fetch compatible versions for the chosen game version
     String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
     if ("curseforge".equals(platform)) {
       platform = "curseForge";
@@ -735,7 +708,6 @@ public class ModBrowseView implements WorkspaceView {
     String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
     String loader = loaderBox.getSelectedItem();
 
-    // Check if specific version chosen
     int verIndex = modVersionCombo.getSelectedIndex();
     OrchestratorBridge.ModVersionInfo chosenVer = null;
     if (verIndex > 0 && (verIndex - 1) < currentModVersions.size()) {
@@ -773,12 +745,12 @@ public class ModBrowseView implements WorkspaceView {
     new Thread(() -> {
       try {
         if (specificVer != null && specificVer.downloadUrl != null && !specificVer.downloadUrl.isEmpty()) {
-          // Direct version file download
+
           OrchestratorBridge.getInstance().downloadModDirect(specificVer.downloadUrl, specificVer.filename, info -> {
             updateProgressUI(mod.name, info);
           }).get();
         } else {
-          // Platform managed download
+
           OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, null, info -> {
             updateProgressUI(mod.name, info);
           }).get();

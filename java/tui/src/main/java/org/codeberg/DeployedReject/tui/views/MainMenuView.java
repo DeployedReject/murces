@@ -63,7 +63,6 @@ public class MainMenuView implements WorkspaceView {
 
         root.addComponent(menuList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Main Navigation (Enter to select)"))));
 
-        // Hotkeys
         Runnable openSvCtrlItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(0); mainWindow.showServerControl(); };
         Runnable openInstallItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(1); mainWindow.showInstallServer(); };
         Runnable openConfigItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(2); mainWindow.showConfigServer(); };

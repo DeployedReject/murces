@@ -9,9 +9,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/**
- * Central event and diagnostic message coordinator for the Activity Window.
- */
 public class ActivityLogger {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -20,13 +17,13 @@ public class ActivityLogger {
     private static final CopyOnWriteArrayList<Consumer<String>> listeners = new CopyOnWriteArrayList<>();
 
     static {
-        // Connect to orchestrator backend events
+
         OrchestratorBridge.getInstance().addLogListener(ActivityLogger::log);
     }
 
     public static synchronized void addListener(Consumer<String> listener) {
         listeners.add(listener);
-        // Deliver recent history
+
         for (String msg : buffer) {
             listener.accept(msg);
         }

@@ -9,11 +9,6 @@ import com.googlecode.lanterna.gui2.TextGUIGraphics;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.LazyVimTheme;
 
-/**
- * A Minecraft-themed loading animation rendering an advancing pickaxe on the
- * same row as the dirt blocks. The pickaxe moves forward across the track as
- * each block is broken, leaving a cleared tunnel behind it.
- */
 public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickaxeAnimation> {
 
   private static final TextColor DIRT_BROWN = new TextColor.RGB(133, 82, 43);
@@ -21,7 +16,7 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
   private static final TextColor DIAMOND_TOOL = new TextColor.RGB(85, 255, 255);
   private static final TextColor PARTICLE_GOLD = new TextColor.RGB(255, 170, 0);
 
-  private double progress = -1; // -1 for looping indeterminate, 0..100 for progress-bound
+  private double progress = -1;
   private int tick = 0;
   private String customMessage = null;
 
@@ -79,9 +74,9 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           }
         }
 
-        int slotWidth = 5; // "[██] " or " ⛏> "
+        int slotWidth = 5;
         int totalSlots = Math.max(4, width / slotWidth);
-        int totalBlocks = totalSlots - 1; // 1 slot allocated for the advancing pickaxe
+        int totalBlocks = totalSlots - 1;
 
         double blockProgress = (effectiveProgress / 100.0) * totalBlocks;
         int activeBlock = Math.min(totalBlocks - 1, (int) blockProgress);
@@ -90,10 +85,8 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
 
         int pickSlot = isComplete ? (totalBlocks - 1) : activeBlock;
 
-        // Add 1 row of padding from the ceiling whenever height permits
         int animRow = (height >= 3) ? 1 : 0;
 
-        // Actual Unicode pickaxe character (⛏ = \u26CF)
         String toolIcon = GlyphHelper.isNerdFontEnabled() ? "⛏" : "/";
         int swingFrame = Math.abs(currentTick) % 3;
         String swingSuffix;
@@ -113,7 +106,6 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           swingColor = PARTICLE_GOLD;
         }
 
-        // Render slots: Mined Tunnel -> Pickaxe -> Active Block -> Remaining Blocks
         for (int slot = 0; slot < totalSlots; slot++) {
           int col = slot * slotWidth;
           if (col + 4 > width) {
@@ -168,7 +160,6 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           }
         }
 
-        // Row height - 1: Status message and progress info
         if (height >= 2) {
           int textRow = height - 1;
           graphics.setForegroundColor(LazyVimTheme.getActivePalette().fg);

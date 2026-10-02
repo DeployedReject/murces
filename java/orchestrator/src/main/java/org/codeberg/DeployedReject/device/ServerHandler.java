@@ -26,7 +26,7 @@ public class ServerHandler {
   public String gVersion;
   public String lVersion;
   public int ram;
-  public int job;// 1 for start,2 for stop, 0 for none,3 for check
+  public int job;
   public JsonArray list = new JsonArray();
 
   public ServerHandler(String type, String loader, String gVersion, String lVersion, int ram, int job) {
@@ -423,11 +423,10 @@ public class ServerHandler {
 
   private void stopServer() {
 
-        // Verify that the tmux session exists before attempting to kill it
         String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
         try {
             if (Shell.execute(checkCmd).waitFor() != 0) {
-                // Session does not exist – nothing to stop
+
                 ErrorHelper.errorJson("Server session not found; nothing to stop");
                 return;
             }
@@ -436,7 +435,6 @@ public class ServerHandler {
             return;
         }
 
-        // Attempt to kill the session gracefully
         String[] command = new String[] {
             "tmux", "kill-session", "-t", "mcServer"
         };

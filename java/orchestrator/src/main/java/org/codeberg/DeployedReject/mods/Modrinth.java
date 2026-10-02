@@ -82,7 +82,7 @@ public class Modrinth implements ModAPI {
                 .create(downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("url").getAsString()))
             .GET()
             .build();
-        // Getting it as a InputStream to monitor download progress.
+
         HttpResponse<InputStream> downloadRequest = NetworkUtils.attemptI(downloading);
         if (downloadRequest == null) {
           return;

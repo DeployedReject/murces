@@ -24,10 +24,6 @@ public class TerminalResizeHelper {
     private static final AtomicReference<TerminalSize> lastKnownSize = new AtomicReference<>(null);
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
 
-    /**
-     * Directly queries the physical terminal dimensions from the OS kernel (/dev/tty or stty size).
-     * This bypasses CPR escape codes and returns instantaneous results.
-     */
     public static TerminalSize queryPhysicalTerminalSize() {
         try {
             File tty = new File("/dev/tty");
@@ -54,7 +50,6 @@ public class TerminalResizeHelper {
             }
         } catch (Exception ignored) {}
 
-        // Fallback to environment variables if available
         try {
             String colsStr = System.getenv("COLUMNS");
             String linesStr = System.getenv("LINES");
@@ -70,9 +65,6 @@ public class TerminalResizeHelper {
         return null;
     }
 
-    /**
-     * Initializes global WINCH signal handler, debounced redraws, and background polling.
-     */
     public static synchronized void setup(Screen screen, MultiWindowTextGUI gui, ResponsiveTerminal terminal) {
         if (initialized.getAndSet(true)) {
             return;
@@ -88,14 +80,12 @@ public class TerminalResizeHelper {
             } catch (Exception ignored) {}
         }
 
-        // 1. Native WINCH signal handler
         try {
             sun.misc.Signal.handle(new sun.misc.Signal("WINCH"), sig -> {
                 scheduleResize(screen, gui, terminal, 50);
             });
         } catch (Throwable ignored) {}
 
-        // 2. Background polling watcher (detects resize even if signals are dropped or unsupported)
         Thread watcher = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
@@ -142,16 +132,13 @@ public class TerminalResizeHelper {
 
             final TerminalSize effectiveSize = realSize;
 
-            // Execute GUI refresh on the GUI thread
             gui.getGUIThread().invokeLater(() -> {
                 try {
-                    // Let Screen adjust its internal buffer
+
                     screen.doResizeIfNecessary();
 
-                    // Full clear of screen buffer to eliminate ghost characters and torn borders
                     screen.clear();
 
-                    // Invalidate active windows for the new dimensions
                     for (Window w : gui.getWindows()) {
                         if (w instanceof org.codeberg.DeployedReject.tui.views.MainWindow) {
                             ((org.codeberg.DeployedReject.tui.views.MainWindow) w).updateLayoutDimensions(effectiveSize);
@@ -159,10 +146,8 @@ public class TerminalResizeHelper {
                         w.invalidate();
                     }
 
-                    // Invalidate background canvas
                     gui.getBackgroundPane().invalidate();
 
-                    // Force redraw to physical terminal
                     gui.updateScreen();
                 } catch (Exception ignored) {}
             });

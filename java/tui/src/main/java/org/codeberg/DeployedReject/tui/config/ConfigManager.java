@@ -10,9 +10,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Handles automatic loading, saving, and default generation for murces.json.
- */
 public class ConfigManager {
 
     private static final String CONFIG_FILENAME = "murces.json";
@@ -76,7 +73,6 @@ public class ConfigManager {
             } catch (Exception ignored) {}
         }
 
-        // Generate default config file if missing or failed to parse
         this.config = new TuiConfig();
         save();
     }

@@ -28,7 +28,6 @@ public class ModManageView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // Top actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         deleteBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [D]elete Mod"), this::onDeleteMod);
         refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]efresh"), this::loadMods);
@@ -42,7 +41,6 @@ public class ModManageView implements WorkspaceView {
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
-        // Mods List
         modsList = new MurcesListBox(new TerminalSize(42, 7));
         modsList.setSelectionListener(idx -> {
             List<String> mods = OrchestratorBridge.listInstalledMods();
@@ -56,11 +54,9 @@ public class ModManageView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Hotkeys
         hotkeys.put('L', modsList::takeFocus);
         hotkeys.put('D', KeyboardNavigationHelper.focus(deleteBtn, this::onDeleteMod));
         hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::loadMods));
@@ -154,7 +150,6 @@ public class ModManageView implements WorkspaceView {
             return;
         }
 
-        // Confirmed deletion
         confirmingDelete = false;
         File f = new File("mods", selectedModFile);
         if (f.exists() && f.delete()) {

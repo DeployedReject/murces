@@ -19,14 +19,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Unified 3-Pane Dashboard Window.
- * Automatically expands to fill the entire terminal window in full-screen mode without dead space.
- * Panes:
- *  1. Center Workspace / Menu (Left/Center, fills remaining area)
- *  2. Activity & Diagnostics Window (Right/Side, color-coded, auto-wrapping, scrollable [A])
- *  3. Server Console Window (Bottom, full-width, auto-wrapping, scrollable [L])
- */
 public class MainWindow extends BasicWindow {
 
     private final Panel root;
@@ -68,7 +60,6 @@ public class MainWindow extends BasicWindow {
         this.gui = gui;
         setHints(Arrays.asList(Hint.FULL_SCREEN, Hint.FIT_TERMINAL_WINDOW));
 
-        // Too small warning panel overlay
         tooSmallPanel = new Panel(new LinearLayout(Direction.VERTICAL));
         Label warnTitle = new Label(GlyphHelper.apply(GlyphHelper.ICON_WARN + "  TERMINAL WINDOW TOO SMALL"));
         warnTitle.setForegroundColor(LazyVimTheme.getErrorColor());
@@ -81,16 +72,13 @@ public class MainWindow extends BasicWindow {
 
         this.root = new Panel(new BorderLayout());
 
-        // 1. Top Header Tooltip (Location.TOP)
         Label tip = KeyboardNavigationHelper.createTooltip();
         tip.setLayoutData(BorderLayout.Location.TOP);
         root.addComponent(tip);
 
-        // 2. Middle Row: Left/Center Workspace + Right Activity Window (Location.CENTER)
         Panel midPanel = new Panel(new BorderLayout());
         midPanel.setLayoutData(BorderLayout.Location.CENTER);
 
-        // Center Workspace Pane
         Panel workspaceOuter = new Panel(new LinearLayout(Direction.VERTICAL));
         workspaceTitleLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Workspace: Main Menu " + GlyphHelper.ICON_SERVER));
         workspaceTitleLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
@@ -111,14 +99,12 @@ public class MainWindow extends BasicWindow {
 
         root.addComponent(midPanel);
 
-        // 3. Bottom Pane: Server Console (Location.BOTTOM)
         consoleLogView = new ColoredLogView(true);
         consoleLogView.setContent("[Server not started - Start server from Server Control [S] to view live output]");
         consoleBordered = consoleLogView.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " Server Console (Live Output) [L]")));
         consoleBordered.setLayoutData(BorderLayout.Location.BOTTOM);
         root.addComponent(consoleBordered);
 
-        // Real-time live screen refresh callbacks for continuous log streaming
         activityLogView.setOnUpdate(() -> {
             activityBordered.invalidate();
             invalidate();
@@ -137,11 +123,9 @@ public class MainWindow extends BasicWindow {
 
         setComponent(root);
 
-        // Initial dynamic dimensions
         TerminalSize initialSize = gui.getScreen() != null ? gui.getScreen().getTerminalSize() : new TerminalSize(80, 24);
         updateLayoutDimensions(initialSize);
 
-        // Instantiate workspace views
         this.mainMenuView = new MainMenuView(this);
         this.serverControlView = new ServerControlView(this);
         this.installServerView = new InstallServerView(this);
@@ -153,21 +137,16 @@ public class MainWindow extends BasicWindow {
         this.customizationView = new CustomizationView(this);
         this.jobManagerView = new JobManagerView(this);
 
-        // Apply persistent theme and configuration
         applyConfig(ConfigManager.getInstance().getConfig());
 
-        // Connect Activity Logger
         ActivityLogger.addListener(msg -> {
             gui.getGUIThread().invokeLater(() -> activityLogView.addLine(msg));
         });
 
-        // Setup Console Poller (every 1 second)
         poller.scheduleWithFixedDelay(this::pollServerConsole, 500, 1000, TimeUnit.MILLISECONDS);
 
-        // Setup Window Listener
         setupInputHandling();
 
-        // Show Main Menu View by default
         showView(mainMenuView);
     }
 
@@ -191,12 +170,9 @@ public class MainWindow extends BasicWindow {
             }
         }
 
-        // Dynamic UI scaling on full screen
-        // Console height: ~25% of rows (min 5, max 16 on full screen)
         int consHeight = Math.max(5, Math.min(16, rows / 4));
         consoleBordered.setPreferredSize(new TerminalSize(cols, consHeight));
 
-        // Activity width: ~35% of cols (min 28, max 65 on full screen)
         int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
         activityBordered.setPreferredSize(new TerminalSize(actWidth, Math.max(10, rows - consHeight - 4)));
 
@@ -319,7 +295,7 @@ public class MainWindow extends BasicWindow {
         addWindowListener(new WindowListenerAdapter() {
             @Override
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliver) {
-                // 0. CTRL+C CLEAN TERMINATION
+
                 if (keyStroke.isCtrlDown() && (keyStroke.getCharacter() == 'c' || keyStroke.getCharacter() == 'C')) {
                     deliver.set(false);
                     poller.shutdownNow();
@@ -327,7 +303,6 @@ public class MainWindow extends BasicWindow {
                     return;
                 }
 
-                // 0a. MOUSE WHEEL SCROLLING & CLICK FOCUS FOR LOG PANES
                 if (keyStroke instanceof MouseAction) {
                     MouseAction ma = (MouseAction) keyStroke;
                     TerminalPosition pos = ma.getPosition();
@@ -362,7 +337,6 @@ public class MainWindow extends BasicWindow {
                 Interactable focused = basePane.getFocusedInteractable();
                 boolean isEditableText = (focused instanceof TextBox) && !((TextBox) focused).isReadOnly();
 
-                // 1. ESCAPE KEY: Universal Un-focus / Navigation
                 if (type == KeyType.Escape) {
                     if (focused != null) {
                         basePane.setFocusedInteractable(null);
@@ -375,7 +349,6 @@ public class MainWindow extends BasicWindow {
                     }
                 }
 
-                // 2. SUPPRESS ARROWS ON BUTTONS (Allow on lists, tables, textboxes, and scrollable log views)
                 if (type == KeyType.ArrowDown || type == KeyType.ArrowUp ||
                     type == KeyType.ArrowLeft || type == KeyType.ArrowRight) {
                     if (focused instanceof ComboBox) {
@@ -405,14 +378,13 @@ public class MainWindow extends BasicWindow {
                     }
                 }
 
-                // 3. HOTKEYS DISPATCH
                 if (!isEditableText) {
                     Character c = null;
                     if (type == KeyType.Character && keyStroke.getCharacter() != null) {
                         c = Character.toUpperCase(keyStroke.getCharacter());
                     }
                     if (c != null) {
-                        // Global focus shortcuts: [A] Activity Log, [L] Server Console
+
                         if (c == 'A') {
                             deliver.set(false);
                             activityLogView.takeFocus();
@@ -423,28 +395,24 @@ public class MainWindow extends BasicWindow {
                             return;
                         }
 
-                        // Global subview Back action
                         if (c == 'B' && currentView != mainMenuView) {
                             deliver.set(false);
                             showMainMenu();
                             return;
                         }
 
-                        // Global customization shortcut [Z]
                         if (c == 'Z' && currentView != customizationView) {
                             deliver.set(false);
                             showCustomization();
                             return;
                         }
 
-                        // Global Active Tasks shortcut [J]
                         if (c == 'J' && currentView != jobManagerView) {
                             deliver.set(false);
                             showJobManager();
                             return;
                         }
 
-                        // Check current view hotkeys
                         if (currentView != null && currentView.getHotkeys() != null) {
                             Map<Character, Runnable> hotkeys = currentView.getHotkeys();
                             if (hotkeys.containsKey(c)) {

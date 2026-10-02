@@ -59,7 +59,7 @@ public class ServerPropertiesManager {
     }
 
     static {
-        // --- Category: Gameplay ---
+
         def("gamemode", PropertyDef.Type.ENUM, "survival", "Gameplay", "Default game mode for new players", Arrays.asList("survival", "creative", "adventure", "spectator"));
         def("difficulty", PropertyDef.Type.ENUM, "easy", "Gameplay", "Game difficulty level", Arrays.asList("peaceful", "easy", "normal", "hard"));
         def("hardcore", PropertyDef.Type.BOOLEAN, "false", "Gameplay", "Enable hardcore mode (permanent death / spectator)");
@@ -74,7 +74,6 @@ public class ServerPropertiesManager {
         def("player-idle-timeout", PropertyDef.Type.INTEGER, "0", "Gameplay", "Minutes idle before kicking player (0 disables)");
         def("pause-when-empty-seconds", PropertyDef.Type.INTEGER, "60", "Gameplay", "Seconds empty before server pauses ticks (-1 disables)");
 
-        // --- Category: World ---
         def("level-name", PropertyDef.Type.STRING, "world", "World", "World save directory and level name");
         def("level-seed", PropertyDef.Type.STRING, "", "World", "World generator seed (empty for random)");
         def("level-type", PropertyDef.Type.ENUM, "minecraft:normal", "World", "World generator preset", Arrays.asList("minecraft:normal", "minecraft:flat", "minecraft:large_biomes", "minecraft:amplified", "minecraft:single_biome_surface"));
@@ -83,7 +82,6 @@ public class ServerPropertiesManager {
         def("allow-nether", PropertyDef.Type.BOOLEAN, "true", "World", "Allow travel to the Nether dimension");
         def("max-world-size", PropertyDef.Type.INTEGER, "29999984", "World", "Maximum world border radius in blocks");
 
-        // --- Category: Network ---
         def("server-port", PropertyDef.Type.INTEGER, "25565", "Network", "TCP port number the Minecraft server listens on");
         def("server-ip", PropertyDef.Type.STRING, "", "Network", "IP address to bind server (empty for all interfaces)");
         def("max-players", PropertyDef.Type.INTEGER, "20", "Network", "Maximum concurrent connected players");
@@ -100,7 +98,6 @@ public class ServerPropertiesManager {
         def("status-contact-details", PropertyDef.Type.STRING, "", "Network", "Contact info shown in server status query");
         def("status-heartbeat-interval", PropertyDef.Type.INTEGER, "0", "Network", "Server status heartbeat interval in ticks");
 
-        // --- Category: Performance ---
         def("view-distance", PropertyDef.Type.INTEGER, "10", "Performance", "Render distance in chunks sent to clients (3-32)");
         def("simulation-distance", PropertyDef.Type.INTEGER, "10", "Performance", "Tick simulation distance in chunks (3-32)");
         def("entity-broadcast-range-percentage", PropertyDef.Type.INTEGER, "100", "Performance", "Entity rendering distance percentage (10-1000)");
@@ -110,7 +107,6 @@ public class ServerPropertiesManager {
         def("use-native-transport", PropertyDef.Type.BOOLEAN, "true", "Performance", "Use native Linux epoll packet transport");
         def("region-file-compression", PropertyDef.Type.ENUM, "deflate", "Performance", "Chunk region file compression algorithm", Arrays.asList("deflate", "lz4", "none"));
 
-        // --- Category: Security ---
         def("enforce-secure-profile", PropertyDef.Type.BOOLEAN, "true", "Security", "Enforce cryptographically signed chat messages");
         def("op-permission-level", PropertyDef.Type.ENUM, "4", "Security", "Default permission level for server operators (1-4)", Arrays.asList("1", "2", "3", "4"));
         def("function-permission-level", PropertyDef.Type.ENUM, "2", "Security", "Permission level required for datapack functions (1-4)", Arrays.asList("1", "2", "3", "4"));
@@ -139,7 +135,6 @@ public class ServerPropertiesManager {
         def("management-server-tls-keystore", PropertyDef.Type.STRING, "", "Security", "TLS keystore file path for management server");
         def("management-server-tls-keystore-password", PropertyDef.Type.STRING, "", "Security", "TLS keystore password for management server");
 
-        // --- Category: Resource Packs ---
         def("require-resource-pack", PropertyDef.Type.BOOLEAN, "false", "Resource Packs", "Disconnect players who decline the resource pack");
         def("resource-pack", PropertyDef.Type.STRING, "", "Resource Packs", "Direct download URL for server resource pack");
         def("resource-pack-prompt", PropertyDef.Type.STRING, "", "Resource Packs", "Custom prompt message shown when offering resource pack");
@@ -198,7 +193,7 @@ public class ServerPropertiesManager {
                     String key = line.substring(0, eqIdx).trim();
                     String val = line.substring(eqIdx + 1).trim();
                     if (!key.isEmpty() && !"=(null)".equals(line)) {
-                        // Unescape escaped colons
+
                         val = val.replace("\\:", ":");
                         properties.put(key, val);
                         if (!DEFINITIONS.containsKey(key)) {
@@ -208,7 +203,7 @@ public class ServerPropertiesManager {
                 }
             }
         } catch (IOException ignored) {
-            // Keep initialized defaults
+
         }
     }
 
@@ -239,7 +234,7 @@ public class ServerPropertiesManager {
                 writer.write("# ------------------------------------------------------------\n");
                 for (String k : catKeys) {
                     String v = properties.getOrDefault(k, "");
-                    // Escape colons for level-type if needed
+
                     if ("level-type".equals(k) && v.contains(":")) {
                         v = v.replace(":", "\\:");
                     }

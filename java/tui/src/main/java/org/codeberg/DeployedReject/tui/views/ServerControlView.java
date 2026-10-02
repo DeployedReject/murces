@@ -31,7 +31,6 @@ public class ServerControlView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // 1. Status Section
         Panel statusPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         statusPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Status: ")));
         statusLabel = new Label("CHECKING...");
@@ -42,7 +41,6 @@ public class ServerControlView implements WorkspaceView {
         statusPanel.addComponent(refreshBtn);
         root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
 
-        // 2. Launch Options (Playit Tunnel & RAM Allocation)
         Panel launchOptionsPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
         launchOptionsPanel.addComponent(publicTunnelCheckBox);
@@ -51,12 +49,11 @@ public class ServerControlView implements WorkspaceView {
         launchOptionsPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [M]emory (RAM): ")));
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(8, 1));
-        ramComboBox.setSelectedIndex(1); // 4G default
+        ramComboBox.setSelectedIndex(1);
         launchOptionsPanel.addComponent(ramComboBox);
 
         root.addComponent(launchOptionsPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Launch Options"))));
 
-        // 3. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         startBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart Server"), this::onStart);
         stopBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_STOP + " [T]erminate Server"), this::onStop);
@@ -69,10 +66,8 @@ public class ServerControlView implements WorkspaceView {
         actionPanel.addComponent(restartBtn);
         root.addComponent(actionPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TASKS + " Server Actions"))));
 
-        // Initial sync of button states
         applyButtonStates(OrchestratorBridge.isServerInstalled(), false, false);
 
-        // 4. Console Command
         Panel cmdPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         cmdPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " [C]onsole Cmd (/): ")));
         commandInput = new TextBox(new TerminalSize(26, 1));
@@ -89,11 +84,9 @@ public class ServerControlView implements WorkspaceView {
         cmdPanel.addComponent(sendBtn);
         root.addComponent(cmdPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " Command Dispatch"))));
 
-        // 5. Navigation Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Configure Hotkeys
         hotkeys.put('S', KeyboardNavigationHelper.focus(startBtn, this::onStart));
         hotkeys.put('T', KeyboardNavigationHelper.focus(stopBtn, this::onStop));
         hotkeys.put('R', KeyboardNavigationHelper.focus(restartBtn, this::onRestart));
@@ -125,7 +118,7 @@ public class ServerControlView implements WorkspaceView {
             startBtn.setEnabled(false);
             stopBtn.setEnabled(false);
             restartBtn.setEnabled(false);
-        } else { // installed and stopped
+        } else {
             startBtn.setEnabled(true);
             stopBtn.setEnabled(false);
             restartBtn.setEnabled(true);

@@ -6,11 +6,6 @@ import com.googlecode.lanterna.gui2.Interactable;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 
-/**
- * A robust ActionListBox that strictly clamps arrow key navigation within list bounds.
- * Prevents escaping out of bounds, focus jumping, or TUI glitches when arrow keys
- * are held down continuously.
- */
 public class MurcesListBox extends ActionListBox {
 
     public interface SelectionListener {
@@ -148,7 +143,7 @@ public class MurcesListBox extends ActionListBox {
                         setSelectedIndex(next);
                     }
                 }
-                // ALWAYS return HANDLED - never leak MOVE_FOCUS_DOWN to prevent escaping/glitching!
+
                 return Interactable.Result.HANDLED;
 
             case ArrowUp:
@@ -158,7 +153,7 @@ public class MurcesListBox extends ActionListBox {
                         setSelectedIndex(prev);
                     }
                 }
-                // ALWAYS return HANDLED - never leak MOVE_FOCUS_UP to prevent escaping/glitching!
+
                 return Interactable.Result.HANDLED;
 
             case PageDown:
@@ -191,15 +186,15 @@ public class MurcesListBox extends ActionListBox {
 
             case ArrowLeft:
             case ArrowRight:
-                // Strictly stay inside the list; do NOT jump focus left or right
+
                 return Interactable.Result.HANDLED;
 
             case Tab:
-                // User can deliberately Tab to the next control
+
                 return Interactable.Result.MOVE_FOCUS_NEXT;
 
             case ReverseTab:
-                // User can deliberately Shift-Tab to the previous control
+
                 return Interactable.Result.MOVE_FOCUS_PREVIOUS;
 
             default:

@@ -61,7 +61,7 @@ public class Main {
         break;
 
       worker.submit(() -> {
-        // type can be modding/server/kill
+
         if (!request.has("type")) {
           ErrorHelper.errorJson("Error Missing A Type Parameter");
           return;

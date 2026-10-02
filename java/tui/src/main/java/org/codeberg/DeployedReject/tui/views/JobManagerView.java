@@ -9,10 +9,6 @@ import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 
 import java.util.*;
 
-/**
- * Dedicated view to monitor active background operations (server installation, mod downloads)
- * and cancel them with automatic cleanup of temporary/partial files.
- */
 public class JobManagerView implements WorkspaceView {
 
     private final MainWindow mainWindow;
@@ -41,14 +37,12 @@ public class JobManagerView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Job list
         jobListBox = new MurcesListBox(new TerminalSize(50, 7));
         jobListBox.setSelectionListener(idx -> {
             mainWindow.getGui().getGUIThread().invokeLater(this::updateSelectedDetails);
         });
         root.addComponent(jobListBox.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TASKS + " Running Tasks [L]ist (↑/↓)"))));
 
-        // Details Panel
         detailsLabel = new Label("No active jobs running.");
         detailsLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
         Panel detailsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
@@ -57,7 +51,6 @@ public class JobManagerView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Actions: 2-row layout to prevent button truncation on constrained/standard terminal widths
         Panel actionPanel = new Panel(new LinearLayout(Direction.VERTICAL));
 
         Panel row1 = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -79,14 +72,12 @@ public class JobManagerView implements WorkspaceView {
         actionPanel.addComponent(row2);
         root.addComponent(actionPanel);
 
-        // Hotkeys
         hotkeys.put('C', KeyboardNavigationHelper.focus(cancelBtn, this::onCancelSelected));
         hotkeys.put('K', KeyboardNavigationHelper.focus(cancelAllBtn, this::onCancelAll));
         hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::refreshJobs));
         hotkeys.put('L', jobListBox::takeFocus);
         hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
 
-        // Listen for live updates
         JobTracker.getInstance().addChangeListener(() -> {
             try {
                 if (mainWindow.getGui() != null && mainWindow.getGui().getGUIThread() != null) {

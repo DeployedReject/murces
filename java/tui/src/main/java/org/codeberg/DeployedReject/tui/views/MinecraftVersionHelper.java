@@ -57,7 +57,7 @@ public class MinecraftVersionHelper {
         String custom = TextInputDialog.showDialog(gui, "Custom Version", "Enter custom Minecraft version (e.g. 1.20.3):", "");
         if (custom != null && !custom.trim().isEmpty()) {
             custom = custom.trim();
-            // Check if already present in combo box
+
             int existingIdx = -1;
             for (int i = 0; i < comboBox.getItemCount(); i++) {
                 if (comboBox.getItem(i).equalsIgnoreCase(custom)) {
@@ -84,7 +84,7 @@ public class MinecraftVersionHelper {
     public static void cycleVersion(ComboBox<String> comboBox) {
         int count = comboBox.getItemCount();
         if (count == 0) return;
-        // Skip "Custom..." when cycling with hotkey
+
         int maxPresets = count > 1 && "Custom...".equals(comboBox.getItem(count - 1)) ? count - 1 : count;
         int next = (comboBox.getSelectedIndex() + 1) % maxPresets;
         comboBox.setSelectedIndex(next);

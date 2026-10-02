@@ -34,7 +34,6 @@ public class ConfigServerView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // 1. Properties List
         listBox = new MurcesListBox(new TerminalSize(42, 6));
         listBox.setSelectionListener(idx -> {
             if (idx >= 0 && idx < displayedKeys.size()) {
@@ -42,7 +41,6 @@ public class ConfigServerView implements WorkspaceView {
             }
         });
 
-        // 2. Search filter & Category Row
         Panel topPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         topPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Filter: ")));
         filterBox = new TextBox(new TerminalSize(16, 1));
@@ -63,7 +61,6 @@ public class ConfigServerView implements WorkspaceView {
 
         root.addComponent(listBox.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Properties [L]ist (Enter toggles/cycles)"))));
 
-        // 3. Inline Value Editor Row
         Panel editPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         editPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_EDIT + " [E]dit Val: ")));
         valueInput = new TextBox(new TerminalSize(18, 1));
@@ -85,14 +82,12 @@ public class ConfigServerView implements WorkspaceView {
         editPanel.addComponent(setValueBtn);
         root.addComponent(editPanel);
 
-        // 4. Status & Description
         descLabel = new Label("Select a property to view or edit.");
         descLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
         root.addComponent(descLabel);
         root.addComponent(statusLabel);
 
-        // 5. Actions
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave"), this::onSave);
         reloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]eload"), this::onReload);
@@ -104,11 +99,9 @@ public class ConfigServerView implements WorkspaceView {
         actionPanel.addComponent(resetBtn);
         root.addComponent(actionPanel);
 
-        // 6. Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Hotkeys
         hotkeys.put('L', listBox::takeFocus);
         hotkeys.put('S', KeyboardNavigationHelper.focus(saveBtn, this::onSave));
         hotkeys.put('R', KeyboardNavigationHelper.focus(reloadBtn, this::onReload));

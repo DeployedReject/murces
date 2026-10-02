@@ -13,10 +13,6 @@ public class KeyboardNavigationHelper {
         return tip;
     }
 
-    /**
-     * Wraps an action so that triggering the shortcut also puts the target button/component into focus.
-     * If the target component is disabled, shortcut execution is suppressed.
-     */
     public static Runnable focus(Interactable target, Runnable action) {
         return () -> {
             if (target != null && !target.isEnabled()) {

@@ -34,7 +34,7 @@ public class CurseForge implements ModAPI {
     this.modId = modId;
   }
 
-  private static HashMap<String, Integer> mLT = new HashMap<>(); // Mod Loader Translator
+  private static HashMap<String, Integer> mLT = new HashMap<>();
 
   private static final String baseURL = "https://api.curseforge.com";
   private static final String searchURL = baseURL + "/v1/mods/search";

@@ -176,7 +176,7 @@ public class OrchestratorBridge {
   }
 
   private void loadConfig() {
-    // 1. Try config.properties from classpath / packaged resources
+
     Properties env = new Properties();
     try (InputStream envStream = getClass().getClassLoader().getResourceAsStream("config.properties")) {
       if (envStream != null) {
@@ -193,7 +193,6 @@ public class OrchestratorBridge {
     } catch (Exception ignored) {
     }
 
-    // 2. Try loading .env file from working directory or parent directory
     File[] envCandidates = new File[] {
         new File(".env"),
         new File("../.env"),
@@ -228,7 +227,6 @@ public class OrchestratorBridge {
       }
     }
 
-    // 3. System environment variables take highest precedence
     if (System.getenv("curseAPI") != null && !System.getenv("curseAPI").isEmpty()) {
       curseAPI = System.getenv("curseAPI");
     }
@@ -290,8 +288,6 @@ public class OrchestratorBridge {
     workerPool.shutdownNow();
   }
 
-  // --- High-level in-memory Orchestrator operations ---
-
   public CompletableFuture<List<ModResult>> searchMods(String platform, String query, String version, String loader) {
     CompletableFuture<List<ModResult>> future = new CompletableFuture<>();
 
@@ -339,7 +335,6 @@ public class OrchestratorBridge {
       }
     });
 
-    // Timeout fallback after 15s
     Executors.newSingleThreadScheduledExecutor().schedule(() -> {
       if (!future.isDone()) {
         removeListener(handler);
@@ -389,7 +384,7 @@ public class OrchestratorBridge {
             }
           }
         } else {
-          int loaderType = 4; // fabric default
+          int loaderType = 4;
           if ("forge".equalsIgnoreCase(loader))
             loaderType = 1;
           else if ("cauldron".equalsIgnoreCase(loader))
@@ -515,21 +510,21 @@ public class OrchestratorBridge {
     if (md == null)
       return "";
     String s = md;
-    // Strip markdown images first
+
     s = s.replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)", "");
-    // Strip empty links left over
+
     s = s.replaceAll("\\[\\s*\\]\\([^)]*\\)", "");
-    // Turn links into their display text
+
     s = s.replaceAll("\\[([^\\]]+)\\]\\([^)]*\\)", "$1");
-    // Strip raw HTML tags
+
     s = s.replaceAll("<[^>]+>", "");
-    // Clean headings
+
     s = s.replaceAll("(?m)^#{1,6}\\s*", "◆ ");
-    // Strip bold and italics formatting
+
     s = s.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
     s = s.replaceAll("__([^_]+)__", "$1");
     s = s.replaceAll("(?m)^[-*]\\s+", "  • ");
-    // Replace HTML entities
+
     s = s.replace("&nbsp;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -706,7 +701,6 @@ public class OrchestratorBridge {
           out.flush();
         }
 
-        // Atomically move temp file to final target
         try {
           Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
               java.nio.file.StandardCopyOption.ATOMIC_MOVE);
@@ -824,8 +818,6 @@ public class OrchestratorBridge {
     return future;
   }
 
-  // --- System Shell Operations ---
-
   public static ProcessResult runShell(String... command) {
     try {
       ProcessBuilder pb = new ProcessBuilder(command);
@@ -852,7 +844,7 @@ public class OrchestratorBridge {
     if (new File("server.jar.tmp").exists() || new File("BuildTools.jar").exists()) {
       return false;
     }
-    // Check for Fabric server
+
     File fabricLaunch = new File("fabric-server-launch.jar");
     if (fabricLaunch.exists() && fabricLaunch.length() > 0) {
       File mcJar = new File("server.jar");
@@ -862,12 +854,12 @@ public class OrchestratorBridge {
         return true;
       }
     }
-    // Check for Forge server run.sh
+
     File runSh = new File("run.sh");
     if (runSh.exists() && runSh.length() > 0) {
       return true;
     }
-    // Check for Vanilla / Paper / Spigot server.jar
+
     File sJar = new File("server.jar");
     if (sJar.exists() && sJar.length() > 5_000_000) {
       return true;

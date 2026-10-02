@@ -25,7 +25,6 @@ public class MigratePlayerView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        // Form
         Panel form = new Panel(new GridLayout(2));
         form.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_USER + " Old [O] Name:")));
         oldNameBox = new TextBox(new TerminalSize(18, 1));
@@ -55,7 +54,6 @@ public class MigratePlayerView implements WorkspaceView {
 
         root.addComponent(form.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_USER + " Player Identity"))));
 
-        // Action
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         actionPanel.addComponent(migrateBtn);
         root.addComponent(actionPanel);
@@ -66,11 +64,9 @@ public class MigratePlayerView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        // Footer
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        // Hotkeys
         hotkeys.put('O', oldNameBox::takeFocus);
         hotkeys.put('N', newNameBox::takeFocus);
         hotkeys.put('M', KeyboardNavigationHelper.focus(migrateBtn, this::onMigrate));
