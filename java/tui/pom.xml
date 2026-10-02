@@ -92,7 +92,6 @@
                                 <buildArg>-R:StackSize=256k</buildArg>
                                 <buildArg>-R:MaximumHeapSizePercent=10</buildArg>
                                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
-                                <buildArg>-H:+CompactingOldGen</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                             </buildArgs>
                         </configuration>
