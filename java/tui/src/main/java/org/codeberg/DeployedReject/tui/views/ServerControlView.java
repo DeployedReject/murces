@@ -31,34 +31,66 @@ public class ServerControlView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
+        refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [U]pdate Status"), this::updateStatus);
+        publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
+        ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
+        ramComboBox.setPreferredSize(new TerminalSize(8, 1));
+        ramComboBox.setSelectedIndex(1);
+        startBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart Server"), this::onStart);
+        stopBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_STOP + " [T]erminate Server"), this::onStop);
+        restartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]estart Server"), this::onRestart);
+        commandInput = new TextBox(new TerminalSize(26, 1));
+        sendBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [D]ispatch"), this::onSendCommand);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
+
+        publicTunnelCheckBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked());
+                ramComboBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        ramComboBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                Interactable target = startBtn.isEnabled() ? startBtn : (stopBtn.isEnabled() ? stopBtn : refreshBtn);
+                if (target != null) {
+                    target.takeFocus();
+                }
+                return false;
+            }
+            return true;
+        });
+
+        commandInput.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                onSendCommand();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowDown) {
+                sendBtn.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
         Panel statusPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         statusPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Status: ")));
         statusLabel = new Label("CHECKING...");
         statusPanel.addComponent(statusLabel);
-
-        refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [U]pdate Status"), this::updateStatus);
         statusPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         statusPanel.addComponent(refreshBtn);
         root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
 
         Panel launchOptionsPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
         launchOptionsPanel.addComponent(publicTunnelCheckBox);
         launchOptionsPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
-
         launchOptionsPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [M]emory (RAM): ")));
-        ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
-        ramComboBox.setPreferredSize(new TerminalSize(8, 1));
-        ramComboBox.setSelectedIndex(1);
         launchOptionsPanel.addComponent(ramComboBox);
-
-        root.addComponent(launchOptionsPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Launch Options"))));
+        root.addComponent(launchOptionsPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Launch Options (Enter advances)"))));
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        startBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart Server"), this::onStart);
-        stopBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_STOP + " [T]erminate Server"), this::onStop);
-        restartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]estart Server"), this::onRestart);
-
         actionPanel.addComponent(startBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(stopBtn);
@@ -70,32 +102,21 @@ public class ServerControlView implements WorkspaceView {
 
         Panel cmdPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         cmdPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " [C]onsole Cmd (/): ")));
-        commandInput = new TextBox(new TerminalSize(26, 1));
-        sendBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [D]ispatch"), this::onSendCommand);
-        commandInput.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                sendBtn.takeFocus();
-                return false;
-            }
-            return true;
-        });
         cmdPanel.addComponent(commandInput);
         cmdPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         cmdPanel.addComponent(sendBtn);
-        root.addComponent(cmdPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " Command Dispatch"))));
+        root.addComponent(cmdPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TERMINAL + " Command Dispatch (Enter sends)"))));
 
-        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        hotkeys.put('S', KeyboardNavigationHelper.focus(startBtn, this::onStart));
-        hotkeys.put('T', KeyboardNavigationHelper.focus(stopBtn, this::onStop));
-        hotkeys.put('R', KeyboardNavigationHelper.focus(restartBtn, this::onRestart));
-        hotkeys.put('U', KeyboardNavigationHelper.focus(refreshBtn, this::updateStatus));
-        hotkeys.put('P', KeyboardNavigationHelper.focus(publicTunnelCheckBox, () -> publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked())));
-        hotkeys.put('M', KeyboardNavigationHelper.focus(ramComboBox, this::cycleRam));
-        hotkeys.put('A', KeyboardNavigationHelper.focus(ramComboBox, this::cycleRam));
-        hotkeys.put('D', KeyboardNavigationHelper.focus(sendBtn, this::onSendCommand));
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('S', KeyboardNavigationHelper.action(startBtn, this::onStart));
+        hotkeys.put('T', KeyboardNavigationHelper.action(stopBtn, this::onStop));
+        hotkeys.put('R', KeyboardNavigationHelper.action(restartBtn, this::onRestart));
+        hotkeys.put('U', KeyboardNavigationHelper.action(refreshBtn, this::updateStatus));
+        hotkeys.put('P', () -> publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked()));
+        hotkeys.put('M', this::cycleRam);
+        hotkeys.put('D', KeyboardNavigationHelper.action(sendBtn, this::onSendCommand));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
         hotkeys.put('/', commandInput::takeFocus);
         hotkeys.put('C', commandInput::takeFocus);
     }

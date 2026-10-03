@@ -104,7 +104,7 @@ public class ServerHandler {
       case 4:
         boolean isRunning = false;
         try {
-          String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
+          String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcsv" };
           isRunning = (Shell.execute(checkCmd).waitFor() == 0);
         } catch (Exception ignored) {
         }
@@ -132,7 +132,7 @@ public class ServerHandler {
           spawnServer();
         break;
       default:
-        ErrorHelper.errorJson("wtf is this job");
+        ErrorHelper.errorJson("Unrecognized server job action requested: " + job);
     }
 
   }
@@ -163,7 +163,7 @@ public class ServerHandler {
     }
 
     if (url.equals("null")) {
-      ErrorHelper.errorJson("Not a valid version.");
+      ErrorHelper.errorJson("Minecraft version '" + gVersion + "' is not a valid Vanilla release.");
       return;
     }
 
@@ -194,7 +194,7 @@ public class ServerHandler {
   private void fabric() {
 
     if (!checkCommand("java")) {
-      ErrorHelper.errorJson("java is not found in PATH. Please install a compatible Java. Recommended: SDKMAN!");
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
       return;
     }
 
@@ -227,7 +227,7 @@ public class ServerHandler {
     HttpRequest downloadRequest = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
     HttpResponse<InputStream> downloading = NetworkUtils.attemptI(downloadRequest);
     if (downloading == null) {
-      ErrorHelper.errorJson("Failed to download Fabric installer");
+      ErrorHelper.errorJson("Failed to download Fabric installer from meta repository.");
       return;
     }
 
@@ -255,11 +255,11 @@ public class ServerHandler {
 
     try {
       if (Shell.execute(commandList.toArray(new String[0])).waitFor() != 0) {
-        ErrorHelper.errorJson("Fabric server installer execution failed");
+        ErrorHelper.errorJson("Fabric installer exited with an error. Please verify Java compatibility and internet connection.");
         return;
       }
     } catch (Exception e) {
-      ErrorHelper.errorJson("Fabric installation error: " + e.getMessage());
+      ErrorHelper.errorJson("Fabric installation failed: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return;
     } finally {
       try {
@@ -300,11 +300,11 @@ public class ServerHandler {
       response.addProperty("type", "server");
       Communicator.printer(response);
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Build failed");
+        ErrorHelper.errorJson("Spigot BuildTools compilation failed. Ensure git and Java are properly installed.");
         return;
       }
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Spigot compilation failed: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     }
 
     try (Stream<Path> jars = Files.list(Paths.get("."))) {
@@ -314,12 +314,12 @@ public class ServerHandler {
             Files.move(jar, Paths.get("server.jar"), StandardCopyOption.REPLACE_EXISTING);
           }
         } catch (Exception e) {
-          ErrorHelper.errorJson("Could not rename spigot.");
+          ErrorHelper.errorJson("Could not rename compiled Spigot jar to server.jar: " + e.getMessage());
         }
       });
 
     } catch (Exception e) {
-      ErrorHelper.errorJson("Ignore this most of the time.");
+      ErrorHelper.errorJson("Could not locate compiled Spigot jar: " + e.getMessage());
     }
 
   }
@@ -337,7 +337,7 @@ public class ServerHandler {
         .build());
 
     if (findingURL == null || findingURL.body() == null) {
-      ErrorHelper.errorJson("Failed to fetch Paper build information");
+      ErrorHelper.errorJson("Failed to fetch Paper build metadata for version " + gVersion);
       return;
     }
 
@@ -358,7 +358,7 @@ public class ServerHandler {
 
       HttpResponse<InputStream> downloading = NetworkUtils.attemptI(downloadRequest);
       if (downloading == null) {
-        ErrorHelper.errorJson("Failed to download Paper server");
+        ErrorHelper.errorJson("Failed to download Paper server jar.");
         return;
       }
 
@@ -380,11 +380,11 @@ public class ServerHandler {
 
   private void spawnServer() {
     if (!checkCommand("tmux")) {
-      ErrorHelper.errorJson("tmux is not installed. Please install tmux (e.g., sudo apt install tmux).");
+      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
     if (!checkCommand("java")) {
-      ErrorHelper.errorJson("java is not found in PATH. Please install Java. Recommended SDKMAN!");
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
       return;
     }
 
@@ -398,7 +398,7 @@ public class ServerHandler {
         "new-session",
         "-d",
         "-s",
-        "mcServer",
+        "mcsv",
         "java",
         "-Xmx" + Integer.toString(ram) + "G",
         "-Xms" + Integer.toString(ram) + "G",
@@ -431,7 +431,7 @@ public class ServerHandler {
       try (java.io.FileWriter eulaWriter = new java.io.FileWriter("eula.txt")) {
         eulaWriter.write("eula=true");
       } catch (Exception e) {
-        ErrorHelper.errorJson(e.toString());
+        ErrorHelper.errorJson("Could not write eula.txt: " + e.getMessage());
         return;
       }
 
@@ -441,7 +441,7 @@ public class ServerHandler {
       Communicator.printer(response);
 
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Server Already Started");
+        ErrorHelper.errorJson("Minecraft server tmux session 'mcsv' is already running.");
       } else {
         JsonObject serverDone = new JsonObject();
         serverDone.addProperty("status", 3);
@@ -449,31 +449,30 @@ public class ServerHandler {
         Communicator.printer(serverDone);
       }
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Failed to launch Minecraft server session: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     }
 
   }
 
   private void stopServer() {
 
-    String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcServer" };
+    String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcsv" };
     try {
       if (Shell.execute(checkCmd).waitFor() != 0) {
-
-        ErrorHelper.errorJson("Server session not found; nothing to stop");
+        ErrorHelper.errorJson("Server tmux session 'mcsv' not found; no active server to stop.");
         return;
       }
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Failed checking server session status: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return;
     }
 
     String[] command = new String[] {
-        "tmux", "kill-session", "-t", "mcServer"
+        "tmux", "kill-session", "-t", "mcsv"
     };
     try {
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Could Not Stop Server");
+        ErrorHelper.errorJson("Could not stop server tmux session 'mcsv'.");
         return;
       }
       JsonObject response = new JsonObject();
@@ -481,7 +480,7 @@ public class ServerHandler {
       response.addProperty("type", "server");
       Communicator.printer(response);
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Failed stopping server session: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     }
 
   }
@@ -501,7 +500,7 @@ public class ServerHandler {
     JsonObject result = JsonParser.parseString(findingURl.body()).getAsJsonObject();
     JsonObject promos = result.has("promos") ? result.getAsJsonObject("promos") : null;
     if (promos == null) {
-      ErrorHelper.errorJson("No Forge promotions found.");
+      ErrorHelper.errorJson("No Forge promotions found in remote metadata.");
       return;
     }
 
@@ -511,7 +510,7 @@ public class ServerHandler {
     } else if (promos.has(gVersion + "-latest")) {
       iVersion = promos.get(gVersion + "-latest").getAsString();
     } else {
-      ErrorHelper.errorJson("No Forge version found for " + gVersion);
+      ErrorHelper.errorJson("No Forge version found for Minecraft " + gVersion);
       return;
     }
 
@@ -523,7 +522,7 @@ public class ServerHandler {
         .attemptI(HttpRequest.newBuilder().uri(URI.create(url)).GET().build());
 
     if (downloading == null) {
-      ErrorHelper.errorJson("Failed to download Forge installer");
+      ErrorHelper.errorJson("Failed to download Forge installer for version " + gVersion);
       return;
     }
 
@@ -541,11 +540,11 @@ public class ServerHandler {
 
     try {
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Error on my side probably");
+        ErrorHelper.errorJson("Forge installer execution failed. Please check Java version and network access.");
         return;
       }
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Forge installer execution error: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     } finally {
       try {
         Files.deleteIfExists(Paths.get(installerName));
@@ -557,11 +556,11 @@ public class ServerHandler {
 
   private void spawnServer(boolean x) {
     if (!checkCommand("tmux")) {
-      ErrorHelper.errorJson("tmux is not installed. Please install tmux (e.g., sudo apt install tmux).");
+      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
     if (!checkCommand("java")) {
-      ErrorHelper.errorJson("java is not found in PATH. Please install Java.");
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
       return;
     }
 
@@ -573,7 +572,7 @@ public class ServerHandler {
     try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
       eulaWriter.write("eula=true");
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Could not write eula.txt: " + e.getMessage());
       return;
     }
 
@@ -602,25 +601,25 @@ public class ServerHandler {
           "-Daikars.new.flags=true");
 
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Could not write Forge user_jvm_args.txt: " + e.getMessage());
     }
 
     try {
       String[] command = new String[] { "chmod", "+x", "run.sh" };
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("User not authorized.");
+        ErrorHelper.errorJson("Permission denied: Unable to make run.sh executable.");
         return;
       }
 
-      command = new String[] { "tmux", "new-session", "-d", "-s", "mcServer", "./run.sh", "nogui" };
+      command = new String[] { "tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui" };
 
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("too tired to write a error message.");
+        ErrorHelper.errorJson("Minecraft server tmux session 'mcsv' is already running.");
         return;
       }
 
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Failed to launch Forge server session: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return;
     }
 

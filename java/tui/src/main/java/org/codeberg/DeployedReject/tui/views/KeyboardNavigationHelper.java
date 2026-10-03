@@ -1,5 +1,6 @@
 package org.codeberg.DeployedReject.tui.views;
 
+import com.googlecode.lanterna.gui2.Button;
 import com.googlecode.lanterna.gui2.Interactable;
 import com.googlecode.lanterna.gui2.Label;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
@@ -8,17 +9,36 @@ import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 public class KeyboardNavigationHelper {
 
     public static Label createTooltip() {
-        Label tip = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " [TIP] " + GlyphHelper.ICON_FILE + " [A] Activity Log │ " + GlyphHelper.ICON_TERMINAL + " [L] Server Console │ " + GlyphHelper.ICON_TASKS + " [J] Active Tasks │ " + GlyphHelper.ICON_OPTIONS + " [TAB] Cycle Focus │ " + GlyphHelper.ICON_BACK + " [ESC] Back"));
+        Label tip = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " [TIP] " + GlyphHelper.ICON_FILE + " [A] Activity Log │ " + GlyphHelper.ICON_TERMINAL + " [L] Server Console │ " + GlyphHelper.ICON_TASKS + " [J] Active Tasks │ " + GlyphHelper.ICON_OPTIONS + " [TAB/ENTER] Navigate │ " + GlyphHelper.ICON_BACK + " [ESC] Back"));
         tip.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         return tip;
     }
 
+    /**
+     * Executes an action on an interactable (e.g. Button) without shifting focus to it.
+     * If the target is disabled, the action is ignored.
+     */
+    public static Runnable action(Interactable target, Runnable action) {
+        return () -> {
+            if (target != null && !target.isEnabled()) {
+                return;
+            }
+            if (action != null) {
+                action.run();
+            }
+        };
+    }
+
+    /**
+     * Executes an action. If the target is not a Button, focus is shifted to it.
+     * Buttons never take focus on hotkeys to avoid disrupting the active input/list position.
+     */
     public static Runnable focus(Interactable target, Runnable action) {
         return () -> {
             if (target != null && !target.isEnabled()) {
                 return;
             }
-            if (target != null) {
+            if (target != null && !(target instanceof Button)) {
                 target.takeFocus();
             }
             if (action != null) {
@@ -27,3 +47,4 @@ public class KeyboardNavigationHelper {
         };
     }
 }
+

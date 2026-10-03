@@ -62,30 +62,51 @@ public class ModBrowseView implements WorkspaceView {
     this.mainWindow = mainWindow;
     this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
+    platformBox = new ComboBox<>("Modrinth", "CurseForge");
+    loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
+    versionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
+    searchBox = new TextBox(new TerminalSize(16, 1), "jei");
+    searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
+    downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
+    resultsList = new MurcesListBox(new TerminalSize(38, 10));
+
+    platformBox.setInputFilter((interactable, keyStroke) -> {
+      if (keyStroke.getKeyType() == KeyType.Enter) {
+        loaderBox.takeFocus();
+        return false;
+      }
+      return true;
+    });
+
+    loaderBox.setInputFilter((interactable, keyStroke) -> {
+      if (keyStroke.getKeyType() == KeyType.Enter) {
+        versionComboBox.takeFocus();
+        return false;
+      }
+      return true;
+    });
+
+    versionComboBox.setInputFilter((interactable, keyStroke) -> {
+      if (keyStroke.getKeyType() == KeyType.Enter) {
+        searchBox.takeFocus();
+        return false;
+      }
+      return true;
+    });
+
     Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [P]lat:")));
-    platformBox = new ComboBox<>("Modrinth", "CurseForge");
     filterPanel.addComponent(platformBox);
-
     filterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " L[o]ad:")));
-    loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
     filterPanel.addComponent(loaderBox);
-
     filterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " [V]er:")));
-    versionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
     filterPanel.addComponent(versionComboBox);
-
     root.addComponent(filterPanel);
 
     Panel searchPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     searchPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Query: ")));
-    searchBox = new TextBox(new TerminalSize(16, 1), "jei");
-    searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
-    downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
-
-    resultsList = new MurcesListBox(new TerminalSize(38, 10));
 
     searchBox.setInputFilter((interactable, keyStroke) -> {
       if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
@@ -216,8 +237,8 @@ public class ModBrowseView implements WorkspaceView {
         searchBox.takeFocus();
       }
     });
-    hotkeys.put('S', KeyboardNavigationHelper.focus(searchBtn, this::onSearch));
-    hotkeys.put('D', KeyboardNavigationHelper.focus(downloadBtn, this::onDownload));
+    hotkeys.put('S', KeyboardNavigationHelper.action(searchBtn, this::onSearch));
+    hotkeys.put('D', KeyboardNavigationHelper.action(downloadBtn, this::onDownload));
     hotkeys.put('Q', searchBox::takeFocus);
     hotkeys.put('/', searchBox::takeFocus);
     hotkeys.put('K', () -> {
@@ -231,22 +252,21 @@ public class ModBrowseView implements WorkspaceView {
     });
     hotkeys.put('[', this::onPrevPage);
     hotkeys.put(']', this::onNextPage);
-    hotkeys.put('P', KeyboardNavigationHelper.focus(platformBox, () -> {
+    hotkeys.put('P', () -> {
       if (platformBox.getItemCount() > 0) {
         int next = (platformBox.getSelectedIndex() + 1) % platformBox.getItemCount();
         platformBox.setSelectedIndex(next);
       }
-    }));
-    hotkeys.put('O', KeyboardNavigationHelper.focus(loaderBox, () -> {
+    });
+    hotkeys.put('O', () -> {
       if (loaderBox.getItemCount() > 0) {
         int next = (loaderBox.getSelectedIndex() + 1) % loaderBox.getItemCount();
         loaderBox.setSelectedIndex(next);
       }
-    }));
-    hotkeys.put('V',
-        KeyboardNavigationHelper.focus(versionComboBox, () -> MinecraftVersionHelper.cycleVersion(versionComboBox)));
-    hotkeys.put('X', KeyboardNavigationHelper.focus(cancelBtn, this::cancelDownload));
-    hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+    });
+    hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(versionComboBox));
+    hotkeys.put('X', KeyboardNavigationHelper.action(cancelBtn, this::cancelDownload));
+    hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
   }
 
   @Override

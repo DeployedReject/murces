@@ -57,10 +57,10 @@ public class BackupView implements WorkspaceView {
         root.addComponent(backBtn);
 
         hotkeys.put('L', table::takeFocus);
-        hotkeys.put('K', KeyboardNavigationHelper.focus(backupNowBtn, this::onRunBackup));
-        hotkeys.put('D', KeyboardNavigationHelper.focus(deleteBtn, this::onDeleteBackup));
-        hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::loadBackups));
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('K', KeyboardNavigationHelper.action(backupNowBtn, this::onRunBackup));
+        hotkeys.put('D', KeyboardNavigationHelper.action(deleteBtn, this::onDeleteBackup));
+        hotkeys.put('R', KeyboardNavigationHelper.action(refreshBtn, this::loadBackups));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
 
         loadBackups();
     }

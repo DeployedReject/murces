@@ -29,14 +29,16 @@ public class Main {
       if (!Files.isDirectory(Paths.get("mods")))
         Files.createDirectory(Paths.get("mods"));
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Failed to initialize 'mods' directory: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     }
 
     Properties env = new Properties();
     try (InputStream envStream = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
-      env.load(envStream);
+      if (envStream != null) {
+        env.load(envStream);
+      }
     } catch (Exception e) {
-      ErrorHelper.errorJson("I probably forgot to load .env" + e.toString());
+      ErrorHelper.errorJson("Failed to load configuration properties: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     }
     String curseAPI = env.getProperty("curseAPI");
     String email = env.getProperty("email");

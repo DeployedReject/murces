@@ -94,7 +94,7 @@ public class Modrinth implements ModAPI {
             filesize);
 
       } else {
-        ErrorHelper.errorJson("No valid Link");
+        ErrorHelper.errorJson("No compatible download version found on Modrinth for '" + modName + "' (" + version + ", " + loader + ")");
       }
 
     }

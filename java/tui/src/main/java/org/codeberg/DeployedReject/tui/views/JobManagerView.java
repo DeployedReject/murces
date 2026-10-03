@@ -72,11 +72,11 @@ public class JobManagerView implements WorkspaceView {
         actionPanel.addComponent(row2);
         root.addComponent(actionPanel);
 
-        hotkeys.put('C', KeyboardNavigationHelper.focus(cancelBtn, this::onCancelSelected));
-        hotkeys.put('K', KeyboardNavigationHelper.focus(cancelAllBtn, this::onCancelAll));
-        hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::refreshJobs));
+        hotkeys.put('C', KeyboardNavigationHelper.action(cancelBtn, this::onCancelSelected));
+        hotkeys.put('K', KeyboardNavigationHelper.action(cancelAllBtn, this::onCancelAll));
+        hotkeys.put('R', KeyboardNavigationHelper.action(refreshBtn, this::refreshJobs));
         hotkeys.put('L', jobListBox::takeFocus);
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
 
         JobTracker.getInstance().addChangeListener(() -> {
             try {

@@ -337,16 +337,32 @@ public class MainWindow extends BasicWindow {
                 Interactable focused = basePane.getFocusedInteractable();
                 boolean isEditableText = (focused instanceof TextBox) && !((TextBox) focused).isReadOnly();
 
+                boolean isLogFocused = (focused == activityLogView || focused == consoleLogView);
+
                 if (type == KeyType.Escape) {
-                    if (focused != null) {
-                        basePane.setFocusedInteractable(null);
+                    if (isEditableText || isLogFocused) {
                         deliver.set(false);
+                        Interactable def = (currentView != null) ? currentView.getDefaultFocus() : null;
+                        if (def != null && def != focused) {
+                            def.takeFocus();
+                        } else {
+                            basePane.setFocusedInteractable(null);
+                        }
                         return;
                     } else if (currentView != mainMenuView) {
                         deliver.set(false);
                         showMainMenu();
                         return;
                     }
+                }
+
+                if (type == KeyType.Enter && isLogFocused) {
+                    deliver.set(false);
+                    Interactable def = (currentView != null) ? currentView.getDefaultFocus() : null;
+                    if (def != null && def != focused) {
+                        def.takeFocus();
+                    }
+                    return;
                 }
 
                 if (type == KeyType.ArrowDown || type == KeyType.ArrowUp ||
@@ -384,12 +400,22 @@ public class MainWindow extends BasicWindow {
                         c = Character.toUpperCase(keyStroke.getCharacter());
                     }
                     if (c != null) {
+                        // Current view hotkeys have first priority
+                        if (currentView != null && currentView.getHotkeys() != null) {
+                            Map<Character, Runnable> hotkeys = currentView.getHotkeys();
+                            if (hotkeys.containsKey(c)) {
+                                deliver.set(false);
+                                hotkeys.get(c).run();
+                                return;
+                            }
+                        }
 
+                        // Global navigation fallbacks
                         if (c == 'A') {
                             deliver.set(false);
                             activityLogView.takeFocus();
                             return;
-                        } else if (c == 'L' && (currentView == null || currentView.getHotkeys() == null || !currentView.getHotkeys().containsKey('L'))) {
+                        } else if (c == 'L') {
                             deliver.set(false);
                             consoleLogView.takeFocus();
                             return;
@@ -411,15 +437,6 @@ public class MainWindow extends BasicWindow {
                             deliver.set(false);
                             showJobManager();
                             return;
-                        }
-
-                        if (currentView != null && currentView.getHotkeys() != null) {
-                            Map<Character, Runnable> hotkeys = currentView.getHotkeys();
-                            if (hotkeys.containsKey(c)) {
-                                deliver.set(false);
-                                hotkeys.get(c).run();
-                                return;
-                            }
                         }
                     }
                 }

@@ -59,6 +59,10 @@
               <buildArgs>
                 <buildArg>-march=compatibility</buildArg>
                 <buildArg>--gc=serial</buildArg>
+                <buildArg>-R:MaxHeapSize=16m</buildArg>
+                <buildArg>-R:MaxNewSize=4m</buildArg>
+                <buildArg>-R:StackSize=256k</buildArg>
+                <buildArg>-R:MaximumHeapSizePercent=10</buildArg>
                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                 <buildArg>-H:+StripDebugInfo</buildArg>
               </buildArgs>

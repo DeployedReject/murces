@@ -157,7 +157,7 @@ public class CurseForge implements ModAPI {
       }
 
     } catch (Exception e) {
-      ErrorHelper.errorJson("API Fucking CHANGED");
+      ErrorHelper.errorJson("Failed to parse CurseForge API response: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return response;
     }
 
@@ -196,7 +196,7 @@ public class CurseForge implements ModAPI {
       }
 
     } catch (Exception e) {
-      ErrorHelper.errorJson("File does not exist");
+      ErrorHelper.errorJson("Requested mod file was not found or has no compatible build for the selected version/loader.");
       return;
     }
 

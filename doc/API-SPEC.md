@@ -94,9 +94,9 @@ The server module manages the download, installation, and background process exe
 - `job`: An integer defining the lifecycle action.
   - `0` : **Install Only** (Downloads/compiles the server but does not start it).
   - `1` : **Install & Start** (Downloads/compiles and immediately spawns the `tmux` session).
-  - `2` : **Stop** (Kills the active `mcServer` tmux session).
+  - `2` : **Stop** (Kills the active `mcsv` tmux session).
   - `3` : **Check Supported Engines** (Returns a list of currently implemented server types).
-  - `4` : **Check Status** (Returns whether the `mcServer` tmux session is currently active).
+  - `4` : **Check Status** (Returns whether the `mcsv` tmux session is currently active).
   - `5` : **Start Only** (Spawns the `tmux` session for an already installed server without reinstalling).
   - `6` : **Restart** (Stops the active server session, waits briefly, and launches it again).
 

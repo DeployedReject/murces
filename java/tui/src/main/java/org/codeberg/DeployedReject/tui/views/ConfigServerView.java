@@ -46,8 +46,10 @@ public class ConfigServerView implements WorkspaceView {
         filterBox = new TextBox(new TerminalSize(16, 1));
         filterBox.setTextChangeListener((newText, changedByUserInteraction) -> refreshList(null));
         filterBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                listBox.takeFocus();
+            if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown || keyStroke.getKeyType() == KeyType.Enter) {
+                if (listBox.getItemCount() > 0) {
+                    listBox.takeFocus();
+                }
                 return false;
             }
             return true;
@@ -59,7 +61,7 @@ public class ConfigServerView implements WorkspaceView {
         topPanel.addComponent(catBtn);
         root.addComponent(topPanel);
 
-        root.addComponent(listBox.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Properties [L]ist (Enter toggles/cycles)"))));
+        root.addComponent(listBox.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Properties [L]ist (Enter toggles/edits/advances)"))));
 
         Panel editPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         editPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_EDIT + " [E]dit Val: ")));
@@ -72,7 +74,18 @@ public class ConfigServerView implements WorkspaceView {
             }
             if (keyStroke.getKeyType() == KeyType.Enter) {
                 onApplyValue();
+                selectNextProperty();
                 listBox.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowDown) {
+                onApplyValue();
+                selectNextProperty();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                onApplyValue();
+                selectPreviousProperty();
                 return false;
             }
             return true;
@@ -103,14 +116,14 @@ public class ConfigServerView implements WorkspaceView {
         root.addComponent(backBtn);
 
         hotkeys.put('L', listBox::takeFocus);
-        hotkeys.put('S', KeyboardNavigationHelper.focus(saveBtn, this::onSave));
-        hotkeys.put('R', KeyboardNavigationHelper.focus(reloadBtn, this::onReload));
-        hotkeys.put('D', KeyboardNavigationHelper.focus(resetBtn, this::onResetDefaults));
+        hotkeys.put('S', KeyboardNavigationHelper.action(saveBtn, this::onSave));
+        hotkeys.put('R', KeyboardNavigationHelper.action(reloadBtn, this::onReload));
+        hotkeys.put('D', KeyboardNavigationHelper.action(resetBtn, this::onResetDefaults));
         hotkeys.put('E', valueInput::takeFocus);
         hotkeys.put('C', this::cycleCategory);
         hotkeys.put('Q', filterBox::takeFocus);
         hotkeys.put('/', filterBox::takeFocus);
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
 
         refreshList(null);
     }
@@ -227,7 +240,7 @@ public class ConfigServerView implements WorkspaceView {
             String newVal = "true".equalsIgnoreCase(currentVal) ? "false" : "true";
             manager.set(key, newVal);
             ActivityLogger.ok("Toggled '" + key + "' -> " + newVal);
-            refreshList(key);
+            selectNextPropertyAfter(key);
         } else if (def != null && def.getType() == PropertyDef.Type.ENUM && !def.getOptions().isEmpty()) {
             List<String> opts = def.getOptions();
             int curIdx = opts.indexOf(currentVal);
@@ -235,9 +248,34 @@ public class ConfigServerView implements WorkspaceView {
             String newVal = opts.get(nextIdx);
             manager.set(key, newVal);
             ActivityLogger.ok("Cycled '" + key + "' -> " + newVal);
-            refreshList(key);
+            selectNextPropertyAfter(key);
         } else {
             valueInput.takeFocus();
+        }
+    }
+
+    private void selectNextPropertyAfter(String key) {
+        int curIdx = displayedKeys.indexOf(key);
+        int nextIdx = (curIdx >= 0 && curIdx < displayedKeys.size() - 1) ? curIdx + 1 : 0;
+        String nextKey = (!displayedKeys.isEmpty() && nextIdx >= 0 && nextIdx < displayedKeys.size()) ? displayedKeys.get(nextIdx) : key;
+        refreshList(nextKey);
+    }
+
+    private void selectNextProperty() {
+        int cur = listBox.getSelectedIndex();
+        int next = (cur >= 0 && cur < displayedKeys.size() - 1) ? cur + 1 : 0;
+        if (next >= 0 && next < displayedKeys.size()) {
+            listBox.setSelectedIndex(next);
+            updateDetailForSelected();
+        }
+    }
+
+    private void selectPreviousProperty() {
+        int cur = listBox.getSelectedIndex();
+        int prev = (cur > 0) ? cur - 1 : Math.max(0, displayedKeys.size() - 1);
+        if (prev >= 0 && prev < displayedKeys.size()) {
+            listBox.setSelectedIndex(prev);
+            updateDetailForSelected();
         }
     }
 

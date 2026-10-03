@@ -14,7 +14,8 @@ public class Shell {
       return running;
 
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      String cmdName = (command != null && command.length > 0) ? command[0] : "process";
+      ErrorHelper.errorJson("Failed to execute command '" + cmdName + "': " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return null;
     }
 

@@ -73,11 +73,11 @@ public class NetworkUtils {
         responseEnd.addProperty("total", filesize > 0 ? filesize : (long) readSize);
         Communicator.printer(responseEnd);
       } catch (Exception e) {
-        ErrorHelper.errorJson(e.toString());
+        ErrorHelper.errorJson("Failed while downloading '" + filename + "': " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       }
 
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("I/O error saving '" + filename + "': " + (e.getMessage() != null ? e.getMessage() : e.toString()));
     } finally {
       if (!success && tempFile.exists()) {
         try {
@@ -86,8 +86,7 @@ public class NetworkUtils {
       }
       try {
         x.close();
-      } catch (Exception e) {
-        ErrorHelper.errorJson("Could Not close connection");
+      } catch (Exception ignored) {
       }
     }
 
@@ -100,12 +99,12 @@ public class NetworkUtils {
       y = Main.device.send(x, BodyHandlers.ofString());
 
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Network request failed (" + x.uri().getHost() + "): " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return null;
     }
 
     if (y.statusCode() != 200) {
-      ErrorHelper.errorJson("Website Returned Status Code: " + y.statusCode());
+      ErrorHelper.errorJson("Remote server (" + x.uri().getHost() + ") returned HTTP status " + y.statusCode());
       return null;
     }
 
@@ -119,12 +118,12 @@ public class NetworkUtils {
     try {
       y = Main.device.send(x, BodyHandlers.ofInputStream());
     } catch (Exception e) {
-      ErrorHelper.errorJson(e.toString());
+      ErrorHelper.errorJson("Download connection failed (" + x.uri().getHost() + "): " + (e.getMessage() != null ? e.getMessage() : e.toString()));
       return null;
     }
 
     if (y.statusCode() != 200) {
-      ErrorHelper.errorJson("Website Returned Status Code: " + y.statusCode());
+      ErrorHelper.errorJson("Download request to " + x.uri().getHost() + " failed with HTTP status " + y.statusCode());
       return null;
     }
 

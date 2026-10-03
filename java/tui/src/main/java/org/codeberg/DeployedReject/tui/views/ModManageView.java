@@ -58,9 +58,9 @@ public class ModManageView implements WorkspaceView {
         root.addComponent(backBtn);
 
         hotkeys.put('L', modsList::takeFocus);
-        hotkeys.put('D', KeyboardNavigationHelper.focus(deleteBtn, this::onDeleteMod));
-        hotkeys.put('R', KeyboardNavigationHelper.focus(refreshBtn, this::loadMods));
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('D', KeyboardNavigationHelper.action(deleteBtn, this::onDeleteMod));
+        hotkeys.put('R', KeyboardNavigationHelper.action(refreshBtn, this::loadMods));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
 
         loadMods();
     }

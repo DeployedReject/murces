@@ -37,7 +37,7 @@ public class MigratePlayerView implements WorkspaceView {
         migrateBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_USER + " [M]igrate Player"), this::onMigrate);
 
         oldNameBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
+            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
                 newNameBox.takeFocus();
                 return false;
             }
@@ -45,14 +45,22 @@ public class MigratePlayerView implements WorkspaceView {
         });
 
         newNameBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                onMigrate();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                oldNameBox.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowDown) {
                 migrateBtn.takeFocus();
                 return false;
             }
             return true;
         });
 
-        root.addComponent(form.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_USER + " Player Identity"))));
+        root.addComponent(form.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_USER + " Player Identity (Enter advances)"))));
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         actionPanel.addComponent(migrateBtn);
@@ -69,8 +77,8 @@ public class MigratePlayerView implements WorkspaceView {
 
         hotkeys.put('O', oldNameBox::takeFocus);
         hotkeys.put('N', newNameBox::takeFocus);
-        hotkeys.put('M', KeyboardNavigationHelper.focus(migrateBtn, this::onMigrate));
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('M', KeyboardNavigationHelper.action(migrateBtn, this::onMigrate));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
     }
 
     @Override
@@ -90,7 +98,7 @@ public class MigratePlayerView implements WorkspaceView {
 
     @Override
     public Interactable getDefaultFocus() {
-        return migrateBtn;
+        return oldNameBox;
     }
 
     @Override

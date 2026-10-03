@@ -2,6 +2,7 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.input.KeyType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
@@ -29,33 +30,66 @@ public class InstallServerView implements WorkspaceView {
         this.mainWindow = mainWindow;
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
-        Panel formPanel = new Panel(new GridLayout(2));
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " [E]ngine:")));
         engineComboBox = new ComboBox<>("Fabric", "Paper", "Spigot", "Vanilla", "Forge");
         engineComboBox.setPreferredSize(new TerminalSize(16, 1));
-        formPanel.addComponent(engineComboBox);
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " Game [V]ersion:")));
         gameVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(16, 1));
-        formPanel.addComponent(gameVersionComboBox);
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Loader [L] Version:")));
         loaderVersionBox = new TextBox(new TerminalSize(16, 1), "0.16.5");
-        formPanel.addComponent(loaderVersionBox);
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
         ramComboBox.setSelectedIndex(1);
-        formPanel.addComponent(ramComboBox);
-
-        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration"))));
-
-        Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         installOnlyBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " [I]nstall Only"), () -> runInstall(0));
         installStartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart & Install"), () -> runInstall(1));
         cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Installation"), this::cancelInstallation);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
+
+        engineComboBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                gameVersionComboBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        gameVersionComboBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                loaderVersionBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        loaderVersionBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
+                ramComboBox.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                gameVersionComboBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        ramComboBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                installOnlyBtn.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        Panel formPanel = new Panel(new GridLayout(2));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " [E]ngine:")));
+        formPanel.addComponent(engineComboBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " Game [V]ersion:")));
+        formPanel.addComponent(gameVersionComboBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " L[o]ader Version:")));
+        formPanel.addComponent(loaderVersionBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
+        formPanel.addComponent(ramComboBox);
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration (Enter advances options)"))));
+
+        Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         actionPanel.addComponent(installOnlyBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(installStartBtn);
@@ -73,18 +107,16 @@ public class InstallServerView implements WorkspaceView {
         root.addComponent(progressLabel);
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-
-        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
         root.addComponent(backBtn);
 
-        hotkeys.put('I', KeyboardNavigationHelper.focus(installOnlyBtn, () -> runInstall(0)));
-        hotkeys.put('S', KeyboardNavigationHelper.focus(installStartBtn, () -> runInstall(1)));
-        hotkeys.put('X', KeyboardNavigationHelper.focus(cancelBtn, this::cancelInstallation));
-        hotkeys.put('E', KeyboardNavigationHelper.focus(engineComboBox, this::cycleEngine));
-        hotkeys.put('V', KeyboardNavigationHelper.focus(gameVersionComboBox, () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox)));
-        hotkeys.put('L', loaderVersionBox::takeFocus);
-        hotkeys.put('R', KeyboardNavigationHelper.focus(ramComboBox, this::cycleRam));
-        hotkeys.put('B', KeyboardNavigationHelper.focus(backBtn, mainWindow::showMainMenu));
+        hotkeys.put('I', KeyboardNavigationHelper.action(installOnlyBtn, () -> runInstall(0)));
+        hotkeys.put('S', KeyboardNavigationHelper.action(installStartBtn, () -> runInstall(1)));
+        hotkeys.put('X', KeyboardNavigationHelper.action(cancelBtn, this::cancelInstallation));
+        hotkeys.put('E', this::cycleEngine);
+        hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox));
+        hotkeys.put('O', loaderVersionBox::takeFocus);
+        hotkeys.put('R', this::cycleRam);
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
     }
 
     @Override
@@ -104,7 +136,7 @@ public class InstallServerView implements WorkspaceView {
 
     @Override
     public Interactable getDefaultFocus() {
-        return installOnlyBtn;
+        return engineComboBox;
     }
 
     @Override

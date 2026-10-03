@@ -2,6 +2,7 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.input.KeyType;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
@@ -22,6 +23,9 @@ public class CustomizationView implements WorkspaceView {
     private final CheckBox trueColorCheck;
     private final CheckBox minSizeCheck;
     private final CheckBox animationCheck;
+    private final Button saveBtn;
+    private final Button resetBtn;
+    private final Button backBtn;
     private final Label statusLabel;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
 
@@ -43,38 +47,87 @@ public class CustomizationView implements WorkspaceView {
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        Panel formPanel = new Panel(new GridLayout(2));
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [T]heme: ")));
         themeCombo = new ComboBox<>();
         List<String> themeNames = Themes.getAvailableThemeNames();
         for (String t : themeNames) {
             themeCombo.addItem(t);
         }
-        formPanel.addComponent(themeCombo);
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Trans[p]arency: ")));
         transparencyCombo = new ComboBox<>();
         for (String opt : TRANSPARENCY_OPTIONS) {
             transparencyCombo.addItem(opt);
         }
-        formPanel.addComponent(transparencyCombo);
-
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [G]lyphs: ")));
         nerdFontCombo = new ComboBox<>("Auto-detect", "Force Nerd Fonts", "Basic (Fallback)");
-        formPanel.addComponent(nerdFontCombo);
+        trueColorCheck = new CheckBox("[C] Enable 24-bit TrueColor (ANSI RGB)");
+        minSizeCheck = new CheckBox("[M] Enforce Minimum Screen Size (>= 70x18)");
+        animationCheck = new CheckBox("[K] Pickaxe dirt-breaking loading animation");
+        saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave & Apply"), this::onSaveAndApply);
+        resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
+        backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack"), mainWindow::showMainMenu);
 
-        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance Settings"))));
+        themeCombo.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                transparencyCombo.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        transparencyCombo.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                nerdFontCombo.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        nerdFontCombo.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                trueColorCheck.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        trueColorCheck.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                trueColorCheck.setChecked(!trueColorCheck.isChecked());
+                minSizeCheck.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        minSizeCheck.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                minSizeCheck.setChecked(!minSizeCheck.isChecked());
+                animationCheck.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        animationCheck.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                animationCheck.setChecked(!animationCheck.isChecked());
+                saveBtn.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        Panel formPanel = new Panel(new GridLayout(2));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [T]heme: ")));
+        formPanel.addComponent(themeCombo);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Trans[p]arency: ")));
+        formPanel.addComponent(transparencyCombo);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [G]lyphs: ")));
+        formPanel.addComponent(nerdFontCombo);
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance Settings (Enter advances)"))));
 
         Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
-        trueColorCheck = new CheckBox("Enable 24-bit TrueColor (ANSI RGB)");
-        minSizeCheck = new CheckBox("Enforce Minimum Screen Size (>= 70x18)");
-        animationCheck = new CheckBox("Minecraft pickaxe dirt-breaking loading animation");
-
         togglePanel.addComponent(trueColorCheck);
         togglePanel.addComponent(minSizeCheck);
         togglePanel.addComponent(animationCheck);
-
         root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Options & Animations"))));
 
         statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
@@ -82,10 +135,6 @@ public class CustomizationView implements WorkspaceView {
         root.addComponent(statusLabel);
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        Button saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave & Apply"), this::onSaveAndApply);
-        Button resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
-        Button backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack"), mainWindow::showMainMenu);
-
         actionPanel.addComponent(saveBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(resetBtn);
@@ -94,12 +143,15 @@ public class CustomizationView implements WorkspaceView {
 
         root.addComponent(actionPanel);
 
-        hotkeys.put('S', this::onSaveAndApply);
-        hotkeys.put('R', this::onResetDefaults);
-        hotkeys.put('B', mainWindow::showMainMenu);
+        hotkeys.put('S', KeyboardNavigationHelper.action(saveBtn, this::onSaveAndApply));
+        hotkeys.put('R', KeyboardNavigationHelper.action(resetBtn, this::onResetDefaults));
+        hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
         hotkeys.put('T', themeCombo::takeFocus);
         hotkeys.put('P', transparencyCombo::takeFocus);
         hotkeys.put('G', nerdFontCombo::takeFocus);
+        hotkeys.put('C', () -> trueColorCheck.setChecked(!trueColorCheck.isChecked()));
+        hotkeys.put('M', () -> minSizeCheck.setChecked(!minSizeCheck.isChecked()));
+        hotkeys.put('K', () -> animationCheck.setChecked(!animationCheck.isChecked()));
 
         loadCurrentConfig();
     }
