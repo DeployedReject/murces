@@ -30,6 +30,7 @@ RESET='\033[0m'
 # Terminal cursor controls
 HIDE_CURSOR='\033[?25l'
 SHOW_CURSOR='\033[?25h'
+CLEAR_LINE='\033[K'
 
 # Modern ANSI progress bar glyphs (UTF-8 blocks)
 BAR_BLOCKS="████████████████████████████████████████████████████████████"
@@ -220,18 +221,21 @@ download_with_progress() {
                 local bar_filled="${BAR_BLOCKS:0:filled}"
                 local bar_empty="${BAR_SHADES:0:empty}"
 
-                printf "\r    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$int_p"
+                printf "\r${CLEAR_LINE}    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$int_p"
             fi
         done
         echo -ne "$SHOW_CURSOR"
 
+        local term_width
+        term_width=$(tput cols 2>/dev/null || echo 80)
+        printf "\r${CLEAR_LINE}%*s\r" "$term_width" ""
+
         if [ -f "$temp_dest" ] && [ -s "$temp_dest" ]; then
-            printf "\r    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
+            printf "    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
             mv -f "$temp_dest" "$dest"
             echo -e "${GREEN}    ✔ Download complete:${RESET} ${DIM}${dest}${RESET}"
             return 0
         else
-            echo ""
             echo -e "${RED}    ✖ Download failed or returned empty file.${RESET}"
             rm -f "$temp_dest"
             return 1
@@ -283,13 +287,13 @@ run_with_ansi_bar() {
             local empty=$(( bar_width - filled ))
             local bar_filled="${BAR_BLOCKS:0:filled}"
             local bar_empty="${BAR_SHADES:0:empty}"
-            printf "\r    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$pct"
+            printf "\r${CLEAR_LINE}    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$pct"
         else
             local r=$(( bar_width - block_size - pos ))
             local left_shade="${BAR_SHADES:0:pos}"
             local block="${BAR_BLOCKS:0:block_size}"
             local right_shade="${BAR_SHADES:0:r}"
-            printf "\r    ${CYAN}[${DIM}%s${GREEN}%s${DIM}%s${CYAN}]${RESET} %s" "$left_shade" "$block" "$right_shade" "${label}"
+            printf "\r${CLEAR_LINE}    ${CYAN}[${DIM}%s${GREEN}%s${DIM}%s${CYAN}]${RESET} %s" "$left_shade" "$block" "$right_shade" "${label}"
 
             pos=$(( pos + dir ))
             if [ "$pos" -ge "$max_pos" ]; then
@@ -309,12 +313,14 @@ run_with_ansi_bar() {
     CURRENT_CMD_PID=""
     echo -ne "$SHOW_CURSOR"
 
+    term_width=$(tput cols 2>/dev/null || echo 80)
+    printf "\r${CLEAR_LINE}%*s\r" "$term_width" ""
+
     if [ "$exit_code" -eq 0 ]; then
-        printf "\r    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
+        printf "    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
         rm -f "$log_file"
         return 0
     else
-        printf "\r%*s\r" $(( bar_width + 40 )) ""
         if [ -s "$log_file" ]; then
             echo -e "${DIM}"
             tail -n 8 "$log_file" | sed 's/^/    | /'
