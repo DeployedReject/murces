@@ -253,12 +253,12 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ## Quickstart
 
-### 1. One-Line Automated Installer
+### 1. Interactive Automated Installer
 
-Run the automated installer to set up all system dependencies (tmux, OpenJDK, curl, tar, rclone, playit) and fetch the latest `murces` standalone executable:
+Run the interactive installer to set up system dependencies (`tmux`, `curl`, `tar`, optional `rclone`, `playit`) with per-package consent prompts and fetch the latest `murces` standalone executable:
 
 ```bash
-# Run the automated installer (installs packages and murces executable)
+# Run the interactive installer (authenticates sudo upfront, prompts for each tool, and installs murces)
 curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash
 
 # Launch the interactive dashboard

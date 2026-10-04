@@ -7,10 +7,12 @@
 # |_|  |_|\__,_|_|  \___\___||___/
 #    Minecraft Server Manager - Installer
 #
-# Automatically installs runtime dependencies and MurCes native executable:
-# - System Packages: tmux, curl, tar, OpenJDK (Java 21/17)
-# - Optional Tools: rclone (Google Drive sync), playit (public tunnels)
-# - MurCes Binary: Fetches latest standalone Linux ELF from GitHub Releases
+# Interactive, consent-driven installer for MurCes:
+# - Authenticates sudo at startup before executing installation tasks
+# - Asks for user consent before installing each package / tool
+# - Shows real-time progress for every package and download
+# - Installs core packages: tmux, curl, tar, rclone, playit, and MurCes binary
+# - NOTE: Does NOT install JDK / Java runtime
 # ==============================================================================
 
 set -uo pipefail
@@ -32,15 +34,14 @@ SHOW_CURSOR='\033[?25h'
 
 cleanup() {
     echo -ne "$SHOW_CURSOR"
-    # Kill background spinner if still alive
-    if [ -n "${SPINNER_PID:-}" ] && kill -0 "$SPINNER_PID" 2>/dev/null; then
-        kill "$SPINNER_PID" 2>/dev/null || true
-        wait "$SPINNER_PID" 2>/dev/null || true
+    # Kill background sudo keep-alive or spinners if still alive
+    if [ -n "${SUDO_KEEP_ALIVE_PID:-}" ] && kill -0 "$SUDO_KEEP_ALIVE_PID" 2>/dev/null; then
+        kill "$SUDO_KEEP_ALIVE_PID" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT INT TERM
 
-# Beautiful header
+# Beautiful banner
 print_banner() {
     clear 2>/dev/null || true
     echo -e "${CYAN}${BOLD}"
@@ -56,52 +57,97 @@ EOF
     echo ""
 }
 
-# Spinner animation for long-running shell actions
-# Usage: run_with_spinner "Action description" command args...
-run_with_spinner() {
-    local label="$1"
-    shift
-    local log_file
-    log_file=$(mktemp)
+print_banner
 
-    echo -ne "${CYAN}  ⠋${RESET} ${label}..."
+# Prompt for sudo privileges upfront before doing anything
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo >/dev/null 2>&1; then
+        SUDO="sudo"
+        echo -e "${YELLOW}${BOLD}Authentication Required${RESET}"
+        echo -e "${DIM}This installer requires administrator privileges to manage system packages.${RESET}"
+        echo -e "${DIM}Please enter your sudo password now to proceed:${RESET}"
+        echo ""
 
-    # Run command in background redirecting output
-    "$@" >"$log_file" 2>&1 &
-    local cmd_pid=$!
-
-    local spin_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local i=0
-
-    echo -ne "$HIDE_CURSOR"
-    while kill -0 "$cmd_pid" 2>/dev/null; do
-        local frame="${spin_chars[i % ${#spin_chars[@]}]}"
-        echo -ne "\r${CYAN}  ${frame}${RESET} ${label}... "
-        i=$((i + 1))
-        sleep 0.08
-    done
-
-    wait "$cmd_pid"
-    local exit_code=$?
-
-    if [ "$exit_code" -eq 0 ]; then
-        echo -ne "\r${GREEN}  ✔${RESET} ${label} ${DIM}(done)${RESET}\n"
-        rm -f "$log_file"
-        return 0
-    else
-        echo -ne "\r${RED}  ✖${RESET} ${label} ${RED}(failed with code ${exit_code})${RESET}\n"
-        if [ -s "$log_file" ]; then
-            echo -e "${DIM}"
-            tail -n 8 "$log_file" | sed 's/^/    | /'
-            echo -e "${RESET}"
+        # Validate sudo credentials upfront
+        if ! sudo -v; then
+            echo -e "${RED}[ERROR] Sudo authentication failed. Aborting installation.${RESET}"
+            exit 1
         fi
-        rm -f "$log_file"
-        return "$exit_code"
+
+        # Keep sudo timestamp updated in background for uninterrupted execution
+        while true; do
+            sudo -n true
+            sleep 50
+            kill -0 "$$" || exit
+        done 2>/dev/null &
+        SUDO_KEEP_ALIVE_PID=$!
+        echo -e "${GREEN}✔ Sudo authentication successful.${RESET}"
+        echo ""
+    elif command -v doas >/dev/null 2>&1; then
+        SUDO="doas"
+    else
+        echo -e "${RED}[ERROR] Root privileges required to install packages. Please install sudo or run as root.${RESET}"
+        exit 1
+    fi
+fi
+
+# Detect package manager
+detect_pm() {
+    if command -v pacman >/dev/null 2>&1; then
+        echo "pacman"
+    elif command -v apt-get >/dev/null 2>&1; then
+        echo "apt"
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        echo "yum"
+    elif command -v zypper >/dev/null 2>&1; then
+        echo "zypper"
+    elif command -v apk >/dev/null 2>&1; then
+        echo "apk"
+    else
+        echo "unknown"
     fi
 }
 
-# Modern block progress bar for file downloads
-# Usage: download_with_progress "URL" "Destination" "Label"
+PM=$(detect_pm)
+echo -e "${MAGENTA}✦${RESET} Package manager detected: ${BOLD}${PM}${RESET}"
+echo ""
+
+# Helper to read user input even when piped from curl (reads from /dev/tty if available)
+ask_consent() {
+    local prompt="$1"
+    local default_val="${2:-y}"
+    local reply=""
+
+    if [ "$default_val" = "y" ]; then
+        echo -ne "${YELLOW}  ?${RESET} ${prompt} [Y/n]: "
+    else
+        echo -ne "${YELLOW}  ?${RESET} ${prompt} [y/N]: "
+    fi
+
+    if [ -t 0 ]; then
+        read -r reply || reply=""
+    elif [ -r /dev/tty ]; then
+        read -r reply </dev/tty || reply=""
+    else
+        reply="$default_val"
+        echo "$reply"
+    fi
+
+    reply="${reply:-$default_val}"
+    case "$reply" in
+        [yY][eE][sS]|[yY])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Modern block progress bar for downloads
 download_with_progress() {
     local url="$1"
     local dest="$2"
@@ -110,12 +156,10 @@ download_with_progress() {
     echo -e "${BLUE}  ⬇${RESET} ${BOLD}${label}${RESET}"
     echo -ne "$HIDE_CURSOR"
 
-    # Use curl with a custom modern progress meter
     local temp_dest="${dest}.tmp"
     rm -f "$temp_dest"
 
     if command -v curl >/dev/null 2>&1; then
-        # Check if terminal supports width, default 60 cols
         local term_width
         term_width=$(tput cols 2>/dev/null || echo 80)
         local bar_width=32
@@ -123,9 +167,7 @@ download_with_progress() {
             bar_width=18
         fi
 
-        # Run curl in background feeding progress info via status line
         curl -sSL -L --fail --progress-bar -o "$temp_dest" "$url" 2>&1 | while IFS= read -r -d $'\r' line; do
-            # Extract percentage from curl's progress bar output
             local percent
             percent=$(echo "$line" | grep -oE '[0-9]+(\.[0-9]+)?%' | tr -d '%' | head -n 1)
             if [ -n "$percent" ]; then
@@ -160,91 +202,92 @@ download_with_progress() {
     fi
 }
 
-# Determine privilege elevation tool
-SUDO=""
-if [ "$(id -u)" -ne 0 ]; then
-    if command -v sudo >/dev/null 2>&1; then
-        SUDO="sudo"
-    elif command -v doas >/dev/null 2>&1; then
-        SUDO="doas"
-    else
-        echo -e "${RED}[ERROR] Root privileges required to install system packages. Please install sudo or run as root.${RESET}"
-        exit 1
-    fi
-fi
+# Install single system package using native package manager with live progress
+install_single_package() {
+    local pkg="$1"
+    local label="$2"
+    local required="$3" # "req" or "opt"
 
-# Detect package manager
-detect_pm() {
-    if command -v apt-get >/dev/null 2>&1; then
-        echo "apt"
-    elif command -v pacman >/dev/null 2>&1; then
-        echo "pacman"
-    elif command -v dnf >/dev/null 2>&1; then
-        echo "dnf"
-    elif command -v yum >/dev/null 2>&1; then
-        echo "yum"
-    elif command -v zypper >/dev/null 2>&1; then
-        echo "zypper"
-    elif command -v apk >/dev/null 2>&1; then
-        echo "apk"
-    else
-        echo "unknown"
+    # Check if already installed
+    if command -v "$pkg" >/dev/null 2>&1; then
+        echo -e "${GREEN}  ✔${RESET} ${BOLD}${pkg}${RESET} (${label}) is already installed."
+        return 0
     fi
-}
 
-install_packages() {
-    local pm="$1"
-    case "$pm" in
-        apt)
-            $SUDO apt-get update -qq -y
-            $SUDO apt-get install -qq -y tmux curl tar openjdk-21-jre-headless rclone 2>/dev/null || \
-            $SUDO apt-get install -qq -y tmux curl tar openjdk-17-jre-headless rclone 2>/dev/null || \
-            $SUDO apt-get install -qq -y tmux curl tar default-jre-headless rclone
-            ;;
+    local req_text="${GREEN}[Required]${RESET}"
+    if [ "$required" = "opt" ]; then
+        req_text="${DIM}[Optional]${RESET}"
+    fi
+
+    if ! ask_consent "Install ${BOLD}${pkg}${RESET} (${label}) ${req_text}?" "y"; then
+        echo -e "${DIM}    - Skipped ${pkg}.${RESET}"
+        return 0
+    fi
+
+    echo -e "${CYAN}  ➔ Installing ${BOLD}${pkg}${RESET} via ${PM}..."
+
+    local exit_code=0
+    case "$PM" in
         pacman)
-            $SUDO pacman -Sy --noconfirm --needed tmux curl tar jre21-openjdk-headless rclone 2>/dev/null || \
-            $SUDO pacman -Sy --noconfirm --needed tmux curl tar jre-openjdk-headless rclone
+            $SUDO pacman -S --needed --noconfirm "$pkg" || exit_code=$?
+            ;;
+        apt)
+            $SUDO apt-get install -y "$pkg" || exit_code=$?
             ;;
         dnf)
-            $SUDO dnf install -y -q tmux curl tar java-21-openjdk-headless rclone 2>/dev/null || \
-            $SUDO dnf install -y -q tmux curl tar java-17-openjdk-headless rclone
+            $SUDO dnf install -y "$pkg" || exit_code=$?
             ;;
         yum)
-            $SUDO yum install -y -q tmux curl tar java-17-openjdk-headless rclone
+            $SUDO yum install -y "$pkg" || exit_code=$?
             ;;
         zypper)
-            $SUDO zypper --quiet --non-interactive install tmux curl tar java-21-openjdk-headless rclone 2>/dev/null || \
-            $SUDO zypper --quiet --non-interactive install tmux curl tar java-17-openjdk-headless rclone
+            $SUDO zypper --non-interactive install "$pkg" || exit_code=$?
             ;;
         apk)
-            $SUDO apk update -q
-            $SUDO apk add -q tmux curl tar openjdk21-jre-headless rclone 2>/dev/null || \
-            $SUDO apk add -q tmux curl tar openjdk17-jre-headless rclone
+            $SUDO apk add "$pkg" || exit_code=$?
             ;;
         *)
+            echo -e "${YELLOW}  ⚠ Unrecognized package manager. Please install ${pkg} manually.${RESET}"
             return 1
             ;;
     esac
+
+    if [ "$exit_code" -eq 0 ]; then
+        echo -e "${GREEN}  ✔ ${pkg} installed successfully.${RESET}"
+    else
+        echo -e "${RED}  ✖ Failed to install ${pkg} (exit code ${exit_code}).${RESET}"
+    fi
+    echo ""
 }
 
-# Main execution flow
-print_banner
-
-PM=$(detect_pm)
-echo -e "${MAGENTA}✦${RESET} Detected Linux environment: ${BOLD}${PM}${RESET}"
-echo ""
-
-# 1. System Dependencies Installation
-echo -e "${BOLD}[1/3] System Dependencies${RESET}"
+# 1. Update Repositories
+echo -e "${BOLD}[1/4] Repository Index Sync${RESET}"
 if [ "$PM" != "unknown" ]; then
-    run_with_spinner "Updating repositories & installing packages (tmux, OpenJDK, curl, tar, rclone)" install_packages "$PM" || true
-else
-    echo -e "${YELLOW}  ⚠ Unrecognized package manager. Skipping package install.${RESET}"
+    if ask_consent "Sync and update package repositories?" "y"; then
+        echo -e "${CYAN}  ➔ Updating package repositories...${RESET}"
+        case "$PM" in
+            pacman) $SUDO pacman -Sy ;;
+            apt)    $SUDO apt-get update -y ;;
+            apk)    $SUDO apk update ;;
+            *)      true ;;
+        esac
+        echo -e "${GREEN}  ✔ Package database synchronized.${RESET}"
+    else
+        echo -e "${DIM}  - Skipped repository refresh.${RESET}"
+    fi
 fi
 echo ""
 
-# 2. Public Tunnel (playit.gg)
-echo -e "${BOLD}[2/3] Public Tunnels (playit.gg)${RESET}"
+# 2. Individual Package Installation (Consented with live download progress)
+echo -e "${BOLD}[2/4] Package Dependencies (JDK skipped)${RESET}"
+install_single_package "tmux" "Detached Process Multiplexer" "req"
+install_single_package "curl" "HTTP Downloader" "req"
+install_single_package "tar" "World Archive Bundler" "req"
+install_single_package "rclone" "Google Drive & Cloud Sync" "opt"
+echo ""
+
+# 3. Public Tunnels (playit.gg)
+echo -e "${BOLD}[3/4] Public Tunnels (playit.gg)${RESET}"
 if command -v playit >/dev/null 2>&1 || [ -x "./playit" ]; then
     echo -e "${GREEN}  ✔${RESET} playit CLI is already installed."
 else
@@ -260,39 +303,41 @@ else
     esac
 
     if [ -n "$PLAYIT_URL" ]; then
-        echo -ne "${YELLOW}  ?${RESET} Install playit binary for zero-config public tunneling? [Y/n]: "
-        read -r choice || choice="y"
-        choice=${choice:-y}
-        case "$choice" in
-            [yY][eE][sS]|[yY])
-                download_with_progress "$PLAYIT_URL" "playit" "playit tunnel agent ($ARCH)"
-                chmod +x playit 2>/dev/null || true
-                ;;
-            *)
-                echo -e "${DIM}  - Skipped playit setup.${RESET}"
-                ;;
-        esac
+        if ask_consent "Install playit client binary for zero-config public tunnels?" "y"; then
+            download_with_progress "$PLAYIT_URL" "playit" "playit tunnel agent ($ARCH)"
+            chmod +x playit 2>/dev/null || true
+        else
+            echo -e "${DIM}  - Skipped playit setup.${RESET}"
+        fi
     fi
 fi
 echo ""
 
-# 3. MurCes Native Executable Installation
-echo -e "${BOLD}[3/3] MurCes Standalone Executable${RESET}"
+# 4. MurCes Standalone Executable Installation
+echo -e "${BOLD}[4/4] MurCes Standalone Executable${RESET}"
 MURCES_BIN="./murces"
 RELEASE_URL="https://github.com/DeployedReject/murces/releases/latest/download/murces"
 
-# Check if local pre-built binary is already present
-if [ -f "java/tui/target/murces" ] && [ ! -f "$MURCES_BIN" ]; then
-    echo -e "${CYAN}  ℹ${RESET} Copying locally built binary..."
-    cp "java/tui/target/murces" "$MURCES_BIN"
-    chmod +x "$MURCES_BIN"
-    echo -e "${GREEN}  ✔${RESET} Deployed local murces executable."
+if [ -f "$MURCES_BIN" ] && [ -x "$MURCES_BIN" ]; then
+    echo -e "${GREEN}  ✔${RESET} ./murces executable is already present in this directory."
+    if ask_consent "Re-download and overwrite with the latest release from GitHub?" "n"; then
+        download_with_progress "$RELEASE_URL" "$MURCES_BIN" "MurCes native binary (Linux x86_64)"
+        chmod +x "$MURCES_BIN" 2>/dev/null || true
+    fi
+elif [ -f "java/tui/target/murces" ]; then
+    if ask_consent "Deploy locally built native binary 'java/tui/target/murces' to ./murces?" "y"; then
+        cp "java/tui/target/murces" "$MURCES_BIN"
+        chmod +x "$MURCES_BIN"
+        echo -e "${GREEN}  ✔ Local murces binary deployed successfully.${RESET}"
+    fi
 else
-    download_with_progress "$RELEASE_URL" "$MURCES_BIN" "MurCes native binary (Linux x86_64)"
-    chmod +x "$MURCES_BIN" 2>/dev/null || true
+    if ask_consent "Download and install MurCes native executable from GitHub Releases?" "y"; then
+        download_with_progress "$RELEASE_URL" "$MURCES_BIN" "MurCes native binary (Linux x86_64)"
+        chmod +x "$MURCES_BIN" 2>/dev/null || true
+    fi
 fi
-
 echo ""
+
 # Verification Summary
 echo -e "${BOLD}============================================================${RESET}"
 echo -e "${BOLD}                 Verification & Summary                     ${RESET}"
@@ -320,13 +365,16 @@ check_tool() {
 
 check_tool "murces" "MurCes Native Manager" "req"
 check_tool "tmux" "Detached Process Supervision" "req"
-check_tool "java" "OpenJDK Runtime" "req"
 check_tool "curl" "HTTP Package Downloader" "req"
 check_tool "tar" "World Archive Bundler" "req"
 check_tool "rclone" "Cloud Sync & Google Drive" "opt"
 check_tool "playit" "Zero-Config Public Tunnels" "opt"
 
 echo ""
-echo -e "${GREEN}${BOLD}✦ Setup finished successfully!${RESET}"
-echo -e "Launch the interactive dashboard anytime with: ${BOLD}${CYAN}./murces${RESET}"
+echo -e "${GREEN}${BOLD}✦ Setup complete!${RESET}"
+if [ -x "./murces" ]; then
+    echo -e "Launch the interactive dashboard anytime with: ${BOLD}${CYAN}./murces${RESET}"
+else
+    echo -e "You can launch MurCes once the executable is present."
+fi
 echo ""
