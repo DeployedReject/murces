@@ -272,7 +272,12 @@ curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.s
 Alternatively, to download the precompiled binary directly without the installer:
 
 ```bash
-curl -sSLO https://github.com/DeployedReject/murces/releases/latest/download/murces
+# For x86_64 / amd64:
+curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64
+
+# For arm64 / aarch64 (Raspberry Pi, ARM VPS, Apple Silicon VM):
+curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-arm64
+
 chmod +x murces
 ./murces
 ```

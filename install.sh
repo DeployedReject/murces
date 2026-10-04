@@ -92,6 +92,38 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
+# Detect architecture
+detect_arch() {
+    local raw_arch
+    raw_arch=$(uname -m)
+    case "$raw_arch" in
+        x86_64|amd64)
+            echo "amd64"
+            ;;
+        aarch64|arm64)
+            echo "arm64"
+            ;;
+        *)
+            echo "unsupported"
+            ;;
+    esac
+}
+
+RAW_ARCH=$(uname -m)
+ARCH=$(detect_arch)
+
+case "$ARCH" in
+    amd64)
+        ARCH_LABEL="Linux x86_64"
+        ;;
+    arm64)
+        ARCH_LABEL="Linux arm64"
+        ;;
+    *)
+        ARCH_LABEL="Unsupported (${RAW_ARCH})"
+        ;;
+esac
+
 # Detect package manager
 detect_pm() {
     if command -v pacman >/dev/null 2>&1; then
@@ -112,6 +144,7 @@ detect_pm() {
 }
 
 PM=$(detect_pm)
+echo -e "${MAGENTA}✦${RESET} Architecture detected:    ${BOLD}${RAW_ARCH}${RESET} (${ARCH_LABEL})"
 echo -e "${MAGENTA}✦${RESET} Package manager detected: ${BOLD}${PM}${RESET}"
 echo ""
 
@@ -291,24 +324,25 @@ echo -e "${BOLD}[3/4] Public Tunnels (playit.gg)${RESET}"
 if command -v playit >/dev/null 2>&1 || [ -x "./playit" ]; then
     echo -e "${GREEN}  ✔${RESET} playit CLI is already installed."
 else
-    ARCH=$(uname -m)
     PLAYIT_URL=""
     case "$ARCH" in
-        x86_64)
+        amd64)
             PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64"
             ;;
-        aarch64|arm64)
+        arm64)
             PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64"
             ;;
     esac
 
     if [ -n "$PLAYIT_URL" ]; then
         if ask_consent "Install playit client binary for zero-config public tunnels?" "y"; then
-            download_with_progress "$PLAYIT_URL" "playit" "playit tunnel agent ($ARCH)"
+            download_with_progress "$PLAYIT_URL" "playit" "playit tunnel agent (${RAW_ARCH})"
             chmod +x playit 2>/dev/null || true
         else
             echo -e "${DIM}  - Skipped playit setup.${RESET}"
         fi
+    else
+        echo -e "${YELLOW}  ⚠ Precompiled playit binary not available for architecture: ${RAW_ARCH}.${RESET}"
     fi
 fi
 echo ""
@@ -316,13 +350,38 @@ echo ""
 # 4. MurCes Standalone Executable Installation
 echo -e "${BOLD}[4/4] MurCes Standalone Executable${RESET}"
 MURCES_BIN="./murces"
-RELEASE_URL="https://github.com/DeployedReject/murces/releases/latest/download/murces"
+
+download_murces() {
+    if [ "$ARCH" = "unsupported" ]; then
+        echo -e "${RED}  ✖ Precompiled MurCes binary is not available for architecture: ${RAW_ARCH}.${RESET}"
+        echo -e "${DIM}    Supported architectures: x86_64 (amd64) and aarch64 (arm64).${RESET}"
+        return 1
+    fi
+
+    local primary_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
+    local desc="MurCes native binary (${ARCH_LABEL})"
+
+    if download_with_progress "$primary_url" "$MURCES_BIN" "$desc"; then
+        chmod +x "$MURCES_BIN" 2>/dev/null || true
+        return 0
+    elif [ "$ARCH" = "amd64" ]; then
+        # Fallback to legacy un-suffixed release asset for older releases
+        local fallback_url="https://github.com/DeployedReject/murces/releases/latest/download/murces"
+        echo -e "${YELLOW}    Retrying with default release asset...${RESET}"
+        if download_with_progress "$fallback_url" "$MURCES_BIN" "$desc"; then
+            chmod +x "$MURCES_BIN" 2>/dev/null || true
+            return 0
+        fi
+    fi
+
+    echo -e "${RED}  ✖ Failed to download MurCes for ${ARCH_LABEL}.${RESET}"
+    return 1
+}
 
 if [ -f "$MURCES_BIN" ] && [ -x "$MURCES_BIN" ]; then
     echo -e "${GREEN}  ✔${RESET} ./murces executable is already present in this directory."
     if ask_consent "Re-download and overwrite with the latest release from GitHub?" "n"; then
-        download_with_progress "$RELEASE_URL" "$MURCES_BIN" "MurCes native binary (Linux x86_64)"
-        chmod +x "$MURCES_BIN" 2>/dev/null || true
+        download_murces
     fi
 elif [ -f "java/tui/target/murces" ]; then
     if ask_consent "Deploy locally built native binary 'java/tui/target/murces' to ./murces?" "y"; then
@@ -331,9 +390,8 @@ elif [ -f "java/tui/target/murces" ]; then
         echo -e "${GREEN}  ✔ Local murces binary deployed successfully.${RESET}"
     fi
 else
-    if ask_consent "Download and install MurCes native executable from GitHub Releases?" "y"; then
-        download_with_progress "$RELEASE_URL" "$MURCES_BIN" "MurCes native binary (Linux x86_64)"
-        chmod +x "$MURCES_BIN" 2>/dev/null || true
+    if ask_consent "Download and install MurCes native executable from GitHub Releases (${ARCH_LABEL})?" "y"; then
+        download_murces
     fi
 fi
 echo ""
