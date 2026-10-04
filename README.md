@@ -6,7 +6,7 @@
  | |\/| | | | | '__/ __/ _ \/ __|
  | |  | | |_| | | | (_|  __/\__ \
  |_|  |_|\__,_|_|  \___\___||___/
-    Minecraft Server Manager v1.0.0
+    Minecraft Server Manager v1.2.0
 ```
 
 # MurCes
@@ -51,9 +51,10 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 **MurCes delivers the sweet spot:**
 
 - **Native Ahead-of-Time (AOT) Binary**: Compiled into a standalone ~30MB Linux executable via **GraalVM Native Image**. Launches in **< 20ms** with less than **40MB resident memory** and zero JVM warmup.
+- **Portable OpenJDK Provisioning**: Zero system Java dependencies required. MurCes automatically downloads and provisions Eclipse Temurin JDKs (Java 8, 17, 21) based on Minecraft game versions on demand.
 - **Detached Process Supervision**: Your server runs inside an isolated, background `tmux` session (`mcsv`). If your SSH connection drops or MurCes exits, the server remains completely unaffected.
 - **Modern Terminal Aesthetics**: Designed with 24-bit TrueColor support, background transparency, and popular developer themes (Catppuccin, Nord, Gruvbox, Tokyo Night, Cyberdream, Rose Pine, Kanagawa).
-- **Built-in Mod Ecosystem**: Query both **Modrinth** and **CurseForge** directly inside the terminal with loader & version filtering, dependency lookups, and one-key atomic downloads.
+- **Built-in Mod Ecosystem & 1-Key Updates**: Query both **Modrinth** and **CurseForge** directly in your terminal. All mods are stored using canonical `<slug>-<version>.jar` naming, enabling instant 1-key bulk updates (`[U]`) with semantic version comparison and automatic legacy jar cleanup.
 - **Safe World State Flushing**: Performs live memory flushing (`save-off` &rarr; `save-all` &rarr; tar archive &rarr; `save-on`) to eliminate backup chunk corruption, with automated retention rotation and optional `rclone` cloud replication.
 - **Zero-Config Port Forwarding**: Built-in Playit.gg integration (`-p`) creates secure public tunnels on demand without touching router NAT tables.
 
@@ -100,6 +101,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 - **Supported Loaders**: Fabric, Paper, Forge, NeoForge, Spigot, and Vanilla.
 - **Dynamic Version Resolver**: Queries live version manifests for both game releases and loader builds.
+- **Portable OpenJDK Provisioning**: Toggle `[J]` to automatically download and isolate the exact required Eclipse Temurin Java version (8, 17, or 21) into `jdks/` for your selected Minecraft release.
 - **Heap Allocation**: Fine-tune `-Xms` and `-Xmx` RAM allocations without modifying startup shell scripts.
 
 ---
@@ -114,6 +116,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 - **Universal Mod Index**: Switch between Modrinth and CurseForge API providers on the fly.
 - **Smart Filtering**: Automatically filters releases by your active server loader (Fabric, Forge, NeoForge, Quilt) and game version.
+- **Canonical Naming**: Downloads are automatically named `<slug>-<version>.jar`, making tracking and version management effortless.
 - **Interactive Inspector**: Read full mod summaries, descriptions, dependencies, and author metadata.
 - **Atomic Telemetry**: Real-time progress bar downloads into `.tmp` staging before atomic deployment to `mods/`.
 
@@ -121,15 +124,16 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ### 4. Installed Mods Manager
 
-> Audit and maintain your active server mods directory cleanly.
+> Audit, update, and maintain your active server mods directory cleanly.
 
 <p align="center">
   <img src="assets/mod_manager.png" alt="Installed Mods Manager" width="880" style="border-radius: 6px;" />
 </p>
 
-- Inspect all `.jar` files present in the server's `mods/` directory.
-- Instant single-key mod removal (`[D]elete Mod`) with confirmation safety.
-- Live file system re-indexing (`[R]efresh`).
+- **One-Key Bulk Updates**: Press `[U]` (`Update All Mods`) to query Modrinth/CurseForge for every installed mod, compare versions, install latest compatible jars, and prune obsolete versions.
+- **Inspect Installed Mods**: View all `.jar` files present in `mods/` with parsed slug and version info.
+- **Instant Removal**: Instant single-key mod removal (`[D]elete Mod`) with confirmation safety.
+- **Live Re-indexing**: Live file system re-indexing (`[R]efresh`).
 
 ---
 
@@ -286,16 +290,18 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 ./murces [command] [options]
 ```
 
-| Command               | Description                                                             | Flags                                        |
-| --------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| `./murces`            | Launches the interactive Lanterna TUI dashboard                         | None                                         |
-| `./murces start`      | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_ |
-| `./murces stop`       | Sends graceful `stop` command and terminates the session                | None                                         |
-| `./murces status`     | Checks if the Minecraft server daemon is active                         | None                                         |
-| `./murces backup`     | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                         |
-| `./murces --test-tui` | Runs headless self-test across all TUI screens and exits                | None                                         |
-| `./murces --help`     | Displays available command options and syntax                           | None                                         |
-| `./murces --version`  | Outputs current release version information                             | None                                         |
+| Command                                     | Description                                                             | Flags / Arguments                             |
+| ------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
+| `./murces`                                  | Launches the interactive Lanterna TUI dashboard                         | None                                          |
+| `./murces start`                            | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_  |
+| `./murces stop`                             | Sends graceful `stop` command and terminates the session                | None                                          |
+| `./murces status`                           | Checks if the Minecraft server daemon is active                         | None                                          |
+| `./murces backup`                           | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                          |
+| `./murces update-mods [version] [loader]`   | Upgrades all installed server mods to latest compatible versions        | `[gameVersion] [loader]` _(optional)_         |
+| `./murces install-jdk [version]`            | Downloads and provisions portable OpenJDK for target MC/Java version    | `[mcVersion]` or `8|17|21`                    |
+| `./murces --test-tui`                       | Runs headless self-test across all TUI screens and exits                | None                                          |
+| `./murces --help`                           | Displays available command options and syntax                           | None                                          |
+| `./murces --version`                        | Outputs current release version information                             | None                                          |
 
 ---
 
@@ -307,7 +313,7 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[ESC]` / `[B]`         | Return to previous view / Back to Main Menu                    |
 | `[A]`                   | Toggle / Jump focus directly to **Activity & Diagnostics Log** |
 | `[L]`                   | Toggle / Jump focus directly to **Server Live Console**        |
-| `[J]`                   | Open **Active Tasks & Job Manager**                            |
+| `[J]`                   | Open **Active Tasks & Job Manager** (from main) / Toggle **Portable JDK** (in Setup) |
 | `[S]`                   | Open **Server Control & Console**                              |
 | `[I]`                   | Open **Install Server Engine**                                 |
 | `[C]`                   | Open **Configure Properties** (`server.properties`)            |
@@ -315,6 +321,7 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[P]`                   | Open **Player UUID Migration**                                 |
 | `[D]`                   | Open **Download & Browse Mods**                                |
 | `[M]`                   | Open **Manage Installed Mods**                                 |
+| `[U]`                   | **Update All Mods** (inside Manage Installed Mods view)        |
 | `[Z]`                   | Open **Customization & Themes**                                |
 | `[E]`                   | Exit MurCes                                                    |
 
@@ -415,13 +422,13 @@ Pipe JSON payloads straight into standard input:
 
 ```bash
 # 1. Query supported server engines
-echo '{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}' | java -jar murces-orchestrator-1.0.jar
+echo '{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}' | java -jar murces-orchestrator-1.2.jar
 
 # 2. Download and boot Paper 1.20.4 with 4GB RAM
-echo '{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}' | java -jar murces-orchestrator-1.0.jar
+echo '{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}' | java -jar murces-orchestrator-1.2.jar
 
 # 3. Search Modrinth for "sodium" on Fabric 1.20.4
-echo '{"type": "modding", "modBrowser": "modrinth", "subType": "search", "modName": "sodium", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}' | java -jar murces-orchestrator-1.0.jar
+echo '{"type": "modding", "modBrowser": "modrinth", "subType": "search", "modName": "sodium", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}' | java -jar murces-orchestrator-1.2.jar
 ```
 
 #### Python Integration (Bots or Web Backends)
@@ -431,7 +438,7 @@ import subprocess
 import json
 
 proc = subprocess.Popen(
-    ["java", "-jar", "murces-orchestrator-1.0.jar"],
+    ["java", "-jar", "murces-orchestrator-1.2.jar"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     text=True,
@@ -484,7 +491,7 @@ cd ../..
 ```bash
 cd java/tui
 mvn clean package
-# Artifact generated at java/tui/target/murces-tui-0.1.jar
+# Artifact generated at java/tui/target/murces-tui-1.2.jar
 cd ../..
 ```
 

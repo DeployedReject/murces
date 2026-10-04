@@ -27,7 +27,7 @@ public class MainMenuView implements WorkspaceView {
             " |  \\/  |_   _ _ __ ___ ___  ___        \n" +
             " | |\\/| | | | | '__/ __/ _ \\/ __|       \n" +
             " | |  | | |_| | | | (_|  __/\\__ \\       \n" +
-            " |_|  |_|\\__,_|_|  \\___\\___||___/  v1.0.0";
+            " |_|  |_|\\__,_|_|  \\___\\___||___/  v1.2.0";
 
     private final MainWindow mainWindow;
     private final Panel root;

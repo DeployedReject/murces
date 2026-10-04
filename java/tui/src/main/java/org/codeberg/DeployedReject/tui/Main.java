@@ -42,15 +42,40 @@ public class Main {
                 System.out.println("  murces stop         Stop server");
                 System.out.println("  murces status       Check server running status");
                 System.out.println("  murces backup       Run world backup");
+                System.out.println("  murces update-mods  Update all installed mods to latest compatible versions");
+                System.out.println("  murces install-jdk  Download portable OpenJDK (8/17/21)");
                 System.out.println("  murces --test-tui   Run automated self-test of all TUI windows");
                 System.out.println("  murces --version    Show version");
                 break;
             case "--version":
             case "-v":
-                System.out.println("murces v1.0.0 (production release)");
+                System.out.println("murces v1.2.0 (production release)");
                 break;
             case "--test-tui":
                 runSelfTest();
+                break;
+            case "update-mods":
+                String uMc = args.length > 1 ? args[1] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String uLd = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getLoader();
+                System.out.println("Updating all mods for Minecraft " + uMc + " (" + uLd + ")...");
+                try {
+                    org.codeberg.DeployedReject.tui.backend.ModUpdateManager.UpdateSummary uSum =
+                        OrchestratorBridge.getInstance().updateAllMods(uMc, uLd, System.out::println, null).get();
+                    System.out.println(uSum.formattedSummary());
+                } catch (Exception e) {
+                    System.err.println("Error updating mods: " + e.getMessage());
+                }
+                break;
+            case "install-jdk":
+                int jVer = 21;
+                if (args.length > 1) {
+                    try {
+                        jVer = Integer.parseInt(args[1]);
+                    } catch (NumberFormatException ignored) {}
+                }
+                System.out.println("Downloading Portable OpenJDK " + jVer + " from Adoptium...");
+                boolean jOk = org.codeberg.DeployedReject.device.JdkManager.downloadAndExtractJdk(jVer, null, System.out::println);
+                System.out.println("Portable JDK installation: " + (jOk ? "SUCCESS" : "FAILED"));
                 break;
             case "status":
                 boolean running = OrchestratorBridge.isServerRunning();

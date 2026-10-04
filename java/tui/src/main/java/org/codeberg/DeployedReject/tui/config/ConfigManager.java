@@ -71,6 +71,15 @@ public class ConfigManager {
                 if (obj.has("nerdFontMode") && !obj.get("nerdFontMode").isJsonNull()) {
                     loaded.setNerdFontMode(obj.get("nerdFontMode").getAsString().trim());
                 }
+                if (obj.has("portableJdk")) {
+                    loaded.setPortableJdk(obj.get("portableJdk").getAsBoolean());
+                }
+                if (obj.has("gameVersion") && !obj.get("gameVersion").isJsonNull()) {
+                    loaded.setGameVersion(obj.get("gameVersion").getAsString().trim());
+                }
+                if (obj.has("loader") && !obj.get("loader").isJsonNull()) {
+                    loaded.setLoader(obj.get("loader").getAsString().trim());
+                }
                 if (obj.has("backupSourceFolder") && !obj.get("backupSourceFolder").isJsonNull()) {
                     loaded.setBackupSourceFolder(obj.get("backupSourceFolder").getAsString().trim());
                 }

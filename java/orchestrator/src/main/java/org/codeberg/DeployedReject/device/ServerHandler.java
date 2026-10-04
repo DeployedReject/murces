@@ -43,6 +43,7 @@ public class ServerHandler {
   public int retentionLimit = 3;
   public boolean cloudSync = false;
   public String cloudRemote = "minecraftdrive";
+  public boolean portableJdk = false;
   public JsonArray list = new JsonArray();
 
   public ServerHandler(String type, String loader, String gVersion, String lVersion, int ram, int job) {
@@ -82,18 +83,39 @@ public class ServerHandler {
   }
 
   public static ProcessResult startServer(boolean publicTunnel) {
-    return startServer(publicTunnel, "4G");
+    return startServer(publicTunnel, "4G", null, null);
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram) {
+    return startServer(publicTunnel, ram, null, null);
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel, String ram, String javaBinOverride, String jdkHomeOverride) {
     if (!isCommandAvailable("tmux")) {
       return new ProcessResult(1,
           "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
     }
-    if (!isCommandAvailable("java")) {
-      return new ProcessResult(1,
-          "[ERROR] 'java' is not found in PATH.\nPlease install Java (e.g. OpenJDK 17/21+) to run Minecraft servers.");
+
+    String javaExec = javaBinOverride;
+    String jdkHome = jdkHomeOverride;
+    if (javaExec == null || javaExec.isEmpty() || !new File(javaExec).canExecute()) {
+      javaExec = JdkManager.getJavaCommand(null, true);
     }
+
+    if (!"java".equals(javaExec) && new File(javaExec).canExecute()) {
+      if (jdkHome == null || jdkHome.isEmpty()) {
+        File parent = new File(javaExec).getParentFile();
+        if (parent != null) {
+          jdkHome = parent.getParent();
+        }
+      }
+    } else if (!isCommandAvailable("java")) {
+      return new ProcessResult(1,
+          "[ERROR] Neither 'java' in PATH nor an executable portable JDK was found.\nPlease install Java or enable Portable JDK in Murces.");
+    } else {
+      javaExec = "java";
+    }
+
     if (isServerRunning()) {
       return new ProcessResult(1, "Minecraft server session 'mcsv' is already running.");
     }
@@ -135,7 +157,15 @@ public class ServerHandler {
     if (runSh.exists()) {
       try {
         new ProcessBuilder("chmod", "+x", "run.sh").start().waitFor();
-        Process p = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui").start();
+        ProcessBuilder pb;
+        if (jdkHome != null && !jdkHome.isEmpty()) {
+          String binPath = new File(jdkHome, "bin").getAbsolutePath();
+          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv",
+              "env", "PATH=" + binPath + ":" + System.getenv("PATH"), "JAVA_HOME=" + jdkHome, "./run.sh", "nogui");
+        } else {
+          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui");
+        }
+        Process p = pb.start();
         int code = p.waitFor();
         if (code == 0) {
           return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
@@ -154,7 +184,7 @@ public class ServerHandler {
 
     List<String> cmd = new ArrayList<>(Arrays.asList(
         "tmux", "new-session", "-d", "-s", "mcsv",
-        "java",
+        javaExec,
         "-Xmx" + ramArg,
         "-Xms" + ramArg,
         "-XX:+UseG1GC",
@@ -182,7 +212,13 @@ public class ServerHandler {
         "nogui"));
 
     try {
-      Process p = new ProcessBuilder(cmd).start();
+      ProcessBuilder pb = new ProcessBuilder(cmd);
+      if (jdkHome != null && !jdkHome.isEmpty()) {
+        String binPath = new File(jdkHome, "bin").getAbsolutePath();
+        pb.environment().put("JAVA_HOME", jdkHome);
+        pb.environment().put("PATH", binPath + ":" + System.getenv("PATH"));
+      }
+      Process p = pb.start();
       int code = p.waitFor();
       if (code == 0) {
         return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
@@ -247,6 +283,22 @@ public class ServerHandler {
   public void serverHandler() {
 
     if (job == 1 || job == 0) {
+      if (portableJdk) {
+        int reqJdk = JdkManager.getRequiredJdkVersion(gVersion);
+        if (!JdkManager.isJdkInstalled(reqJdk)) {
+          JsonObject startJdk = new JsonObject();
+          startJdk.addProperty("status", 2);
+          startJdk.addProperty("type", "jdk");
+          startJdk.addProperty("message", "Downloading Portable JDK " + reqJdk + " for Minecraft " + gVersion + "...");
+          Communicator.printer(startJdk);
+          boolean ok = JdkManager.downloadAndExtractJdk(reqJdk, null, null);
+          if (!ok) {
+            ErrorHelper.errorJson("Failed to download Portable JDK " + reqJdk + " for Minecraft " + gVersion);
+            return;
+          }
+        }
+      }
+
       JsonObject startMsg = new JsonObject();
       startMsg.addProperty("status", 2);
       startMsg.addProperty("type", "server");
@@ -411,8 +463,9 @@ public class ServerHandler {
 
   private void fabric() {
 
-    if (!checkCommand("java")) {
-      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
+    String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
+    if ("java".equals(javaExec) && !checkCommand("java")) {
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21) or enable Portable JDK.");
       return;
     }
 
@@ -453,7 +506,7 @@ public class ServerHandler {
     NetworkUtils.prog(downloading.body(), installerJar, filesize);
 
     java.util.List<String> commandList = new java.util.ArrayList<>();
-    commandList.add("java");
+    commandList.add(javaExec);
     commandList.add("-jar");
     commandList.add(installerJar);
     commandList.add("server");
@@ -502,8 +555,14 @@ public class ServerHandler {
     long filesize = build.headers().firstValueAsLong("content-length").orElse(-1L);
     NetworkUtils.prog(build.body(), "BuildTools.jar", filesize);
 
+    String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
+    if ("java".equals(javaExec) && !checkCommand("java")) {
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21) or enable Portable JDK.");
+      return;
+    }
+
     String[] command = new String[] {
-        "java",
+        javaExec,
         "-Xmx" + Integer.toString(ram) + "G",
         "-Xms" + Integer.toString(ram) + "G",
         "-jar",
@@ -601,8 +660,9 @@ public class ServerHandler {
       ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
-    if (!checkCommand("java")) {
-      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
+    String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
+    if ("java".equals(javaExec) && !checkCommand("java")) {
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21) or enable Portable JDK.");
       return;
     }
 
@@ -617,7 +677,7 @@ public class ServerHandler {
         "-d",
         "-s",
         "mcsv",
-        "java",
+        javaExec,
         "-Xmx" + Integer.toString(ram) + "G",
         "-Xms" + Integer.toString(ram) + "G",
         "-XX:+UseG1GC",
@@ -718,7 +778,13 @@ public class ServerHandler {
 
     NetworkUtils.prog(downloading.body(), installerName, filesize);
 
-    String[] command = new String[] { "java", "-jar", installerName,
+    String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
+    if ("java".equals(javaExec) && !checkCommand("java")) {
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21) or enable Portable JDK.");
+      return;
+    }
+
+    String[] command = new String[] { javaExec, "-jar", installerName,
         "--installServer" };
 
     JsonObject response = new JsonObject();
@@ -747,8 +813,9 @@ public class ServerHandler {
       ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
-    if (!checkCommand("java")) {
-      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21).");
+    String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
+    if ("java".equals(javaExec) && !checkCommand("java")) {
+      ErrorHelper.errorJson("Java runtime not found in PATH. Please install Java (JDK 17/21) or enable Portable JDK.");
       return;
     }
 

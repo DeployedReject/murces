@@ -63,7 +63,7 @@ public class Modrinth implements ModAPI {
     HttpRequest downloading = HttpRequest
         .newBuilder()
         .uri(URI.create(url))
-        .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+        .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
         .GET()
         .build();
     HttpResponse<String> result = NetworkUtils.attemptS(downloading);
@@ -89,14 +89,39 @@ public class Modrinth implements ModAPI {
         }
 
         long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
-        NetworkUtils.prog(downloadRequest.body(), "mods/"
-            + downloadLink.get("files").getAsJsonArray().get(0).getAsJsonObject().get("filename").getAsString(),
-            filesize);
+        String verNum = downloadLink.has("version_number") ? downloadLink.get("version_number").getAsString() : "";
+        if (verNum.isEmpty() && downloadLink.has("name")) {
+          verNum = downloadLink.get("name").getAsString();
+        }
+        String cleanVer = verNum.replaceAll("[^a-zA-Z0-9_.+-]", "");
+        String cleanSlug = modName.toLowerCase().replaceAll("[^a-z0-9_-]", "");
+        String finalFilename = cleanSlug + (cleanVer.isEmpty() ? "" : "-" + cleanVer) + ".jar";
+        cleanOldModVersions(cleanSlug, finalFilename);
+
+        NetworkUtils.prog(downloadRequest.body(), "mods/" + finalFilename, filesize);
 
       } else {
         ErrorHelper.errorJson("No compatible download version found on Modrinth for '" + modName + "' (" + version + ", " + loader + ")");
       }
 
+    }
+  }
+
+  private void cleanOldModVersions(String slug, String keepFilename) {
+    try {
+      java.io.File modsDir = new java.io.File("mods");
+      if (!modsDir.exists() || !modsDir.isDirectory()) return;
+      java.io.File[] files = modsDir.listFiles((dir, name) -> name.endsWith(".jar"));
+      if (files == null) return;
+      String prefix = slug.toLowerCase() + "-";
+      for (java.io.File f : files) {
+        String fname = f.getName().toLowerCase();
+        if ((fname.startsWith(prefix) || fname.equals(slug.toLowerCase() + ".jar"))
+            && !f.getName().equalsIgnoreCase(keepFilename)) {
+          f.delete();
+        }
+      }
+    } catch (Exception ignored) {
     }
   }
 
@@ -119,7 +144,7 @@ public class Modrinth implements ModAPI {
     HttpRequest searching = HttpRequest
         .newBuilder()
         .uri(URI.create(url))
-        .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+        .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
         .GET()
         .build();
 

@@ -362,7 +362,7 @@ public class OrchestratorBridge {
               + "&game_versions=" + encVersion;
           HttpRequest req = HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+              .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
@@ -467,7 +467,7 @@ public class OrchestratorBridge {
           String url = "https://api.modrinth.com/v2/project/" + cleanId;
           HttpRequest req = HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+              .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
@@ -656,7 +656,7 @@ public class OrchestratorBridge {
       try {
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(downloadUrl))
-            .header("User-Agent", "DeployedReject/MurCes/1.0.0 (" + email + ")")
+            .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
             .GET()
             .build();
         HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
@@ -710,6 +710,14 @@ public class OrchestratorBridge {
               java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception moveEx) {
           Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        try {
+          ModUpdateManager.ModFileInfo parsed = ModUpdateManager.parseModFile(targetFinal);
+          if (parsed != null && !parsed.slug.isEmpty()) {
+            ModUpdateManager.cleanOldModVersions(parsed.slug, targetFinal.getName());
+          }
+        } catch (Exception ignored) {
         }
         finishedSuccessfully = true;
         JobTracker.getInstance().unregisterJob(jobId);
@@ -810,6 +818,7 @@ public class OrchestratorBridge {
       try {
         String lVersion = (loaderVersion != null && !loaderVersion.isEmpty()) ? loaderVersion : "latest";
         ServerHandler sh = new ServerHandler("server", serverType.toLowerCase(), gameVersion, lVersion, ram, job);
+        sh.portableJdk = ConfigManager.getInstance().getConfig().isPortableJdk();
         sh.serverHandler();
       } catch (Exception e) {
         serverInstalling.set(false);
@@ -917,8 +926,53 @@ public class OrchestratorBridge {
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram) {
-    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.startServer(publicTunnel, ram);
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    boolean usePortable = cfg.isPortableJdk();
+    String javaCmd = null;
+    String jdkHome = null;
+    if (usePortable) {
+      int reqJdk = org.codeberg.DeployedReject.device.JdkManager.getRequiredJdkVersion(cfg.getGameVersion());
+      if (org.codeberg.DeployedReject.device.JdkManager.isJdkInstalled(reqJdk)) {
+        javaCmd = org.codeberg.DeployedReject.device.JdkManager.getJavaExecutable(reqJdk).getAbsolutePath();
+        jdkHome = org.codeberg.DeployedReject.device.JdkManager.getJdkHome(reqJdk).getAbsolutePath();
+      }
+    }
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.startServer(publicTunnel, ram, javaCmd, jdkHome);
     return new ProcessResult(res.exitCode, res.output);
+  }
+
+  public CompletableFuture<ModUpdateManager.UpdateSummary> updateAllMods(String gameVersion, String loader,
+      Consumer<String> logCallback, Consumer<Double> progressCallback) {
+    CompletableFuture<ModUpdateManager.UpdateSummary> future = new CompletableFuture<>();
+    String jobId = "mods-update-all";
+
+    final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+        jobId,
+        "Update All Mods (MC " + gameVersion + ")",
+        "Mod",
+        () -> future.cancel(true));
+
+    workerPool.submit(() -> {
+      try {
+        ModUpdateManager.UpdateSummary summary = ModUpdateManager.updateAllMods(
+            gameVersion, loader, email, curseAPI,
+            msg -> {
+              if (logCallback != null) logCallback.accept(msg);
+              trackedJob.setStatus(msg);
+            },
+            pct -> {
+              if (progressCallback != null) progressCallback.accept(pct);
+              trackedJob.setProgress(pct);
+            });
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.complete(summary);
+      } catch (Exception e) {
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.completeExceptionally(e);
+      }
+    });
+
+    return future;
   }
 
   public static ProcessResult stopServer() {

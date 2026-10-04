@@ -90,6 +90,7 @@ public class Main {
           if (request.has("retentionLimit")) sh.retentionLimit = request.get("retentionLimit").getAsInt();
           if (request.has("cloudSync")) sh.cloudSync = request.get("cloudSync").getAsBoolean();
           if (request.has("cloudRemote")) sh.cloudRemote = request.get("cloudRemote").getAsString();
+          if (request.has("portableJdk")) sh.portableJdk = request.get("portableJdk").getAsBoolean();
 
           sh.serverHandler();
 

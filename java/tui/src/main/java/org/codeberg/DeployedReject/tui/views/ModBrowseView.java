@@ -817,13 +817,21 @@ public class ModBrowseView implements WorkspaceView {
 
     new Thread(() -> {
       try {
-        if (specificVer != null && specificVer.downloadUrl != null && !specificVer.downloadUrl.isEmpty()) {
+        String verStr = specificVer != null
+            ? (specificVer.versionNumber != null && !specificVer.versionNumber.trim().isEmpty() ? specificVer.versionNumber.trim() : specificVer.versionName)
+            : version;
+        if (verStr != null && verStr.toLowerCase().endsWith(".jar")) {
+          verStr = verStr.substring(0, verStr.length() - 4);
+        }
+        String cleanVer = (verStr != null ? verStr : "unknown").replaceAll("[^a-zA-Z0-9_.+-]", "");
+        String cleanSlug = mod.id.toLowerCase().replaceAll("[^a-z0-9_-]", "");
+        String targetFilename = cleanSlug + (cleanVer.isEmpty() ? "" : "-" + cleanVer) + ".jar";
 
-          OrchestratorBridge.getInstance().downloadModDirect(specificVer.downloadUrl, specificVer.filename, info -> {
+        if (specificVer != null && specificVer.downloadUrl != null && !specificVer.downloadUrl.isEmpty()) {
+          OrchestratorBridge.getInstance().downloadModDirect(specificVer.downloadUrl, targetFilename, info -> {
             updateProgressUI(mod.name, info);
           }).get();
         } else {
-
           OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, null, info -> {
             updateProgressUI(mod.name, info);
           }).get();

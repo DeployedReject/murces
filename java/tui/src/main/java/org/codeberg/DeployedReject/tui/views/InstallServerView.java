@@ -18,6 +18,7 @@ public class InstallServerView implements WorkspaceView {
     private final ComboBox<String> gameVersionComboBox;
     private final TextBox loaderVersionBox;
     private final ComboBox<String> ramComboBox;
+    private final CheckBox portableJdkCheck;
     private final ProgressBar progressBar;
     private final Label progressLabel;
     private final Button installOnlyBtn;
@@ -37,6 +38,8 @@ public class InstallServerView implements WorkspaceView {
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
         ramComboBox.setSelectedIndex(1);
+        portableJdkCheck = new CheckBox("Enabled");
+        portableJdkCheck.setChecked(org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().isPortableJdk());
         installOnlyBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " [I]nstall Only"), () -> runInstall(0));
         installStartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart & Install"), () -> runInstall(1));
         cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Installation"), this::cancelInstallation);
@@ -71,8 +74,20 @@ public class InstallServerView implements WorkspaceView {
 
         ramComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
             if (changedByUserInteraction) {
-                mainWindow.getGui().getGUIThread().invokeLater(installOnlyBtn::takeFocus);
+                mainWindow.getGui().getGUIThread().invokeLater(portableJdkCheck::takeFocus);
             }
+        });
+
+        portableJdkCheck.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                boolean val = !portableJdkCheck.isChecked();
+                portableJdkCheck.setChecked(val);
+                org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setPortableJdk(val);
+                org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
+                installOnlyBtn.takeFocus();
+                return false;
+            }
+            return true;
         });
 
         Panel formPanel = new Panel(new GridLayout(2));
@@ -84,6 +99,8 @@ public class InstallServerView implements WorkspaceView {
         formPanel.addComponent(loaderVersionBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         formPanel.addComponent(ramComboBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Portable [J]DK:")));
+        formPanel.addComponent(portableJdkCheck);
         root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration (Enter opens dropdown)"))));
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -114,6 +131,12 @@ public class InstallServerView implements WorkspaceView {
         hotkeys.put('C', () -> MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), gameVersionComboBox, gameVersionComboBox.getSelectedIndex()));
         hotkeys.put('O', loaderVersionBox::takeFocus);
         hotkeys.put('R', this::cycleRam);
+        hotkeys.put('J', () -> {
+            boolean val = !portableJdkCheck.isChecked();
+            portableJdkCheck.setChecked(val);
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setPortableJdk(val);
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
+        });
         hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
     }
 
@@ -201,6 +224,11 @@ public class InstallServerView implements WorkspaceView {
             progressLabel.setText("[WARN] Game version cannot be empty!");
             return;
         }
+
+        org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setGameVersion(gameVer);
+        org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setLoader(engine.toLowerCase());
+        org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setPortableJdk(portableJdkCheck.isChecked());
+        org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
 
         installOnlyBtn.setEnabled(false);
         installStartBtn.setEnabled(false);

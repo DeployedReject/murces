@@ -18,11 +18,13 @@ public class ModManageView implements WorkspaceView {
     private final MurcesListBox modsList;
     private final Label statusLabel;
     private final Button deleteBtn;
+    private final Button updateAllBtn;
     private final Button refreshBtn;
     private final Button backBtn;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
     private String selectedModFile = null;
     private boolean confirmingDelete = false;
+    private boolean isUpdatingMods = false;
 
     public ModManageView(MainWindow mainWindow) {
         this.mainWindow = mainWindow;
@@ -30,14 +32,17 @@ public class ModManageView implements WorkspaceView {
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         deleteBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [D]elete Mod"), this::onDeleteMod);
+        updateAllBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [U]pdate All Mods"), this::onUpdateAllMods);
         refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [R]efresh"), this::loadMods);
 
         actionPanel.addComponent(deleteBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        actionPanel.addComponent(updateAllBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(refreshBtn);
         root.addComponent(actionPanel);
 
-        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Use Arrow keys to browse installed mods."));
+        statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_INFO + " Use Arrow keys to browse installed mods, [U] to update all."));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
@@ -59,6 +64,7 @@ public class ModManageView implements WorkspaceView {
 
         hotkeys.put('L', modsList::takeFocus);
         hotkeys.put('D', KeyboardNavigationHelper.action(deleteBtn, this::onDeleteMod));
+        hotkeys.put('U', KeyboardNavigationHelper.action(updateAllBtn, this::onUpdateAllMods));
         hotkeys.put('R', KeyboardNavigationHelper.action(refreshBtn, this::loadMods));
         hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
 
@@ -162,5 +168,80 @@ public class ModManageView implements WorkspaceView {
             statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Could not delete mod file."));
             statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
         }
+    }
+
+    private void onUpdateAllMods() {
+        if (isUpdatingMods) {
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Mod update is already in progress."));
+            statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+            return;
+        }
+
+        List<String> installed = OrchestratorBridge.listInstalledMods();
+        if (installed.isEmpty()) {
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] No mods found in ./mods folder to update."));
+            statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+            ActivityLogger.warn("Update All Mods: No mods found in ./mods directory.");
+            return;
+        }
+
+        org.codeberg.DeployedReject.tui.config.TuiConfig config = org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig();
+        String gameVer = config.getGameVersion();
+        String loader = config.getLoader();
+
+        isUpdatingMods = true;
+        updateAllBtn.setEnabled(false);
+        deleteBtn.setEnabled(false);
+        refreshBtn.setEnabled(false);
+
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Updating " + installed.size() + " mod(s) for MC " + gameVer + " (" + loader + ")..."));
+        statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+        ActivityLogger.info("Starting automatic update of " + installed.size() + " mods for Minecraft " + gameVer + " (" + loader + ")...");
+
+        new Thread(() -> {
+            try {
+                org.codeberg.DeployedReject.tui.backend.ModUpdateManager.UpdateSummary summary =
+                    OrchestratorBridge.getInstance().updateAllMods(
+                        gameVer, loader,
+                        msg -> {
+                            mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                                statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " " + msg));
+                                ActivityLogger.log(msg);
+                                mainWindow.invalidate();
+                            });
+                        },
+                        pct -> {
+                        }
+                    ).get();
+
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    isUpdatingMods = false;
+                    updateAllBtn.setEnabled(true);
+                    deleteBtn.setEnabled(true);
+                    refreshBtn.setEnabled(true);
+                    loadMods();
+
+                    String finalMsg = String.format("[OK] Finished: %d upgraded, %d latest, %d skipped/errors.",
+                        summary.upgraded, summary.alreadyUpToDate, summary.notFound + summary.errors);
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " " + finalMsg));
+                    statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+                    ActivityLogger.ok("All mods updated: " + summary.formattedSummary());
+                    mainWindow.invalidate();
+                });
+            } catch (Exception e) {
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    isUpdatingMods = false;
+                    updateAllBtn.setEnabled(true);
+                    deleteBtn.setEnabled(true);
+                    refreshBtn.setEnabled(true);
+                    loadMods();
+
+                    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Update failed: " + e.getMessage()));
+                    statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
+                    ActivityLogger.err("Update All Mods error: " + e.getMessage());
+                    mainWindow.invalidate();
+                });
+            }
+        }).start();
     }
 }

@@ -178,6 +178,7 @@ public class CurseForge implements ModAPI {
         .build();
 
     String downloadURL, filename;
+    String displayName = null;
     try {
       HttpResponse<String> tempR = NetworkUtils.attemptS(downloading);
       if (tempR == null) {
@@ -193,6 +194,9 @@ public class CurseForge implements ModAPI {
       } else {
         downloadURL = data.get("downloadUrl").getAsString();
         filename = data.get("fileName").getAsString();
+        if (data.has("displayName") && !data.get("displayName").isJsonNull()) {
+          displayName = data.get("displayName").getAsString();
+        }
       }
 
     } catch (Exception e) {
@@ -219,7 +223,32 @@ public class CurseForge implements ModAPI {
 
     long filesize = downloadRequest.headers().firstValueAsLong("content-length").orElse(-1L);
 
-    NetworkUtils.prog(downloadRequest.body(), "mods/" + filename, filesize);
+    String rawVer = displayName != null ? displayName : filename;
+    if (rawVer.toLowerCase().endsWith(".jar")) rawVer = rawVer.substring(0, rawVer.length() - 4);
+    String cleanVer = rawVer.replaceAll("[^a-zA-Z0-9_.+-]", "");
+    String cleanSlug = (modName != null && !modName.isEmpty() ? modName : modId).toLowerCase().replaceAll("[^a-z0-9_-]", "");
+    String targetFilename = cleanSlug + (cleanVer.isEmpty() ? "" : "-" + cleanVer) + ".jar";
+    cleanOldModVersions(cleanSlug, targetFilename);
 
+    NetworkUtils.prog(downloadRequest.body(), "mods/" + targetFilename, filesize);
+
+  }
+
+  private void cleanOldModVersions(String slug, String keepFilename) {
+    try {
+      java.io.File modsDir = new java.io.File("mods");
+      if (!modsDir.exists() || !modsDir.isDirectory()) return;
+      java.io.File[] files = modsDir.listFiles((dir, name) -> name.endsWith(".jar"));
+      if (files == null) return;
+      String prefix = slug.toLowerCase() + "-";
+      for (java.io.File f : files) {
+        String fname = f.getName().toLowerCase();
+        if ((fname.startsWith(prefix) || fname.equals(slug.toLowerCase() + ".jar"))
+            && !f.getName().equalsIgnoreCase(keepFilename)) {
+          f.delete();
+        }
+      }
+    } catch (Exception ignored) {
+    }
   }
 }

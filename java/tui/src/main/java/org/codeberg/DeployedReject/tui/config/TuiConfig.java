@@ -59,6 +59,38 @@ public class TuiConfig {
         this.nerdFontMode = nerdFontMode;
     }
 
+    private boolean portableJdk = false;
+    private String gameVersion = "1.21.1";
+    private String loader = "fabric";
+
+    public boolean isPortableJdk() {
+        return portableJdk;
+    }
+
+    public void setPortableJdk(boolean portableJdk) {
+        this.portableJdk = portableJdk;
+    }
+
+    public String getGameVersion() {
+        return gameVersion != null && !gameVersion.trim().isEmpty() ? gameVersion.trim() : "1.21.1";
+    }
+
+    public void setGameVersion(String gameVersion) {
+        if (gameVersion != null && !gameVersion.trim().isEmpty()) {
+            this.gameVersion = gameVersion.trim();
+        }
+    }
+
+    public String getLoader() {
+        return loader != null && !loader.trim().isEmpty() ? loader.trim() : "fabric";
+    }
+
+    public void setLoader(String loader) {
+        if (loader != null && !loader.trim().isEmpty()) {
+            this.loader = loader.trim();
+        }
+    }
+
     private String backupSourceFolder = "world";
     private String backupTargetFolder = "backup";
     private int backupRetentionLimit = 3;

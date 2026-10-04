@@ -23,6 +23,7 @@ public class CustomizationView implements WorkspaceView {
     private final CheckBox trueColorCheck;
     private final CheckBox minSizeCheck;
     private final CheckBox animationCheck;
+    private final CheckBox portableJdkCheck;
     private final Button saveBtn;
     private final Button resetBtn;
     private final Button backBtn;
@@ -60,6 +61,7 @@ public class CustomizationView implements WorkspaceView {
         trueColorCheck = new CheckBox("[C] Enable 24-bit TrueColor (ANSI RGB)");
         minSizeCheck = new CheckBox("[M] Enforce Minimum Screen Size (>= 70x18)");
         animationCheck = new CheckBox("[K] Pickaxe dirt-breaking loading animation");
+        portableJdkCheck = new CheckBox("[J] Auto-download portable JDKs for Minecraft versions");
         saveBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " [S]ave & Apply"), this::onSaveAndApply);
         resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack"), mainWindow::showMainMenu);
@@ -103,6 +105,15 @@ public class CustomizationView implements WorkspaceView {
         animationCheck.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Enter) {
                 animationCheck.setChecked(!animationCheck.isChecked());
+                portableJdkCheck.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        portableJdkCheck.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                portableJdkCheck.setChecked(!portableJdkCheck.isChecked());
                 saveBtn.takeFocus();
                 return false;
             }
@@ -122,6 +133,7 @@ public class CustomizationView implements WorkspaceView {
         togglePanel.addComponent(trueColorCheck);
         togglePanel.addComponent(minSizeCheck);
         togglePanel.addComponent(animationCheck);
+        togglePanel.addComponent(portableJdkCheck);
         root.addComponent(togglePanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Options & Animations"))));
 
         statusLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Ready."));
@@ -146,6 +158,7 @@ public class CustomizationView implements WorkspaceView {
         hotkeys.put('C', () -> trueColorCheck.setChecked(!trueColorCheck.isChecked()));
         hotkeys.put('M', () -> minSizeCheck.setChecked(!minSizeCheck.isChecked()));
         hotkeys.put('K', () -> animationCheck.setChecked(!animationCheck.isChecked()));
+        hotkeys.put('J', () -> portableJdkCheck.setChecked(!portableJdkCheck.isChecked()));
 
         loadCurrentConfig();
     }
@@ -176,6 +189,7 @@ public class CustomizationView implements WorkspaceView {
         trueColorCheck.setChecked(config.isTrueColor());
         minSizeCheck.setChecked(config.isEnforceMinSize());
         animationCheck.setChecked(config.isPickaxeAnimation());
+        portableJdkCheck.setChecked(config.isPortableJdk());
     }
 
     private void onSaveAndApply() {
@@ -204,6 +218,7 @@ public class CustomizationView implements WorkspaceView {
         config.setTrueColor(trueColorCheck.isChecked());
         config.setEnforceMinSize(minSizeCheck.isChecked());
         config.setPickaxeAnimation(animationCheck.isChecked());
+        config.setPortableJdk(portableJdkCheck.isChecked());
 
         ConfigManager.getInstance().save();
 
