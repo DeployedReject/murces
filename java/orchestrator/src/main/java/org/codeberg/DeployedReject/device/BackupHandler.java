@@ -41,6 +41,11 @@ public class BackupHandler {
       boolean cloudSync, String cloudRemote) {
     if (sourceFolder == null || sourceFolder.trim().isEmpty()) {
       sourceFolder = "world";
+    } else {
+      sourceFolder = sourceFolder.trim();
+      while ((sourceFolder.endsWith("/") || sourceFolder.endsWith("\\")) && sourceFolder.length() > 1) {
+        sourceFolder = sourceFolder.substring(0, sourceFolder.length() - 1);
+      }
     }
     if (targetFolder == null || targetFolder.trim().isEmpty()) {
       targetFolder = "backup";
@@ -89,7 +94,27 @@ public class BackupHandler {
       String archiveName = timestamp + ".tar";
       File archiveFile = new File(targetDir, archiveName);
 
-      ProcessBuilder pb = new ProcessBuilder("tar", "-cf", archiveFile.getPath(), sourceFolder);
+      List<String> tarArgs = new ArrayList<>(Arrays.asList("tar", "-cf", archiveFile.getPath(), sourceFolder));
+
+      File netherDir = new File(sourceFolder + "_nether");
+      if (netherDir.exists() && netherDir.isDirectory()) {
+        tarArgs.add(netherDir.getPath());
+        String netherMsg = "Included Bukkit/Paper Nether folder: '" + netherDir.getPath() + "'\n";
+        logOutput.append(netherMsg);
+        appendToLog("backup.log", netherMsg);
+        writeStatus("backup.status.log", netherMsg);
+      }
+
+      File endDir = new File(sourceFolder + "_the_end");
+      if (endDir.exists() && endDir.isDirectory()) {
+        tarArgs.add(endDir.getPath());
+        String endMsg = "Included Bukkit/Paper The End folder: '" + endDir.getPath() + "'\n";
+        logOutput.append(endMsg);
+        appendToLog("backup.log", endMsg);
+        writeStatus("backup.status.log", endMsg);
+      }
+
+      ProcessBuilder pb = new ProcessBuilder(tarArgs);
       pb.redirectErrorStream(true);
       Process p = pb.start();
       int tarCode = p.waitFor();

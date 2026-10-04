@@ -26,3 +26,6 @@ murces
 java/orchestrator/apitest.txt
 /java/orchestrator/mods/
 murces.json
+
+# Local developer & contributor guides
+CONTRIBUTOR_GUIDE.md
