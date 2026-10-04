@@ -358,24 +358,16 @@ download_murces() {
         return 1
     fi
 
-    local primary_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
+    local target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
     local desc="MurCes native binary (${ARCH_LABEL})"
 
-    if download_with_progress "$primary_url" "$MURCES_BIN" "$desc"; then
+    if download_with_progress "$target_url" "$MURCES_BIN" "$desc"; then
         chmod +x "$MURCES_BIN" 2>/dev/null || true
         return 0
-    elif [ "$ARCH" = "amd64" ]; then
-        # Fallback to legacy un-suffixed release asset for older releases
-        local fallback_url="https://github.com/DeployedReject/murces/releases/latest/download/murces"
-        echo -e "${YELLOW}    Retrying with default release asset...${RESET}"
-        if download_with_progress "$fallback_url" "$MURCES_BIN" "$desc"; then
-            chmod +x "$MURCES_BIN" 2>/dev/null || true
-            return 0
-        fi
+    else
+        echo -e "${RED}  ✖ Failed to download MurCes for ${ARCH_LABEL}.${RESET}"
+        return 1
     fi
-
-    echo -e "${RED}  ✖ Failed to download MurCes for ${ARCH_LABEL}.${RESET}"
-    return 1
 }
 
 if [ -f "$MURCES_BIN" ] && [ -x "$MURCES_BIN" ]; then
