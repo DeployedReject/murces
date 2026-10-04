@@ -1,14 +1,5 @@
 <div align="center">
 
-```
-  __  __
- |  \/  |_   _ _ __ ___ ___  ___
- | |\/| | | | | '__/ __/ _ \/ __|
- | |  | | |_| | | | (_|  __/\__ \
- |_|  |_|\__,_|_|  \___\___||___/
-    Minecraft Server Manager v1.2.0
-```
-
 # MurCes
 
 **A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux.**
