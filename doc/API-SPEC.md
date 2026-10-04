@@ -13,70 +13,25 @@ Every request sent to the backend **must** contain a `type` parameter. This repr
 Valid `type` values:
 
 - `"kill"`: Ends the background service gracefully and terminates the Java process.
-- `"server"`: Manages server instance installation, lifecycle (start/stop), and deployment.
+- `"server"`: Manages server instance installation, lifecycle (start/stop), commands, and deployment.
 - `"modding"`: Manages mod querying and downloading.
-
-_(Note: If a required parameter for a specific type is missing, the backend will immediately return a `status: 1` error.)_
-
----
-
-## Type: `kill`
-
-Gracefully breaks the listener loop and shuts down the Java thread pool.
-**Example:** `{"type": "kill"}`
+- `"backup"`: Flushes memory, creates `.tar` world snapshots, manages retention rotation, and cloud syncs.
 
 ---
 
-## Type: `modding`
+## Type: `backup`
 
-The modding module acts as a unified translation layer between the UI and multiple external mod repositories.
+Triggers live memory flushing (`save-all` & `save-off`), creates a timestamped `.tar` snapshot of the target world, cleans up old snapshots beyond the retention quota, re-enables saving (`save-on`), and optionally synchronizes to Google Drive via `rclone`.
 
-**Required Parameters for ALL modding requests:**
-`type`, `modBrowser`, `subType`, `modName`, `version`, `modLoader`, `modId`
-
-_(Note: Even if a specific `subType` doesn't use all parameters—e.g., searches don't need a `modId`—they must still be included in the JSON with dummy data like `"0"` or `"none"` to pass the backend safety checks)._
-
-### `modBrowser`: "modrinth" | "curseForge"
-
-Defines which external API the backend should route the request to.
-
-### `subType`: "search" | "home" | "download"
-
-This represents the specific action to take within the selected mod browser.
-
-#### 1. `search`
-
-Searches the database based on the provided parameters.
-
-- `modName`: The search term (e.g., "lithium").
-- `version`: The required Minecraft game version (e.g., "1.20.4").
-- `modLoader`: The target loader (e.g., "fabric", "forge", "neoForge", "quilt", "liteLoader", "cauldron").
-
-**Example (Modrinth Search):**
-`{"type": "modding", "modBrowser": "modrinth", "subType": "search", "modName": "lithium", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}`
-
-**Example (CurseForge Search):**
-`{"type": "modding", "modBrowser": "curseForge", "subType": "search", "modName": "jei", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}`
-
-#### 2. `home`
-
-Fetches a generic list of featured/top mods to populate the UI if the user hasn't typed a query yet. You still need to pass dummy data for `modName` to satisfy the master check.
+**Parameters:**
+- `sourceFolder`: Source world folder (e.g., `"world"`, optional, default `"world"`).
+- `targetFolder`: Directory for archives (e.g., `"backup"`, optional, default `"backup"`).
+- `retentionLimit`: Number of newest backups to retain (e.g., `3`, optional, default `3`).
+- `cloudSync`: Boolean toggle to sync via rclone (`true` / `false`, default `false`).
+- `cloudRemote`: Rclone remote name (e.g., `"minecraftdrive"`, default `"minecraftdrive"`).
 
 **Example:**
-`{"type": "modding", "modBrowser": "modrinth", "subType": "home", "modName": "none", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}`
-
-#### 3. `download`
-
-Downloads the exact mod matching the query and places it in the `mods/` directory.
-
-- For **Modrinth**: `modName` must be the exact internal `slug` of the mod.
-- For **CurseForge**: `modId` must be the exact numeric ID of the mod.
-
-**Example (Modrinth Download):**
-`{"type": "modding", "modBrowser": "modrinth", "subType": "download", "modName": "roughly-enough-items", "version": "1.20.4", "modLoader": "fabric", "modId": "0"}`
-
-**Example (CurseForge Download):**
-`{"type": "modding", "modBrowser": "curseForge", "subType": "download", "modName": "none", "version": "1.20.4", "modLoader": "fabric", "modId": "238222"}`
+`{"type": "backup", "sourceFolder": "world", "targetFolder": "backup", "retentionLimit": 3, "cloudSync": false, "cloudRemote": "minecraftdrive"}`
 
 ---
 
@@ -94,11 +49,14 @@ The server module manages the download, installation, and background process exe
 - `job`: An integer defining the lifecycle action.
   - `0` : **Install Only** (Downloads/compiles the server but does not start it).
   - `1` : **Install & Start** (Downloads/compiles and immediately spawns the `tmux` session).
-  - `2` : **Stop** (Kills the active `mcsv` tmux session).
+  - `2` : **Stop** (Gracefully stops the active `mcsv` Minecraft server session).
   - `3` : **Check Supported Engines** (Returns a list of currently implemented server types).
   - `4` : **Check Status** (Returns whether the `mcsv` tmux session is currently active).
   - `5` : **Start Only** (Spawns the `tmux` session for an already installed server without reinstalling).
   - `6` : **Restart** (Stops the active server session, waits briefly, and launches it again).
+  - `7` : **Console Command** (Dispatches in-game command specified in `"command"` parameter).
+  - `8` : **Migrate Player** (Migrates player data specified in `"oldName"` and `"newName"`).
+  - `9` : **Backup** (Runs world snapshot using configured backup parameters).
 
 **Example (Install & Launch Paper):**
 `{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 1}`
@@ -106,17 +64,11 @@ The server module manages the download, installation, and background process exe
 **Example (Stop Server):**
 `{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 2}`
 
-**Example (Query Supported Engines):**
-`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 3}`
+**Example (Dispatch Console Command):**
+`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 7, "command": "say Hello World"}`
 
-**Example (Check Server Running Status):**
-`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 4}`
-
-**Example (Start Existing Server):**
-`{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 5}`
-
-**Example (Restart Server):**
-`{"type": "server", "serverType": "paper", "gameVersion": "1.20.4", "loaderVersion": "none", "ram": 4, "job": 6}`
+**Example (Migrate Player UUID):**
+`{"type": "server", "serverType": "none", "gameVersion": "none", "loaderVersion": "none", "ram": 0, "job": 8, "oldName": "OldNick", "newName": "NewNick"}`
 
 ---
 

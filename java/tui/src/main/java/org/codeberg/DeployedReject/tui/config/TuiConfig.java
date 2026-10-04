@@ -58,4 +58,50 @@ public class TuiConfig {
     public void setNerdFontMode(String nerdFontMode) {
         this.nerdFontMode = nerdFontMode;
     }
+
+    private String backupSourceFolder = "world";
+    private String backupTargetFolder = "backup";
+    private int backupRetentionLimit = 3;
+    private boolean backupCloudSync = false;
+    private String backupCloudRemote = "minecraftdrive";
+
+    public String getBackupSourceFolder() {
+        return backupSourceFolder != null && !backupSourceFolder.trim().isEmpty() ? backupSourceFolder.trim() : "world";
+    }
+
+    public void setBackupSourceFolder(String backupSourceFolder) {
+        this.backupSourceFolder = backupSourceFolder != null && !backupSourceFolder.trim().isEmpty() ? backupSourceFolder.trim() : "world";
+    }
+
+    public String getBackupTargetFolder() {
+        return backupTargetFolder != null && !backupTargetFolder.trim().isEmpty() ? backupTargetFolder.trim() : "backup";
+    }
+
+    public void setBackupTargetFolder(String backupTargetFolder) {
+        this.backupTargetFolder = backupTargetFolder != null && !backupTargetFolder.trim().isEmpty() ? backupTargetFolder.trim() : "backup";
+    }
+
+    public int getBackupRetentionLimit() {
+        return backupRetentionLimit > 0 ? backupRetentionLimit : 3;
+    }
+
+    public void setBackupRetentionLimit(int backupRetentionLimit) {
+        this.backupRetentionLimit = backupRetentionLimit > 0 ? backupRetentionLimit : 3;
+    }
+
+    public boolean isBackupCloudSync() {
+        return backupCloudSync;
+    }
+
+    public void setBackupCloudSync(boolean backupCloudSync) {
+        this.backupCloudSync = backupCloudSync;
+    }
+
+    public String getBackupCloudRemote() {
+        return backupCloudRemote != null && !backupCloudRemote.trim().isEmpty() ? backupCloudRemote.trim() : "minecraftdrive";
+    }
+
+    public void setBackupCloudRemote(String backupCloudRemote) {
+        this.backupCloudRemote = backupCloudRemote != null && !backupCloudRemote.trim().isEmpty() ? backupCloudRemote.trim() : "minecraftdrive";
+    }
 }

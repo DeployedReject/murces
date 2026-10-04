@@ -87,27 +87,15 @@ jobs:
           chmod +x java/tui/target/murces
           ./java/tui/target/murces --test-tui
 
-      - name: Package Release ZIP
+      - name: Prepare Standalone Executable
         run: |
-          mkdir -p dist
-          # Copy compiled native executable
-          cp java/tui/target/murces dist/
-
-          # Copy all root shell scripts (svctrl.sh, backup.sh, etc.)
-          cp *.sh dist/ 2>/dev/null || true
-
-          # Set executable permissions
-          chmod +x dist/murces dist/*.sh 2>/dev/null || true
-
-          # Create zip archive
-          cd dist
-          zip -r ../murces.zip .
-          cd ..
+          cp java/tui/target/murces ./murces
+          chmod +x ./murces
 
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.notes.outputs.tag_name }}" murces.zip \
+          gh release create "${{ steps.notes.outputs.tag_name }}" murces \
             --title "MurCes ${{ steps.notes.outputs.tag_name }}" \
             --notes-file release_notes.md

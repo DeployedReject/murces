@@ -3,9 +3,13 @@ package org.codeberg.DeployedReject.tui.backend;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.codeberg.DeployedReject.device.BackupHandler;
+import org.codeberg.DeployedReject.device.MigrationHandler;
 import org.codeberg.DeployedReject.device.ServerHandler;
 import org.codeberg.DeployedReject.mods.CurseForge;
 import org.codeberg.DeployedReject.mods.Modrinth;
+import org.codeberg.DeployedReject.tui.config.ConfigManager;
+import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.utils.Communicator;
 import org.codeberg.DeployedReject.utils.NetworkUtils;
 
@@ -913,83 +917,48 @@ public class OrchestratorBridge {
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram) {
-    if (!isCommandAvailable("tmux")) {
-      return new ProcessResult(1,
-          "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
-    }
-    if (!isCommandAvailable("java")) {
-      return new ProcessResult(1,
-          "[ERROR] 'java' is not found in PATH.\nPlease install Java (e.g. OpenJDK 17/21+) to run Minecraft servers.");
-    }
-    try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
-      eulaWriter.write("eula=true\n");
-    } catch (Exception ignored) {}
-
-    String ramArg = (ram != null && !ram.trim().isEmpty()) ? ram.trim() : "4G";
-    String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
-    if (publicTunnel) {
-      return runShell("bash", script, "start", "--public", "--ram", ramArg);
-    } else {
-      return runShell("bash", script, "start", "--ram", ramArg);
-    }
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.startServer(publicTunnel, ram);
+    return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult stopServer() {
-    if (!isCommandAvailable("tmux")) {
-      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
-    }
-    String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
-    return runShell("bash", script, "stop");
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.stopServer();
+    return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult sendConsoleCommand(String cmd) {
-    if (!isCommandAvailable("tmux")) {
-      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
-    }
-    String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
-    return runShell("bash", script, "-mc", cmd);
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.sendConsoleCommand(cmd);
+    return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult migratePlayer(String oldName, String newName) {
-    String script = findScript("c/Shell/svctrl.sh", "./svctrl.sh");
-    return runShell("bash", script, "--migrate", oldName, newName);
+    org.codeberg.DeployedReject.utils.ProcessResult res = MigrationHandler.migratePlayer(oldName, newName);
+    return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult runBackup() {
-    String script = findScript("c/Shell/backup.sh", "./backup.sh");
-    return runShell("bash", script);
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return runBackup(cfg.getBackupSourceFolder(), cfg.getBackupTargetFolder(),
+        cfg.getBackupRetentionLimit(), cfg.isBackupCloudSync(), cfg.getBackupCloudRemote());
+  }
+
+  public static ProcessResult runBackup(String sourceFolder, String targetFolder, int retentionLimit,
+      boolean cloudSync, String cloudRemote) {
+    org.codeberg.DeployedReject.utils.ProcessResult res = BackupHandler.runBackup(sourceFolder, targetFolder,
+        retentionLimit, cloudSync, cloudRemote);
+    return new ProcessResult(res.exitCode, res.output);
   }
 
   public static List<BackupInfo> listBackups() {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return listBackups(cfg.getBackupTargetFolder());
+  }
+
+  public static List<BackupInfo> listBackups(String targetFolder) {
     List<BackupInfo> list = new ArrayList<>();
-    List<File> dirs = new ArrayList<>();
-    File d1 = new File("backup");
-    if (d1.exists() && d1.isDirectory()) dirs.add(d1);
-    File d2 = new File("backups");
-    if (d2.exists() && d2.isDirectory() && !d2.equals(d1)) dirs.add(d2);
-    if (dirs.isEmpty()) {
-      dirs.add(new File("."));
-    }
-
-    Set<String> seen = new HashSet<>();
-    List<File> allFiles = new ArrayList<>();
-    for (File dir : dirs) {
-      File[] files = dir.listFiles((d, name) -> {
-        String lower = name.toLowerCase();
-        return lower.endsWith(".tar") || lower.endsWith(".tar.gz") || lower.endsWith(".tgz") || lower.endsWith(".zip");
-      });
-      if (files != null) {
-        for (File f : files) {
-          if (f.isFile() && seen.add(f.getName())) {
-            allFiles.add(f);
-          }
-        }
-      }
-    }
-
-    allFiles.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-    for (File f : allFiles) {
-      list.add(new BackupInfo(f.getName(), f.length(), f.lastModified()));
+    List<BackupHandler.BackupInfo> src = BackupHandler.listBackups(targetFolder);
+    for (BackupHandler.BackupInfo b : src) {
+      list.add(new BackupInfo(b.name, b.sizeBytes, b.lastModified));
     }
     return list;
   }
@@ -1019,29 +988,11 @@ public class OrchestratorBridge {
   }
 
   public static boolean deleteBackup(String filename) {
-    if (filename == null || filename.trim().isEmpty() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-      return false;
-    }
-    File f1 = new File("backup", filename);
-    if (f1.exists() && f1.isFile()) {
-      return f1.delete();
-    }
-    File f2 = new File("backups", filename);
-    if (f2.exists() && f2.isFile()) {
-      return f2.delete();
-    }
-    File f3 = new File(".", filename);
-    if (f3.exists() && f3.isFile()) {
-      return f3.delete();
-    }
-    return false;
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return deleteBackup(cfg.getBackupTargetFolder(), filename);
   }
 
-  private static String findScript(String relative1, String relative2) {
-    if (new File(relative1).exists())
-      return relative1;
-    if (new File(relative2).exists())
-      return relative2;
-    return relative1;
+  public static boolean deleteBackup(String targetFolder, String filename) {
+    return BackupHandler.deleteBackup(targetFolder, filename);
   }
 }

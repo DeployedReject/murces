@@ -64,28 +64,22 @@ public class CustomizationView implements WorkspaceView {
         resetBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [R]eset Defaults"), this::onResetDefaults);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack"), mainWindow::showMainMenu);
 
-        themeCombo.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                transparencyCombo.takeFocus();
-                return false;
+        themeCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
+                mainWindow.getGui().getGUIThread().invokeLater(transparencyCombo::takeFocus);
             }
-            return true;
         });
 
-        transparencyCombo.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                nerdFontCombo.takeFocus();
-                return false;
+        transparencyCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
+                mainWindow.getGui().getGUIThread().invokeLater(nerdFontCombo::takeFocus);
             }
-            return true;
         });
 
-        nerdFontCombo.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                trueColorCheck.takeFocus();
-                return false;
+        nerdFontCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
+                mainWindow.getGui().getGUIThread().invokeLater(trueColorCheck::takeFocus);
             }
-            return true;
         });
 
         trueColorCheck.setInputFilter((interactable, keyStroke) -> {

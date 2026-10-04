@@ -17,7 +17,15 @@ import com.google.gson.JsonParser;
 import org.codeberg.DeployedReject.utils.ErrorHelper;
 import org.codeberg.DeployedReject.utils.Communicator;
 import org.codeberg.DeployedReject.utils.NetworkUtils;
+import org.codeberg.DeployedReject.utils.ProcessResult;
 import org.codeberg.DeployedReject.utils.Shell;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class ServerHandler {
 
@@ -27,6 +35,14 @@ public class ServerHandler {
   public String lVersion;
   public int ram;
   public int job;
+  public String command;
+  public String oldName;
+  public String newName;
+  public String sourceFolder;
+  public String targetFolder;
+  public int retentionLimit = 3;
+  public boolean cloudSync = false;
+  public String cloudRemote = "minecraftdrive";
   public JsonArray list = new JsonArray();
 
   public ServerHandler(String type, String loader, String gVersion, String lVersion, int ram, int job) {
@@ -36,7 +52,196 @@ public class ServerHandler {
     this.lVersion = lVersion;
     this.ram = ram;
     this.job = job;
+  }
 
+  public static boolean isCommandAvailable(String cmd) {
+    try {
+      Process p = new ProcessBuilder("which", cmd).start();
+      return p.waitFor() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public static boolean isServerRunning() {
+    try {
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      if (p.waitFor() == 0)
+        return true;
+      p = new ProcessBuilder("tmux", "has-session", "-t", "mcServer").start();
+      if (p.waitFor() == 0)
+        return true;
+      p = new ProcessBuilder("pgrep", "-f", "server.jar").start();
+      if (p.waitFor() == 0)
+        return true;
+      p = new ProcessBuilder("pgrep", "-f", "fabric-server-launch.jar").start();
+      return p.waitFor() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel) {
+    return startServer(publicTunnel, "4G");
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel, String ram) {
+    if (!isCommandAvailable("tmux")) {
+      return new ProcessResult(1,
+          "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
+    }
+    if (!isCommandAvailable("java")) {
+      return new ProcessResult(1,
+          "[ERROR] 'java' is not found in PATH.\nPlease install Java (e.g. OpenJDK 17/21+) to run Minecraft servers.");
+    }
+    if (isServerRunning()) {
+      return new ProcessResult(1, "Minecraft server session 'mcsv' is already running.");
+    }
+
+    try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
+      eulaWriter.write("eula=true\n");
+    } catch (Exception ignored) {
+    }
+
+    String ramArg = (ram != null && !ram.trim().isEmpty()) ? ram.trim() : "4G";
+    if (ramArg.matches("^[0-9]+$")) {
+      ramArg = ramArg + "G";
+    }
+
+    if (publicTunnel) {
+      try {
+        Process p = new ProcessBuilder("tmux", "has-session", "-t", "playit").start();
+        if (p.waitFor() != 0) {
+          String playitBin = new File("./playit").canExecute() ? "./playit" : "playit";
+          new ProcessBuilder("tmux", "new-session", "-d", "-s", "playit",
+              playitBin + " --secret_path ./playit.toml start").start().waitFor();
+        }
+      } catch (Exception ignored) {
+      }
+    }
+
+    File userJvmArgs = new File("user_jvm_args.txt");
+    if (userJvmArgs.exists()) {
+      try {
+        String content = Files.readString(userJvmArgs.toPath(), StandardCharsets.UTF_8);
+        content = content.replaceAll("-Xmx[0-9]*[GM]", "-Xmx" + ramArg)
+            .replaceAll("-Xms[0-9]*[GM]", "-Xms" + ramArg);
+        Files.writeString(userJvmArgs.toPath(), content, StandardCharsets.UTF_8);
+      } catch (Exception ignored) {
+      }
+    }
+
+    File runSh = new File("run.sh");
+    if (runSh.exists()) {
+      try {
+        new ProcessBuilder("chmod", "+x", "run.sh").start().waitFor();
+        Process p = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui").start();
+        int code = p.waitFor();
+        if (code == 0) {
+          return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
+        } else {
+          return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
+        }
+      } catch (Exception e) {
+        return new ProcessResult(1, "Failed to launch run.sh: " + e.getMessage());
+      }
+    }
+
+    String targetJar = "server.jar";
+    if (new File("fabric-server-launch.jar").exists()) {
+      targetJar = "fabric-server-launch.jar";
+    }
+
+    List<String> cmd = new ArrayList<>(Arrays.asList(
+        "tmux", "new-session", "-d", "-s", "mcsv",
+        "java",
+        "-Xmx" + ramArg,
+        "-Xms" + ramArg,
+        "-XX:+UseG1GC",
+        "-XX:+ParallelRefProcEnabled",
+        "-XX:MaxGCPauseMillis=200",
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:+DisableExplicitGC",
+        "-XX:+AlwaysPreTouch",
+        "-XX:G1NewSizePercent=30",
+        "-XX:G1MaxNewSizePercent=40",
+        "-XX:G1HeapRegionSize=8M",
+        "-XX:G1ReservePercent=20",
+        "-XX:G1HeapWastePercent=5",
+        "-XX:G1MixedGCCountTarget=4",
+        "-XX:InitiatingHeapOccupancyPercent=15",
+        "-XX:G1MixedGCLiveThresholdPercent=90",
+        "-XX:G1RSetUpdatingPauseTimePercent=5",
+        "-XX:SurvivorRatio=32",
+        "-XX:+PerfDisableSharedMem",
+        "-XX:MaxTenuringThreshold=1",
+        "-Dusing.aikars.flags=https://mcflags.emc.gs",
+        "-Daikars.new.flags=true",
+        "-jar",
+        targetJar,
+        "nogui"));
+
+    try {
+      Process p = new ProcessBuilder(cmd).start();
+      int code = p.waitFor();
+      if (code == 0) {
+        return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
+      } else {
+        return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
+      }
+    } catch (Exception e) {
+      return new ProcessResult(1, "Failed to launch server session: " + e.getMessage());
+    }
+  }
+
+  public static ProcessResult stopServer() {
+    if (!isCommandAvailable("tmux")) {
+      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+    }
+
+    boolean hasSession = false;
+    try {
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      hasSession = (p.waitFor() == 0);
+    } catch (Exception ignored) {
+    }
+
+    if (!hasSession) {
+      return new ProcessResult(0, "Minecraft server session 'mcsv' is not running.");
+    }
+
+    try {
+      new ProcessBuilder("tmux", "send-keys", "-t", "mcsv", "stop", "C-m").start().waitFor();
+
+      for (int i = 0; i < 30; i++) {
+        Thread.sleep(500);
+        Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+        if (p.waitFor() != 0) {
+          return new ProcessResult(0, "Minecraft server stopped.");
+        }
+      }
+
+      new ProcessBuilder("tmux", "kill-session", "-t", "mcsv").start().waitFor();
+      return new ProcessResult(0, "Minecraft server session terminated.");
+    } catch (Exception e) {
+      return new ProcessResult(1, "Failed to stop server: " + e.getMessage());
+    }
+  }
+
+  public static ProcessResult sendConsoleCommand(String cmd) {
+    if (!isCommandAvailable("tmux")) {
+      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+    }
+    try {
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      if (p.waitFor() != 0) {
+        return new ProcessResult(1, "Minecraft server session 'mcsv' not found.");
+      }
+      new ProcessBuilder("tmux", "send-keys", "-t", "mcsv", cmd, "C-m").start().waitFor();
+      return new ProcessResult(0, "Command dispatched to Minecraft server.");
+    } catch (Exception e) {
+      return new ProcessResult(1, "Failed to send command: " + e.getMessage());
+    }
   }
 
   public void serverHandler() {
@@ -80,13 +285,14 @@ public class ServerHandler {
         Communicator.printer(comp);
         break;
       case 1:
-        if (loader.equals("forge"))
-          spawnServer(true);
-        else
-          spawnServer();
+        startServer(false, String.valueOf(ram) + "G");
         break;
       case 2:
         stopServer();
+        JsonObject stopResp = new JsonObject();
+        stopResp.addProperty("status", 0);
+        stopResp.addProperty("type", "server");
+        Communicator.printer(stopResp);
         break;
       case 3:
         JsonObject response = new JsonObject();
@@ -102,23 +308,14 @@ public class ServerHandler {
         Communicator.printer(response);
         break;
       case 4:
-        boolean isRunning = false;
-        try {
-          String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcsv" };
-          isRunning = (Shell.execute(checkCmd).waitFor() == 0);
-        } catch (Exception ignored) {
-        }
         JsonObject statusResp = new JsonObject();
         statusResp.addProperty("status", 0);
         statusResp.addProperty("type", "server");
-        statusResp.addProperty("running", isRunning);
+        statusResp.addProperty("running", isServerRunning());
         Communicator.printer(statusResp);
         break;
       case 5:
-        if (loader.equals("forge"))
-          spawnServer(true);
-        else
-          spawnServer();
+        startServer(false, String.valueOf(ram) + "G");
         break;
       case 6:
         stopServer();
@@ -126,10 +323,31 @@ public class ServerHandler {
           Thread.sleep(1000);
         } catch (Exception ignored) {
         }
-        if (loader.equals("forge"))
-          spawnServer(true);
-        else
-          spawnServer();
+        startServer(false, String.valueOf(ram) + "G");
+        break;
+      case 7:
+        ProcessResult cmdRes = sendConsoleCommand(command != null ? command : "");
+        JsonObject cmdResp = new JsonObject();
+        cmdResp.addProperty("status", cmdRes.exitCode == 0 ? 0 : 1);
+        cmdResp.addProperty("type", "server");
+        cmdResp.addProperty("output", cmdRes.output);
+        Communicator.printer(cmdResp);
+        break;
+      case 8:
+        ProcessResult migRes = MigrationHandler.migratePlayer(oldName, newName);
+        JsonObject migResp = new JsonObject();
+        migResp.addProperty("status", migRes.exitCode == 0 ? 0 : 1);
+        migResp.addProperty("type", "server");
+        migResp.addProperty("output", migRes.output);
+        Communicator.printer(migResp);
+        break;
+      case 9:
+        ProcessResult bakRes = BackupHandler.runBackup(sourceFolder, targetFolder, retentionLimit, cloudSync, cloudRemote);
+        JsonObject bakResp = new JsonObject();
+        bakResp.addProperty("status", bakRes.exitCode == 0 ? 0 : 1);
+        bakResp.addProperty("type", "server");
+        bakResp.addProperty("output", bakRes.output);
+        Communicator.printer(bakResp);
         break;
       default:
         ErrorHelper.errorJson("Unrecognized server job action requested: " + job);
@@ -454,36 +672,6 @@ public class ServerHandler {
 
   }
 
-  private void stopServer() {
-
-    String[] checkCmd = new String[] { "tmux", "has-session", "-t", "mcsv" };
-    try {
-      if (Shell.execute(checkCmd).waitFor() != 0) {
-        ErrorHelper.errorJson("Server tmux session 'mcsv' not found; no active server to stop.");
-        return;
-      }
-    } catch (Exception e) {
-      ErrorHelper.errorJson("Failed checking server session status: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
-      return;
-    }
-
-    String[] command = new String[] {
-        "tmux", "kill-session", "-t", "mcsv"
-    };
-    try {
-      if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Could not stop server tmux session 'mcsv'.");
-        return;
-      }
-      JsonObject response = new JsonObject();
-      response.addProperty("status", 0);
-      response.addProperty("type", "server");
-      Communicator.printer(response);
-    } catch (Exception e) {
-      ErrorHelper.errorJson("Failed stopping server session: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
-    }
-
-  }
 
   private void forge() {
     if (job == 3) {

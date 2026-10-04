@@ -42,20 +42,19 @@ public class InstallServerView implements WorkspaceView {
         cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Installation"), this::cancelInstallation);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
 
-        engineComboBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                gameVersionComboBox.takeFocus();
-                return false;
+        engineComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
+                mainWindow.getGui().getGUIThread().invokeLater(gameVersionComboBox::takeFocus);
             }
-            return true;
         });
 
-        gameVersionComboBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                loaderVersionBox.takeFocus();
-                return false;
+        gameVersionComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (selectedIndex >= 0 && selectedIndex < gameVersionComboBox.getItemCount()) {
+                String selected = gameVersionComboBox.getItem(selectedIndex);
+                if (!"Custom...".equals(selected) && changedByUserInteraction) {
+                    mainWindow.getGui().getGUIThread().invokeLater(loaderVersionBox::takeFocus);
+                }
             }
-            return true;
         });
 
         loaderVersionBox.setInputFilter((interactable, keyStroke) -> {
@@ -70,24 +69,22 @@ public class InstallServerView implements WorkspaceView {
             return true;
         });
 
-        ramComboBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                installOnlyBtn.takeFocus();
-                return false;
+        ramComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
+                mainWindow.getGui().getGUIThread().invokeLater(installOnlyBtn::takeFocus);
             }
-            return true;
         });
 
         Panel formPanel = new Panel(new GridLayout(2));
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " [E]ngine:")));
         formPanel.addComponent(engineComboBox);
-        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " Game [V]ersion:")));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " Game [V]ersion ([C]ustom):")));
         formPanel.addComponent(gameVersionComboBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " L[o]ader Version:")));
         formPanel.addComponent(loaderVersionBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         formPanel.addComponent(ramComboBox);
-        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration (Enter advances options)"))));
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Server Configuration (Enter opens dropdown)"))));
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         actionPanel.addComponent(installOnlyBtn);
@@ -114,6 +111,7 @@ public class InstallServerView implements WorkspaceView {
         hotkeys.put('X', KeyboardNavigationHelper.action(cancelBtn, this::cancelInstallation));
         hotkeys.put('E', this::cycleEngine);
         hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox));
+        hotkeys.put('C', () -> MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), gameVersionComboBox, gameVersionComboBox.getSelectedIndex()));
         hotkeys.put('O', loaderVersionBox::takeFocus);
         hotkeys.put('R', this::cycleRam);
         hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));

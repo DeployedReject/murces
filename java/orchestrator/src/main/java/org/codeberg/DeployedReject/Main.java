@@ -82,11 +82,32 @@ public class Main {
           int job = request.get("job").getAsInt();
 
           ServerHandler sh = new ServerHandler(type, loader, gVersion, lVersion, ram, job);
+          if (request.has("command")) sh.command = request.get("command").getAsString();
+          if (request.has("oldName")) sh.oldName = request.get("oldName").getAsString();
+          if (request.has("newName")) sh.newName = request.get("newName").getAsString();
+          if (request.has("sourceFolder")) sh.sourceFolder = request.get("sourceFolder").getAsString();
+          if (request.has("targetFolder")) sh.targetFolder = request.get("targetFolder").getAsString();
+          if (request.has("retentionLimit")) sh.retentionLimit = request.get("retentionLimit").getAsInt();
+          if (request.has("cloudSync")) sh.cloudSync = request.get("cloudSync").getAsBoolean();
+          if (request.has("cloudRemote")) sh.cloudRemote = request.get("cloudRemote").getAsString();
 
           sh.serverHandler();
 
-        } else if (type.equals("modding")) {
+        } else if (type.equals("backup")) {
+          String src = request.has("sourceFolder") ? request.get("sourceFolder").getAsString() : "world";
+          String tgt = request.has("targetFolder") ? request.get("targetFolder").getAsString() : "backup";
+          int ret = request.has("retentionLimit") ? request.get("retentionLimit").getAsInt() : 3;
+          boolean sync = request.has("cloudSync") && request.get("cloudSync").getAsBoolean();
+          String remote = request.has("cloudRemote") ? request.get("cloudRemote").getAsString() : "minecraftdrive";
+          org.codeberg.DeployedReject.utils.ProcessResult res =
+              org.codeberg.DeployedReject.device.BackupHandler.runBackup(src, tgt, ret, sync, remote);
+          JsonObject resp = new JsonObject();
+          resp.addProperty("status", res.exitCode == 0 ? 0 : 1);
+          resp.addProperty("type", "backup");
+          resp.addProperty("output", res.output);
+          Communicator.printer(resp);
 
+        } else if (type.equals("modding")) {
           if (!(request.has("modBrowser") && request.has("modName") && request.has("version")
               && (request.has("loader") || request.has("modLoader")) && request.has("subType"))) {
             ErrorHelper.errorJson("Missing One or More Necessary Parameters.");

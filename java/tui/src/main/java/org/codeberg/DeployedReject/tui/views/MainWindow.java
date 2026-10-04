@@ -367,27 +367,11 @@ public class MainWindow extends BasicWindow {
 
                 if (type == KeyType.ArrowDown || type == KeyType.ArrowUp ||
                     type == KeyType.ArrowLeft || type == KeyType.ArrowRight) {
-                    if (focused instanceof ComboBox) {
-                        ComboBox<?> cb = (ComboBox<?>) focused;
-                        if (cb.getItemCount() > 0) {
-                            if (type == KeyType.ArrowDown) {
-                                int next = (cb.getSelectedIndex() + 1) % cb.getItemCount();
-                                cb.setSelectedIndex(next);
-                                deliver.set(false);
-                                return;
-                            } else if (type == KeyType.ArrowUp) {
-                                int prev = (cb.getSelectedIndex() - 1 + cb.getItemCount()) % cb.getItemCount();
-                                cb.setSelectedIndex(prev);
-                                deliver.set(false);
-                                return;
-                            }
-                        }
-                    }
-
                     boolean isScrollableOrText = (focused instanceof ActionListBox) ||
                                                  (focused instanceof Table) ||
                                                  (focused instanceof TextBox) ||
-                                                 (focused instanceof ColoredLogView);
+                                                 (focused instanceof ColoredLogView) ||
+                                                 (focused instanceof ComboBox);
                     if (!isScrollableOrText) {
                         deliver.set(false);
                         return;

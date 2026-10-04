@@ -52,15 +52,13 @@ public class ServerControlView implements WorkspaceView {
             return true;
         });
 
-        ramComboBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
+        ramComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+            if (changedByUserInteraction) {
                 Interactable target = startBtn.isEnabled() ? startBtn : (stopBtn.isEnabled() ? stopBtn : refreshBtn);
                 if (target != null) {
-                    target.takeFocus();
+                    mainWindow.getGui().getGUIThread().invokeLater(target::takeFocus);
                 }
-                return false;
             }
-            return true;
         });
 
         commandInput.setInputFilter((interactable, keyStroke) -> {

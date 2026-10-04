@@ -6,6 +6,7 @@ import com.googlecode.lanterna.input.KeyType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.theme.GlyphHelper;
+import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 import org.codeberg.DeployedReject.tui.theme.Themes;
 
 import java.util.*;
@@ -23,6 +24,7 @@ public class ModBrowseView implements WorkspaceView {
   private final TextBox searchBox;
   private final MurcesListBox resultsList;
   private final ComboBox<String> modVersionCombo;
+  private final Label versionDetailLabel;
   private final ComboBox<String> descModeCombo;
   private final Label titleAuthorLabel;
   private final Label descContentLabel;
@@ -70,28 +72,25 @@ public class ModBrowseView implements WorkspaceView {
     downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
     resultsList = new MurcesListBox(new TerminalSize(38, 10));
 
-    platformBox.setInputFilter((interactable, keyStroke) -> {
-      if (keyStroke.getKeyType() == KeyType.Enter) {
-        loaderBox.takeFocus();
-        return false;
+    platformBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      if (changedByUserInteraction) {
+        mainWindow.getGui().getGUIThread().invokeLater(loaderBox::takeFocus);
       }
-      return true;
     });
 
-    loaderBox.setInputFilter((interactable, keyStroke) -> {
-      if (keyStroke.getKeyType() == KeyType.Enter) {
-        versionComboBox.takeFocus();
-        return false;
+    loaderBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      if (changedByUserInteraction) {
+        mainWindow.getGui().getGUIThread().invokeLater(versionComboBox::takeFocus);
       }
-      return true;
     });
 
-    versionComboBox.setInputFilter((interactable, keyStroke) -> {
-      if (keyStroke.getKeyType() == KeyType.Enter) {
-        searchBox.takeFocus();
-        return false;
+    versionComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      if (selectedIndex >= 0 && selectedIndex < versionComboBox.getItemCount()) {
+        String sel = versionComboBox.getItem(selectedIndex);
+        if (!"Custom...".equals(sel) && changedByUserInteraction) {
+          mainWindow.getGui().getGUIThread().invokeLater(searchBox::takeFocus);
+        }
       }
-      return true;
     });
 
     Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -159,6 +158,26 @@ public class ModBrowseView implements WorkspaceView {
     modVersionCombo = new ComboBox<>("[Latest Compatible]");
     versionRow.addComponent(modVersionCombo);
     detailsCard.addComponent(versionRow);
+
+    versionDetailLabel = new Label("");
+    versionDetailLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+    detailsCard.addComponent(versionDetailLabel);
+
+    modVersionCombo.setInputFilter((interactable, keyStroke) -> {
+      if (keyStroke.getKeyType() == KeyType.Enter ||
+          (keyStroke.getKeyType() == KeyType.Character && keyStroke.getCharacter() != null && keyStroke.getCharacter() == ' ')) {
+        WideDropDownHelper.showWideDropDown(mainWindow.getGui(), modVersionCombo, 10, idx -> {
+          updateSelectedVersionDisplay();
+          downloadBtn.takeFocus();
+        });
+        return false;
+      }
+      return true;
+    });
+
+    modVersionCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      updateSelectedVersionDisplay();
+    });
 
     Panel modeRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
     modeRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " View [M]ode: ")));
@@ -244,6 +263,10 @@ public class ModBrowseView implements WorkspaceView {
     hotkeys.put('K', () -> {
       if (modVersionCombo.getItemCount() > 0) {
         modVersionCombo.takeFocus();
+        WideDropDownHelper.showWideDropDown(mainWindow.getGui(), modVersionCombo, 10, idx -> {
+          updateSelectedVersionDisplay();
+          downloadBtn.takeFocus();
+        });
       }
     });
     hotkeys.put('M', () -> {
@@ -335,6 +358,7 @@ public class ModBrowseView implements WorkspaceView {
       resultsList.setPreferredSize(new TerminalSize(leftWidth, middleHeight));
       detailsCard.setPreferredSize(new TerminalSize(rightWidth, middleHeight));
       descContentLabel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
+      modVersionCombo.setPreferredSize(new TerminalSize(Math.max(22, rightWidth - 22), 1));
       pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 4), 3));
       if (downloadPanel != null) {
         downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 2), 5));
@@ -349,6 +373,7 @@ public class ModBrowseView implements WorkspaceView {
       resultsList.setPreferredSize(new TerminalSize(fullWidth, halfH));
       detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 3));
       descContentLabel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
+      modVersionCombo.setPreferredSize(new TerminalSize(Math.max(22, fullWidth - 22), 1));
       pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 3));
       if (downloadPanel != null) {
         downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 2), 5));
@@ -530,6 +555,30 @@ public class ModBrowseView implements WorkspaceView {
     mainWindow.invalidate();
   }
 
+  private void updateSelectedVersionDisplay() {
+    if (versionDetailLabel == null) return;
+    int sel = modVersionCombo.getSelectedIndex();
+    if (sel > 0 && (sel - 1) < currentModVersions.size()) {
+      OrchestratorBridge.ModVersionInfo v = currentModVersions.get(sel - 1);
+      String fullTitle = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : (v.versionNumber != null ? v.versionNumber : "");
+      String fileInfo = (v.filename != null ? v.filename : "") + (v.sizeBytes > 0 ? " (" + formatSize(v.sizeBytes) + ")" : "");
+      versionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Full: " + fullTitle + "\n" + GlyphHelper.ICON_FILE + " File: " + fileInfo));
+    } else if (sel == 0 && !currentModVersions.isEmpty()) {
+      OrchestratorBridge.ModVersionInfo v = currentModVersions.get(0);
+      String fullTitle = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : (v.versionNumber != null ? v.versionNumber : "");
+      versionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Full [Latest]: " + fullTitle));
+    } else {
+      versionDetailLabel.setText("");
+    }
+  }
+
+  private String formatSize(long bytes) {
+    if (bytes < 1024) return bytes + " B";
+    int exp = (int) (Math.log(bytes) / Math.log(1024));
+    char unit = "KMGTPE".charAt(exp - 1);
+    return String.format("%.1f %cB", bytes / Math.pow(1024, exp), unit);
+  }
+
   private List<String> formatAndWrapDescription(String text, int width) {
     List<String> result = new ArrayList<>();
     if (text == null || text.trim().isEmpty()) {
@@ -605,6 +654,7 @@ public class ModBrowseView implements WorkspaceView {
     modVersionCombo.addItem("[Latest Compatible]");
     modVersionCombo.setSelectedIndex(0);
     currentModVersions.clear();
+    updateSelectedVersionDisplay();
 
     final String finalPlat = platform;
     final String currentModId = mod.id;
@@ -618,10 +668,12 @@ public class ModBrowseView implements WorkspaceView {
               currentModVersions.clear();
               currentModVersions.addAll(versions);
               for (OrchestratorBridge.ModVersionInfo v : versions) {
-                if (v != null && v.versionNumber != null) {
-                  modVersionCombo.addItem(v.toString());
+                if (v != null) {
+                  String label = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : v.toString();
+                  modVersionCombo.addItem(label != null ? label : "Unknown Version");
                 }
               }
+              updateSelectedVersionDisplay();
               mainWindow.invalidate();
             }
           } catch (Exception ignored) {
@@ -663,6 +715,7 @@ public class ModBrowseView implements WorkspaceView {
               modVersionCombo.addItem("[No Mod Selected]");
               modVersionCombo.setSelectedIndex(0);
               currentModVersions.clear();
+              updateSelectedVersionDisplay();
               updateDetailsDisplay();
 
               statusLabel.setText(

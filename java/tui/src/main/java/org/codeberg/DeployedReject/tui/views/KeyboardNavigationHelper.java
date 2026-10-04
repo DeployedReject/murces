@@ -30,15 +30,14 @@ public class KeyboardNavigationHelper {
     }
 
     /**
-     * Executes an action. If the target is not a Button, focus is shifted to it.
-     * Buttons never take focus on hotkeys to avoid disrupting the active input/list position.
+     * Executes an action and shifts focus to the target.
      */
     public static Runnable focus(Interactable target, Runnable action) {
         return () -> {
             if (target != null && !target.isEnabled()) {
                 return;
             }
-            if (target != null && !(target instanceof Button)) {
+            if (target != null) {
                 target.takeFocus();
             }
             if (action != null) {

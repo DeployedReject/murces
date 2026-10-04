@@ -68,6 +68,24 @@ public class ConfigManager {
                 if (obj.has("pickaxeAnimation")) {
                     loaded.setPickaxeAnimation(obj.get("pickaxeAnimation").getAsBoolean());
                 }
+                if (obj.has("nerdFontMode") && !obj.get("nerdFontMode").isJsonNull()) {
+                    loaded.setNerdFontMode(obj.get("nerdFontMode").getAsString().trim());
+                }
+                if (obj.has("backupSourceFolder") && !obj.get("backupSourceFolder").isJsonNull()) {
+                    loaded.setBackupSourceFolder(obj.get("backupSourceFolder").getAsString().trim());
+                }
+                if (obj.has("backupTargetFolder") && !obj.get("backupTargetFolder").isJsonNull()) {
+                    loaded.setBackupTargetFolder(obj.get("backupTargetFolder").getAsString().trim());
+                }
+                if (obj.has("backupRetentionLimit")) {
+                    loaded.setBackupRetentionLimit(obj.get("backupRetentionLimit").getAsInt());
+                }
+                if (obj.has("backupCloudSync")) {
+                    loaded.setBackupCloudSync(obj.get("backupCloudSync").getAsBoolean());
+                }
+                if (obj.has("backupCloudRemote") && !obj.get("backupCloudRemote").isJsonNull()) {
+                    loaded.setBackupCloudRemote(obj.get("backupCloudRemote").getAsString().trim());
+                }
                 this.config = loaded;
                 return;
             } catch (Exception ignored) {}
@@ -86,6 +104,12 @@ public class ConfigManager {
             obj.addProperty("trueColor", config.isTrueColor());
             obj.addProperty("enforceMinSize", config.isEnforceMinSize());
             obj.addProperty("pickaxeAnimation", config.isPickaxeAnimation());
+            obj.addProperty("nerdFontMode", config.getNerdFontMode());
+            obj.addProperty("backupSourceFolder", config.getBackupSourceFolder());
+            obj.addProperty("backupTargetFolder", config.getBackupTargetFolder());
+            obj.addProperty("backupRetentionLimit", config.getBackupRetentionLimit());
+            obj.addProperty("backupCloudSync", config.isBackupCloudSync());
+            obj.addProperty("backupCloudRemote", config.getBackupCloudRemote());
             GSON.toJson(obj, writer);
         } catch (Exception ignored) {}
     }

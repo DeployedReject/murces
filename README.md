@@ -160,11 +160,11 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **Archive Management**: View timestamped `.tar` snapshots with file sizes directly in the TUI.
 - **Retention & Cloud Replication**: Automatically retains the latest snapshots and optionally syncs archives offsite via `rclone`.
 
-#### Configuring Google Drive Backups (`backup.sh`)
+#### Configuring Google Drive & World Backups
 
-`backup.sh` handles automated save flushing, tar archiving, snapshot rotation, and cloud synchronization via `rclone`.
+The orchestrator handles automated save flushing, tar archiving, snapshot rotation, and cloud synchronization via `rclone` natively without external scripts.
 
-1. **Install rclone**:
+1. **Install rclone** (for optional cloud sync):
 
    ```bash
    sudo apt install rclone
@@ -178,7 +178,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
    rclone config
    ```
    - Press `n` for a new remote.
-   - Name the remote `minecraftdrive` (matching line 39 in `backup.sh`).
+   - Name the remote `minecraftdrive` (or any custom name).
    - Select `drive` for Google Drive.
    - Leave client ID and secret blank for defaults, or provide your own OAuth credentials.
    - Select access scope `1` (full access).
@@ -190,29 +190,21 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
    rclone lsd minecraftdrive:
    ```
 
-4. **Customize `backup.sh` settings** (optional):
-   Edit the parameters at the top of `backup.sh`:
-
-   ```bash
-   SOURCE_FOLDER="world"   # World directory to archive
-   TARGET_FOLDER="backup"  # Local storage folder for .tar snapshots
-   ```
-   - **Custom Remote Name**: If your rclone remote is named differently, update line 39:
-     ```bash
-     rclone sync "$TARGET_FOLDER" your_remote_name:"$TARGET_FOLDER"
-     ```
-   - **Local Retention Limit**: By default, only the 3 newest `.tar` archives are kept locally. To change this quota, modify line 30:
-     ```bash
-     if [ "$COUNT" -gt 5 ]; then  # Retains 5 newest archives
-     ```
+4. **Customize backup settings directly in MurCes TUI**:
+   Open **World Backups** (`[B]` from Main Menu) to configure options:
+   - **Source World**: Directory to archive (default `world`).
+   - **Target Dir**: Folder for `.tar` snapshots (default `backup`).
+   - **Retain Count**: Maximum snapshot quota to keep locally (default `3`).
+   - **Cloud Sync**: Checkbox toggle to automatically replicate archives via `rclone`.
+   - **Remote**: Target rclone remote name (default `minecraftdrive`).
+   - Press **`[S]ave Options`** to persist your configuration to `murces.json`.
 
 5. **Trigger a backup**:
-   Run directly or via MurCes CLI:
-   ```bash
-   ./murces backup
-   # or execute the script directly:
-   ./backup.sh
-   ```
+   - In the TUI: Press **`[K] Backup Now`** in the World Backups view.
+   - Or via MurCes CLI:
+     ```bash
+     ./murces backup
+     ```
 
 ---
 
@@ -261,24 +253,28 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ## Quickstart
 
-### 1. Download & Extract
+### 1. One-Line Automated Installer
 
-Download the latest `murces.zip` release bundle from [GitHub Releases](https://github.com/DeployedReject/murces/releases) into your Minecraft server directory:
+Run the automated installer to set up all system dependencies (tmux, OpenJDK, curl, tar, rclone, playit) and fetch the latest `murces` standalone executable:
 
 ```bash
-# Download and unzip the standalone native release
-curl -sSLO https://github.com/DeployedReject/murces/releases/latest/download/murces.zip
-unzip murces.zip
-
-# Grant executable permissions
-chmod +x murces svctrl.sh backup.sh
+# Run the automated installer (installs packages and murces executable)
+curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash
 
 # Launch the interactive dashboard
 ./murces
 ```
 
+Alternatively, to download the precompiled binary directly without the installer:
+
+```bash
+curl -sSLO https://github.com/DeployedReject/murces/releases/latest/download/murces
+chmod +x murces
+./murces
+```
+
 > [!NOTE]
-> The precompiled native release is completely self-contained. It does **not** require a JDK or GraalVM runtime installed on your server.
+> The precompiled native release is completely self-contained in a single executable file. No zip archive extraction or complex configuration is required.
 
 ---
 
