@@ -12,7 +12,6 @@
 # - Asks for user consent before installing each package / tool
 # - Shows real-time progress for every package and download
 # - Installs core packages: tmux, curl, tar, rclone, playit, and MurCes binary
-# - NOTE: Does NOT install JDK / Java runtime
 # ==============================================================================
 
 set -uo pipefail
@@ -32,11 +31,19 @@ RESET='\033[0m'
 HIDE_CURSOR='\033[?25l'
 SHOW_CURSOR='\033[?25h'
 
+# Modern ANSI progress bar glyphs (UTF-8 blocks)
+BAR_BLOCKS="████████████████████████████████████████████████████████████"
+BAR_SHADES="░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
+CURRENT_CMD_PID=""
+
 cleanup() {
     echo -ne "$SHOW_CURSOR"
-    # Kill background sudo keep-alive or spinners if still alive
+    # Kill background sudo keep-alive or running command if still alive
     if [ -n "${SUDO_KEEP_ALIVE_PID:-}" ] && kill -0 "$SUDO_KEEP_ALIVE_PID" 2>/dev/null; then
         kill "$SUDO_KEEP_ALIVE_PID" 2>/dev/null || true
+    fi
+    if [ -n "${CURRENT_CMD_PID:-}" ] && kill -0 "$CURRENT_CMD_PID" 2>/dev/null; then
+        kill "$CURRENT_CMD_PID" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT INT TERM
@@ -200,31 +207,31 @@ download_with_progress() {
             bar_width=18
         fi
 
-        curl -sSL -L --fail --progress-bar -o "$temp_dest" "$url" 2>&1 | while IFS= read -r -d $'\r' line; do
-            local percent
-            percent=$(echo "$line" | grep -oE '[0-9]+(\.[0-9]+)?%' | tr -d '%' | head -n 1)
-            if [ -n "$percent" ]; then
-                local int_p=${percent%.*}
+        printf "    ${CYAN}[${DIM}%s${CYAN}]${RESET}   0%%" "${BAR_SHADES:0:bar_width}"
+
+        curl -f -L --progress-bar -o "$temp_dest" "$url" 2>&1 | while IFS= read -r -d $'\r' line; do
+            if [[ "$line" =~ ([0-9]+)(\.[0-9]+)?% ]]; then
+                local int_p="${BASH_REMATCH[1]}"
                 int_p=${int_p:-0}
                 if [ "$int_p" -gt 100 ]; then int_p=100; fi
 
                 local filled=$(( (int_p * bar_width) / 100 ))
                 local empty=$(( bar_width - filled ))
-                local bar_filled
-                local bar_empty
-                bar_filled=$(printf "%${filled}s" | tr ' ' '█')
-                bar_empty=$(printf "%${empty}s" | tr ' ' '░')
+                local bar_filled="${BAR_BLOCKS:0:filled}"
+                local bar_empty="${BAR_SHADES:0:empty}"
 
                 printf "\r    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$int_p"
             fi
         done
-        echo ""
+        echo -ne "$SHOW_CURSOR"
 
         if [ -f "$temp_dest" ] && [ -s "$temp_dest" ]; then
+            printf "\r    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
             mv -f "$temp_dest" "$dest"
             echo -e "${GREEN}    ✔ Download complete:${RESET} ${DIM}${dest}${RESET}"
             return 0
         else
+            echo ""
             echo -e "${RED}    ✖ Download failed or returned empty file.${RESET}"
             rm -f "$temp_dest"
             return 1
@@ -233,6 +240,117 @@ download_with_progress() {
         echo -e "${RED}  ✖ curl is not available.${RESET}"
         return 1
     fi
+}
+
+# Execute command in background while displaying an animated ANSI block progress bar
+run_with_ansi_bar() {
+    local label="$1"
+    shift
+    local log_file
+    log_file=$(mktemp)
+
+    echo -ne "$HIDE_CURSOR"
+
+    local term_width
+    term_width=$(tput cols 2>/dev/null || echo 80)
+    local bar_width=32
+    if [ "$term_width" -lt 60 ]; then
+        bar_width=18
+    fi
+    local block_size=8
+    if [ "$bar_width" -lt 24 ]; then
+        block_size=5
+    fi
+
+    local max_pos=$(( bar_width - block_size ))
+    local pos=0
+    local dir=1
+
+    # Run command in background redirecting output to log
+    "$@" >"$log_file" 2>&1 &
+    CURRENT_CMD_PID=$!
+
+    while kill -0 "$CURRENT_CMD_PID" 2>/dev/null; do
+        local pct=""
+        local last_line
+        last_line=$(tail -n 3 "$log_file" 2>/dev/null | tr '\r' '\n' | tail -n 1)
+        if [[ "$last_line" =~ ([0-9]+)% ]]; then
+            pct="${BASH_REMATCH[1]}"
+        fi
+
+        if [ -n "$pct" ] && [ "$pct" -ge 0 ] && [ "$pct" -le 100 ]; then
+            local filled=$(( (pct * bar_width) / 100 ))
+            local empty=$(( bar_width - filled ))
+            local bar_filled="${BAR_BLOCKS:0:filled}"
+            local bar_empty="${BAR_SHADES:0:empty}"
+            printf "\r    ${CYAN}[${GREEN}%s${DIM}%s${CYAN}]${RESET} %3d%%" "$bar_filled" "$bar_empty" "$pct"
+        else
+            local r=$(( bar_width - block_size - pos ))
+            local left_shade="${BAR_SHADES:0:pos}"
+            local block="${BAR_BLOCKS:0:block_size}"
+            local right_shade="${BAR_SHADES:0:r}"
+            printf "\r    ${CYAN}[${DIM}%s${GREEN}%s${DIM}%s${CYAN}]${RESET} %s" "$left_shade" "$block" "$right_shade" "${label}"
+
+            pos=$(( pos + dir ))
+            if [ "$pos" -ge "$max_pos" ]; then
+                pos="$max_pos"
+                dir=-1
+            elif [ "$pos" -le 0 ]; then
+                pos=0
+                dir=1
+            fi
+        fi
+
+        sleep 0.05
+    done
+
+    wait "$CURRENT_CMD_PID"
+    local exit_code=$?
+    CURRENT_CMD_PID=""
+    echo -ne "$SHOW_CURSOR"
+
+    if [ "$exit_code" -eq 0 ]; then
+        printf "\r    ${CYAN}[${GREEN}%s${CYAN}]${RESET} 100%%\n" "${BAR_BLOCKS:0:bar_width}"
+        rm -f "$log_file"
+        return 0
+    else
+        printf "\r%*s\r" $(( bar_width + 40 )) ""
+        if [ -s "$log_file" ]; then
+            echo -e "${DIM}"
+            tail -n 8 "$log_file" | sed 's/^/    | /'
+            echo -e "${RESET}"
+        fi
+        rm -f "$log_file"
+        return "$exit_code"
+    fi
+}
+
+# Backend dispatch for package installation
+run_pm_install() {
+    local pkg="$1"
+    case "$PM" in
+        pacman)
+            $SUDO pacman -S --needed --noconfirm "$pkg"
+            ;;
+        apt)
+            $SUDO apt-get install -y "$pkg"
+            ;;
+        dnf)
+            $SUDO dnf install -y "$pkg"
+            ;;
+        yum)
+            $SUDO yum install -y "$pkg"
+            ;;
+        zypper)
+            $SUDO zypper --non-interactive install "$pkg"
+            ;;
+        apk)
+            $SUDO apk add "$pkg"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 # Install single system package using native package manager with live progress
@@ -257,38 +375,12 @@ install_single_package() {
         return 0
     fi
 
-    echo -e "${CYAN}  ➔ Installing ${BOLD}${pkg}${RESET} via ${PM}..."
+    echo -e "${CYAN}  ➔ Installing ${BOLD}${pkg}${RESET} via ${PM}...${RESET}"
 
-    local exit_code=0
-    case "$PM" in
-        pacman)
-            $SUDO pacman -S --needed --noconfirm "$pkg" || exit_code=$?
-            ;;
-        apt)
-            $SUDO apt-get install -y "$pkg" || exit_code=$?
-            ;;
-        dnf)
-            $SUDO dnf install -y "$pkg" || exit_code=$?
-            ;;
-        yum)
-            $SUDO yum install -y "$pkg" || exit_code=$?
-            ;;
-        zypper)
-            $SUDO zypper --non-interactive install "$pkg" || exit_code=$?
-            ;;
-        apk)
-            $SUDO apk add "$pkg" || exit_code=$?
-            ;;
-        *)
-            echo -e "${YELLOW}  ⚠ Unrecognized package manager. Please install ${pkg} manually.${RESET}"
-            return 1
-            ;;
-    esac
-
-    if [ "$exit_code" -eq 0 ]; then
+    if run_with_ansi_bar "Installing ${pkg}..." run_pm_install "$pkg"; then
         echo -e "${GREEN}  ✔ ${pkg} installed successfully.${RESET}"
     else
-        echo -e "${RED}  ✖ Failed to install ${pkg} (exit code ${exit_code}).${RESET}"
+        echo -e "${RED}  ✖ Failed to install ${pkg}.${RESET}"
     fi
     echo ""
 }
@@ -298,13 +390,22 @@ echo -e "${BOLD}[1/4] Repository Index Sync${RESET}"
 if [ "$PM" != "unknown" ]; then
     if ask_consent "Sync and update package repositories?" "y"; then
         echo -e "${CYAN}  ➔ Updating package repositories...${RESET}"
-        case "$PM" in
-            pacman) $SUDO pacman -Sy ;;
-            apt)    $SUDO apt-get update -y ;;
-            apk)    $SUDO apk update ;;
-            *)      true ;;
-        esac
-        echo -e "${GREEN}  ✔ Package database synchronized.${RESET}"
+        sync_repo() {
+            case "$PM" in
+                pacman) $SUDO pacman -Sy ;;
+                apt)    $SUDO apt-get update -y ;;
+                apk)    $SUDO apk update ;;
+                dnf)    $SUDO dnf check-update ;;
+                yum)    $SUDO yum check-update ;;
+                zypper) $SUDO zypper refresh ;;
+                *)      true ;;
+            esac
+        }
+        if run_with_ansi_bar "Syncing package database..." sync_repo; then
+            echo -e "${GREEN}  ✔ Package database synchronized.${RESET}"
+        else
+            echo -e "${RED}  ✖ Failed to synchronize package database.${RESET}"
+        fi
     else
         echo -e "${DIM}  - Skipped repository refresh.${RESET}"
     fi
@@ -312,7 +413,7 @@ fi
 echo ""
 
 # 2. Individual Package Installation (Consented with live download progress)
-echo -e "${BOLD}[2/4] Package Dependencies (JDK skipped)${RESET}"
+echo -e "${BOLD}[2/4] Package Dependencies${RESET}"
 install_single_package "tmux" "Detached Process Multiplexer" "req"
 install_single_package "curl" "HTTP Downloader" "req"
 install_single_package "tar" "World Archive Bundler" "req"
