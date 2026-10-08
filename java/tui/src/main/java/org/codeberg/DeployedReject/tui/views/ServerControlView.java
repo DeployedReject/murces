@@ -15,6 +15,8 @@ public class ServerControlView implements WorkspaceView {
 
     private final MainWindow mainWindow;
     private final Panel root;
+    private final TextBox serverNameInput;
+    private final Button saveNameBtn;
     private final Label statusLabel;
     private final Label tunnelStatusLabel;
     private final Button configTunnelBtn;
@@ -66,13 +68,33 @@ public class ServerControlView implements WorkspaceView {
             return true;
         });
 
+        Panel serverNamePanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+        serverNamePanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server [N]ame (tmux session): ")));
+        serverNameInput = new TextBox(new TerminalSize(16, 1), org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().getServerName());
+        serverNameInput.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter) {
+                onRenameServer();
+                return false;
+            }
+            return true;
+        });
+        saveNameBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SAVE + " Save"), this::onRenameServer);
+        serverNamePanel.addComponent(serverNameInput);
+        serverNamePanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        serverNamePanel.addComponent(saveNameBtn);
+
         Panel statusPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         statusPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Status: ")));
         statusLabel = new Label("CHECKING...");
         statusPanel.addComponent(statusLabel);
         statusPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         statusPanel.addComponent(refreshBtn);
-        root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
+
+        Panel stateOuter = new Panel(new LinearLayout(Direction.VERTICAL));
+        stateOuter.addComponent(serverNamePanel);
+        stateOuter.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        stateOuter.addComponent(statusPanel);
+        root.addComponent(stateOuter.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server Identity & State"))));
 
         Panel launchOptionsPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
         launchOptionsPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [M]emory (RAM): ")));
@@ -107,6 +129,7 @@ public class ServerControlView implements WorkspaceView {
         hotkeys.put('R', KeyboardNavigationHelper.action(restartBtn, this::onRestart));
         hotkeys.put('U', KeyboardNavigationHelper.action(refreshBtn, this::updateStatus));
         hotkeys.put('K', KeyboardNavigationHelper.action(configTunnelBtn, mainWindow::showTunnelConfig));
+        hotkeys.put('N', serverNameInput::takeFocus);
         hotkeys.put('M', this::cycleRam);
         hotkeys.put('D', KeyboardNavigationHelper.action(sendBtn, this::onSendCommand));
         hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
@@ -351,5 +374,19 @@ public class ServerControlView implements WorkspaceView {
                 }
             });
         }).start();
+    }
+
+    private void onRenameServer() {
+        String newName = serverNameInput.getText().trim();
+        if (newName.isEmpty()) {
+            newName = "mcsv";
+            serverNameInput.setText(newName);
+        }
+        org.codeberg.DeployedReject.tui.config.TuiConfig cfg = org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig();
+        String oldName = cfg.getServerName();
+        cfg.setServerName(newName);
+        org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
+        ActivityLogger.ok("Server name & tmux session updated: '" + oldName + "' -> '" + cfg.getServerName() + "'");
+        updateStatus();
     }
 }

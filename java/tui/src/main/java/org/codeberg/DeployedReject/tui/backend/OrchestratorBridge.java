@@ -94,6 +94,134 @@ public class OrchestratorBridge {
     }
   }
 
+  public static class ModpackResult {
+    public final String id;
+    public final String slug;
+    public final String name;
+    public final String author;
+    public final String description;
+    public final int downloads;
+
+    public ModpackResult(String id, String slug, String name, String author, String description, int downloads) {
+      this.id = id != null ? id : "";
+      this.slug = slug != null ? slug : "";
+      this.name = name != null ? name : "";
+      this.author = author != null ? author : "";
+      this.description = description != null ? description : "";
+      this.downloads = downloads;
+    }
+
+    @Override
+    public String toString() {
+      if (author != null && !author.isEmpty()) {
+        return name + " by " + author;
+      }
+      return name + " (" + slug + ")";
+    }
+  }
+
+  public static class ModpackVersionInfo {
+    public final String versionId;
+    public final String versionName;
+    public final String versionNumber;
+    public final String mrpackUrl;
+    public final String filename;
+    public final long sizeBytes;
+    public final int dependencyCount;
+
+    public ModpackVersionInfo(String versionId, String versionName, String versionNumber, String mrpackUrl,
+        String filename, long sizeBytes, int dependencyCount) {
+      this.versionId = versionId;
+      this.versionName = versionName;
+      this.versionNumber = versionNumber;
+      this.mrpackUrl = mrpackUrl;
+      this.filename = filename;
+      this.sizeBytes = sizeBytes;
+      this.dependencyCount = dependencyCount;
+    }
+
+    @Override
+    public String toString() {
+      if (versionNumber != null && !versionNumber.isEmpty()) {
+        return versionNumber + (dependencyCount > 0 ? " (" + dependencyCount + " mods)" : "");
+      }
+      if (versionName != null && !versionName.isEmpty()) {
+        return versionName + (dependencyCount > 0 ? " (" + dependencyCount + " mods)" : "");
+      }
+      return versionId;
+    }
+  }
+
+  public static class ModpackDependencyInfo {
+    public final String projectId;
+    public final String versionId;
+    public final String name;
+    public final String filename;
+    public final String downloadUrl;
+    public final long sizeBytes;
+    public final String environment;
+    public final String dependencyType;
+
+    public ModpackDependencyInfo(String projectId, String versionId, String name, String filename,
+        String downloadUrl, long sizeBytes, String environment, String dependencyType) {
+      this.projectId = projectId != null ? projectId : "";
+      this.versionId = versionId != null ? versionId : "";
+      this.name = name != null ? name : "";
+      this.filename = filename != null ? filename : "";
+      this.downloadUrl = downloadUrl != null ? downloadUrl : "";
+      this.sizeBytes = sizeBytes;
+      this.environment = environment != null ? environment : "";
+      this.dependencyType = dependencyType != null ? dependencyType : "required";
+    }
+
+    public boolean isClientOnly() {
+      return "client_only".equalsIgnoreCase(environment) || "client".equalsIgnoreCase(environment);
+    }
+
+    public boolean isServerOnly() {
+      return "server_only".equalsIgnoreCase(environment) || "server".equalsIgnoreCase(environment);
+    }
+
+    public String formattedEnvironment() {
+      if (isClientOnly()) return "Client Only";
+      if (isServerOnly()) return "Server Only";
+      return "Server & Client";
+    }
+  }
+
+  public static class ModpackInstallSummary {
+    public final String modpackName;
+    public final int totalDependencies;
+    public final int installedCount;
+    public final int skippedClientCount;
+    public final int errorCount;
+    public final long totalBytes;
+    public final List<String> installedModNames;
+
+    public ModpackInstallSummary(String modpackName, int totalDependencies, int installedCount,
+        int skippedClientCount, int errorCount, long totalBytes, List<String> installedModNames) {
+      this.modpackName = modpackName;
+      this.totalDependencies = totalDependencies;
+      this.installedCount = installedCount;
+      this.skippedClientCount = skippedClientCount;
+      this.errorCount = errorCount;
+      this.totalBytes = totalBytes;
+      this.installedModNames = installedModNames != null ? installedModNames : Collections.emptyList();
+    }
+
+    public String formattedSummary() {
+      return String.format("Modpack '%s' installed successfully: %d mods downloaded (%s), %d client-only mods skipped, %d errors.",
+          modpackName, installedCount, formatBytes(totalBytes), skippedClientCount, errorCount);
+    }
+
+    private static String formatBytes(long bytes) {
+      if (bytes < 1024) return bytes + " B";
+      int exp = (int) (Math.log(bytes) / Math.log(1024));
+      char unit = "KMGTPE".charAt(exp - 1);
+      return String.format("%.1f %cB", bytes / Math.pow(1024, exp), unit);
+    }
+  }
+
   public static class DownloadProgressInfo {
     public final double percent;
     public final long bytesRead;
@@ -403,7 +531,7 @@ public class OrchestratorBridge {
               + "&game_versions=" + encVersion;
           HttpRequest req = HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
@@ -508,7 +636,7 @@ public class OrchestratorBridge {
           String url = "https://api.modrinth.com/v2/project/" + cleanId;
           HttpRequest req = HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
@@ -590,6 +718,14 @@ public class OrchestratorBridge {
   public CompletableFuture<Boolean> downloadMod(String platform, String modIdOrSlug, String version, String loader,
       Consumer<Double> progressCallback,
       Consumer<DownloadProgressInfo> richProgressCallback) {
+    var compat = checkCompatibility(loader, version);
+    if (!compat.isCompatible()) {
+      log("[ERR:] " + compat.getMessage());
+      CompletableFuture<Boolean> errFuture = new CompletableFuture<>();
+      errFuture.completeExceptionally(new IllegalArgumentException(compat.getMessage()));
+      return errFuture;
+    }
+
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     long startTime = System.currentTimeMillis();
     String jobId = "mod-" + modIdOrSlug;
@@ -668,6 +804,20 @@ public class OrchestratorBridge {
 
   public CompletableFuture<Boolean> downloadModDirect(String downloadUrl, String filename,
       Consumer<DownloadProgressInfo> richProgressCallback) {
+    return downloadModDirect(downloadUrl, filename, null, null, richProgressCallback);
+  }
+
+  public CompletableFuture<Boolean> downloadModDirect(String downloadUrl, String filename,
+      String loader, String gameVersion,
+      Consumer<DownloadProgressInfo> richProgressCallback) {
+    var compat = checkCompatibility(loader, gameVersion);
+    if (!compat.isCompatible()) {
+      log("[ERR:] " + compat.getMessage());
+      CompletableFuture<Boolean> errFuture = new CompletableFuture<>();
+      errFuture.completeExceptionally(new IllegalArgumentException(compat.getMessage()));
+      return errFuture;
+    }
+
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     String jobId = "mod-direct-" + filename;
     File targetTmp = new File("mods", filename + ".tmp");
@@ -697,7 +847,7 @@ public class OrchestratorBridge {
       try {
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(downloadUrl))
-            .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
+            .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
             .GET()
             .build();
         HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
@@ -774,6 +924,540 @@ public class OrchestratorBridge {
         future.completeExceptionally(e);
       }
     });
+    return future;
+  }
+
+  public CompletableFuture<List<ModpackResult>> searchModpacks(String platform, String query, String version, String loader) {
+    CompletableFuture<List<ModpackResult>> future = new CompletableFuture<>();
+    workerPool.submit(() -> {
+      try {
+        List<ModpackResult> list = new ArrayList<>();
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+          int loaderType = 4;
+          if ("forge".equalsIgnoreCase(loader)) loaderType = 1;
+          else if ("cauldron".equalsIgnoreCase(loader)) loaderType = 2;
+          else if ("liteLoader".equalsIgnoreCase(loader)) loaderType = 3;
+          else if ("quilt".equalsIgnoreCase(loader)) loaderType = 5;
+          else if ("neoForge".equalsIgnoreCase(loader)) loaderType = 6;
+
+          String q = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
+          String gVer = version != null && !"any".equalsIgnoreCase(version) ? URLEncoder.encode(version.trim(), StandardCharsets.UTF_8) : "";
+          String url = "https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&searchFilter=" + q;
+          if (!gVer.isEmpty()) url += "&gameVersion=" + gVer;
+          url += "&modLoaderType=" + loaderType + "&pageSize=15";
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("x-api-key", curseAPI != null ? curseAPI : "")
+              .header("Accept", "application/json")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("data") && root.get("data").isJsonArray()) {
+              JsonArray arr = root.getAsJsonArray("data");
+              for (JsonElement el : arr) {
+                if (el.isJsonObject()) {
+                  JsonObject o = el.getAsJsonObject();
+                  String id = o.has("id") ? o.get("id").getAsString() : "";
+                  String slug = o.has("slug") ? o.get("slug").getAsString() : id;
+                  String name = o.has("name") ? o.get("name").getAsString() : "";
+                  String author = "";
+                  if (o.has("authors") && o.get("authors").isJsonArray() && o.getAsJsonArray("authors").size() > 0) {
+                    JsonObject firstAuthor = o.getAsJsonArray("authors").get(0).getAsJsonObject();
+                    if (firstAuthor.has("name") && !firstAuthor.get("name").isJsonNull()) {
+                      author = firstAuthor.get("name").getAsString();
+                    }
+                  }
+                  String summary = o.has("summary") && !o.get("summary").isJsonNull() ? o.get("summary").getAsString() : "";
+                  int dls = o.has("downloadCount") ? o.get("downloadCount").getAsInt() : 0;
+                  list.add(new ModpackResult(id, slug, name, author, summary, dls));
+                }
+              }
+            }
+          }
+        } else {
+          // Modrinth
+          String encQuery = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
+          String facets;
+          if (version != null && !version.isEmpty() && loader != null && !loader.isEmpty()) {
+            facets = "[[\"project_type:modpack\"],[\"versions:" + version + "\"],[\"categories:" + loader + "\"]]";
+          } else {
+            facets = "[[\"project_type:modpack\"]]";
+          }
+          String encFacets = URLEncoder.encode(facets, StandardCharsets.UTF_8);
+          String url = "https://api.modrinth.com/v2/search?query=" + encQuery + "&facets=" + encFacets + "&limit=15";
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("hits") && root.get("hits").isJsonArray()) {
+              JsonArray arr = root.getAsJsonArray("hits");
+              for (JsonElement el : arr) {
+                if (el.isJsonObject()) {
+                  JsonObject o = el.getAsJsonObject();
+                  String id = o.has("project_id") ? o.get("project_id").getAsString() : "";
+                  String slug = o.has("slug") && !o.get("slug").isJsonNull() ? o.get("slug").getAsString() : id;
+                  String name = o.has("title") && !o.get("title").isJsonNull() ? o.get("title").getAsString() : slug;
+                  String author = o.has("author") && !o.get("author").isJsonNull() ? o.get("author").getAsString() : "";
+                  String desc = o.has("description") && !o.get("description").isJsonNull() ? o.get("description").getAsString() : "";
+                  int dls = o.has("downloads") ? o.get("downloads").getAsInt() : 0;
+                  list.add(new ModpackResult(id, slug, name, author, desc, dls));
+                }
+              }
+            }
+          }
+        }
+        future.complete(list);
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public CompletableFuture<List<ModpackVersionInfo>> getModpackVersions(String platform, String modpackIdOrSlug,
+      String gameVersion, String loader) {
+    CompletableFuture<List<ModpackVersionInfo>> future = new CompletableFuture<>();
+    workerPool.submit(() -> {
+      try {
+        List<ModpackVersionInfo> list = new ArrayList<>();
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+          int loaderType = 4;
+          if ("forge".equalsIgnoreCase(loader)) loaderType = 1;
+          else if ("cauldron".equalsIgnoreCase(loader)) loaderType = 2;
+          else if ("liteLoader".equalsIgnoreCase(loader)) loaderType = 3;
+          else if ("quilt".equalsIgnoreCase(loader)) loaderType = 5;
+          else if ("neoForge".equalsIgnoreCase(loader)) loaderType = 6;
+
+          String url = "https://api.curseforge.com/v1/mods/" + modpackIdOrSlug + "/files?gameVersion=" + gameVersion
+              + "&modLoaderType=" + loaderType;
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("x-api-key", curseAPI != null ? curseAPI : "")
+              .header("Accept", "application/json")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("data") && root.get("data").isJsonArray()) {
+              JsonArray data = root.getAsJsonArray("data");
+              for (JsonElement el : data) {
+                if (el.isJsonObject()) {
+                  JsonObject obj = el.getAsJsonObject();
+                  String vId = obj.get("id").getAsString();
+                  String vName = obj.has("displayName") ? obj.get("displayName").getAsString() : "";
+                  String fn = obj.has("fileName") ? obj.get("fileName").getAsString() : "";
+                  String dUrl = (obj.has("downloadUrl") && !obj.get("downloadUrl").isJsonNull())
+                      ? obj.get("downloadUrl").getAsString() : "";
+                  long sz = obj.has("fileLength") ? obj.get("fileLength").getAsLong() : -1;
+                  int depCount = (obj.has("dependencies") && obj.get("dependencies").isJsonArray())
+                      ? obj.getAsJsonArray("dependencies").size() : 0;
+                  list.add(new ModpackVersionInfo(vId, vName, fn, dUrl, fn, sz, depCount));
+                }
+              }
+            }
+          }
+        } else {
+          // Modrinth
+          String encLoader = URLEncoder.encode("[\"" + loader + "\"]", StandardCharsets.UTF_8);
+          String encVersion = URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8);
+          String url = "https://api.modrinth.com/v2/project/" + modpackIdOrSlug + "/version?loaders=" + encLoader
+              + "&game_versions=" + encVersion;
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp == null || resp.statusCode() != 200 || resp.body().trim().equals("[]")) {
+            // Fallback: fetch all versions
+            url = "https://api.modrinth.com/v2/project/" + modpackIdOrSlug + "/version";
+            req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                .GET()
+                .build();
+            resp = NetworkUtils.attemptS(req);
+          }
+
+          if (resp != null && resp.statusCode() == 200) {
+            JsonArray arr = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonArray();
+            for (JsonElement el : arr) {
+              if (el.isJsonObject()) {
+                JsonObject obj = el.getAsJsonObject();
+                String vId = obj.get("id").getAsString();
+                String vName = obj.has("name") ? obj.get("name").getAsString() : "";
+                String vNum = obj.has("version_number") ? obj.get("version_number").getAsString() : "";
+                String mrpackUrl = "";
+                String fn = "";
+                long sz = -1;
+                if (obj.has("files") && obj.getAsJsonArray("files").size() > 0) {
+                  for (JsonElement fe : obj.getAsJsonArray("files")) {
+                    if (fe.isJsonObject()) {
+                      JsonObject fObj = fe.getAsJsonObject();
+                      String fname = fObj.has("filename") ? fObj.get("filename").getAsString() : "";
+                      if (fname.endsWith(".mrpack") || mrpackUrl.isEmpty()) {
+                        mrpackUrl = fObj.has("url") ? fObj.get("url").getAsString() : "";
+                        fn = fname;
+                        sz = fObj.has("size") ? fObj.get("size").getAsLong() : -1;
+                        if (fname.endsWith(".mrpack")) break;
+                      }
+                    }
+                  }
+                }
+                int depCount = (obj.has("dependencies") && obj.get("dependencies").isJsonArray())
+                    ? obj.getAsJsonArray("dependencies").size() : 0;
+                list.add(new ModpackVersionInfo(vId, vName, vNum, mrpackUrl, fn, sz, depCount));
+              }
+            }
+          }
+        }
+        future.complete(list);
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public CompletableFuture<List<ModpackDependencyInfo>> getModpackDependencies(String platform, String versionId) {
+    CompletableFuture<List<ModpackDependencyInfo>> future = new CompletableFuture<>();
+    if (versionId == null || versionId.trim().isEmpty()) {
+      future.complete(Collections.emptyList());
+      return future;
+    }
+    workerPool.submit(() -> {
+      try {
+        List<ModpackDependencyInfo> deps = new ArrayList<>();
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+          future.complete(deps);
+          return;
+        }
+
+        // Modrinth version dependencies
+        String url = "https://api.modrinth.com/v2/version/" + versionId.trim();
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+            .GET()
+            .build();
+        HttpResponse<String> resp = NetworkUtils.attemptS(req);
+        if (resp != null && resp.statusCode() == 200) {
+          JsonObject vObj = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+          if (vObj.has("dependencies") && vObj.get("dependencies").isJsonArray()) {
+            JsonArray depArr = vObj.getAsJsonArray("dependencies");
+            List<String> versionIds = new ArrayList<>();
+            Map<String, String> depTypes = new HashMap<>();
+            for (JsonElement de : depArr) {
+              if (de.isJsonObject()) {
+                JsonObject dObj = de.getAsJsonObject();
+                if (dObj.has("version_id") && !dObj.get("version_id").isJsonNull()) {
+                  String vid = dObj.get("version_id").getAsString();
+                  versionIds.add(vid);
+                  String dt = dObj.has("dependency_type") ? dObj.get("dependency_type").getAsString() : "required";
+                  depTypes.put(vid, dt);
+                }
+              }
+            }
+
+            int chunkSize = 80;
+            for (int i = 0; i < versionIds.size(); i += chunkSize) {
+              List<String> chunk = versionIds.subList(i, Math.min(i + chunkSize, versionIds.size()));
+              JsonArray idsArr = new JsonArray();
+              for (String id : chunk) {
+                idsArr.add(id);
+              }
+              String idsParam = URLEncoder.encode(idsArr.toString(), StandardCharsets.UTF_8);
+              String batchUrl = "https://api.modrinth.com/v2/versions?ids=" + idsParam;
+              HttpRequest batchReq = HttpRequest.newBuilder()
+                  .uri(URI.create(batchUrl))
+                  .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                  .GET()
+                  .build();
+              HttpResponse<String> batchResp = NetworkUtils.attemptS(batchReq);
+              if (batchResp != null && batchResp.statusCode() == 200) {
+                JsonArray verArray = com.google.gson.JsonParser.parseString(batchResp.body()).getAsJsonArray();
+                for (JsonElement ve : verArray) {
+                  if (ve.isJsonObject()) {
+                    JsonObject vo = ve.getAsJsonObject();
+                    String vid = vo.get("id").getAsString();
+                    String pid = vo.has("project_id") ? vo.get("project_id").getAsString() : "";
+                    String vname = vo.has("name") ? vo.get("name").getAsString() : "";
+                    String env = vo.has("environment") && !vo.get("environment").isJsonNull() ? vo.get("environment").getAsString() : "client_and_server";
+                    String dUrl = "";
+                    String fn = "";
+                    long sz = -1;
+                    if (vo.has("files") && vo.getAsJsonArray("files").size() > 0) {
+                      for (JsonElement fe : vo.getAsJsonArray("files")) {
+                        if (fe.isJsonObject()) {
+                          JsonObject fo = fe.getAsJsonObject();
+                          boolean isPrimary = fo.has("primary") && fo.get("primary").getAsBoolean();
+                          String fname = fo.has("filename") ? fo.get("filename").getAsString() : "";
+                          if (isPrimary || fname.endsWith(".jar") || dUrl.isEmpty()) {
+                            dUrl = fo.has("url") ? fo.get("url").getAsString() : "";
+                            fn = fname;
+                            sz = fo.has("size") ? fo.get("size").getAsLong() : -1;
+                            if (isPrimary || fname.endsWith(".jar")) break;
+                          }
+                        }
+                      }
+                    }
+                    String dtype = depTypes.getOrDefault(vid, "required");
+                    deps.add(new ModpackDependencyInfo(pid, vid, vname, fn, dUrl, sz, env, dtype));
+                  }
+                }
+              }
+            }
+          }
+        }
+        future.complete(deps);
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public CompletableFuture<ModpackInstallSummary> installModpack(
+      String platform,
+      String modpackName,
+      String versionId,
+      String mrpackUrl,
+      String gameVersion,
+      String loader,
+      boolean includeClientMods,
+      Consumer<String> statusCallback,
+      Consumer<Double> overallProgressCallback,
+      Consumer<DownloadProgressInfo> fileProgressCallback) {
+
+    var compat = checkCompatibility(loader, gameVersion);
+    if (!compat.isCompatible()) {
+      log("[ERR:] " + compat.getMessage());
+      CompletableFuture<ModpackInstallSummary> errFuture = new CompletableFuture<>();
+      errFuture.completeExceptionally(new IllegalArgumentException(compat.getMessage()));
+      return errFuture;
+    }
+
+    CompletableFuture<ModpackInstallSummary> future = new CompletableFuture<>();
+    String jobId = "modpack-" + (versionId != null ? versionId : modpackName);
+
+    final Thread[] currentWorker = new Thread[1];
+    final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+        jobId,
+        "Install Modpack: " + modpackName,
+        "Modpack",
+        () -> {
+          if (currentWorker[0] != null) {
+            currentWorker[0].interrupt();
+          }
+        });
+
+    workerPool.submit(() -> {
+      currentWorker[0] = Thread.currentThread();
+      try {
+        if (statusCallback != null) {
+          statusCallback.accept("Resolving modpack dependencies from version metadata...");
+        }
+        trackedJob.setStatus("Resolving metadata...");
+
+        List<ModpackDependencyInfo> allDeps = getModpackDependencies(platform, versionId).get(30, TimeUnit.SECONDS);
+
+        // Extract overrides from .mrpack if mrpackUrl is present
+        if (mrpackUrl != null && !mrpackUrl.isEmpty() && mrpackUrl.endsWith(".mrpack")) {
+          try {
+            if (statusCallback != null) {
+              statusCallback.accept("Downloading modpack archive for configurations & overrides...");
+            }
+            HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(mrpackUrl))
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                .GET()
+                .build();
+            HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
+            if (resp != null && resp.statusCode() == 200) {
+              try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(resp.body())) {
+                java.util.zip.ZipEntry ze;
+                File targetBase = new File(".");
+                while ((ze = zis.getNextEntry()) != null) {
+                  String name = ze.getName();
+                  if (name.startsWith("overrides/") && !ze.isDirectory()) {
+                    String relative = name.substring("overrides/".length());
+                    File targetFile = new File(targetBase, relative);
+                    if (targetFile.getCanonicalPath().startsWith(targetBase.getCanonicalPath())) {
+                      File parent = targetFile.getParentFile();
+                      if (parent != null && !parent.exists()) {
+                        parent.mkdirs();
+                      }
+                      try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) {
+                          fos.write(buffer, 0, len);
+                        }
+                      }
+                    }
+                  }
+                  zis.closeEntry();
+                }
+              }
+            }
+          } catch (Exception e) {
+            // Non-fatal override extraction failure
+          }
+        }
+
+        File modsDir = new File("mods");
+        if (!modsDir.exists()) {
+          modsDir.mkdirs();
+        }
+
+        int totalDeps = allDeps.size();
+        List<ModpackDependencyInfo> toInstall = new ArrayList<>();
+        int skippedClient = 0;
+
+        for (ModpackDependencyInfo dep : allDeps) {
+          if (!includeClientMods && dep.isClientOnly()) {
+            skippedClient++;
+          } else {
+            toInstall.add(dep);
+          }
+        }
+
+        int installedCount = 0;
+        int errorCount = 0;
+        long totalBytesDownloaded = 0;
+        List<String> installedModNames = new ArrayList<>();
+
+        int totalToInstall = toInstall.size();
+        for (int i = 0; i < totalToInstall; i++) {
+          if (Thread.currentThread().isInterrupted() || trackedJob.isCancelled()) {
+            throw new InterruptedException("Modpack installation cancelled by user.");
+          }
+
+          ModpackDependencyInfo dep = toInstall.get(i);
+          String filename = dep.filename;
+          if (filename == null || filename.isEmpty()) {
+            filename = dep.name.toLowerCase().replaceAll("[^a-z0-9_.-]", "") + ".jar";
+          }
+          if (!filename.endsWith(".jar")) {
+            filename += ".jar";
+          }
+
+          String stepMsg = String.format("[%d/%d] %s (%s)", (i + 1), totalToInstall, dep.name.isEmpty() ? filename : dep.name, dep.formattedEnvironment());
+          if (statusCallback != null) {
+            statusCallback.accept(stepMsg);
+          }
+          trackedJob.setStatus(stepMsg);
+
+          double overallPct = (i * 100.0) / Math.max(1, totalToInstall);
+          if (overallProgressCallback != null) {
+            overallProgressCallback.accept(overallPct);
+          }
+          trackedJob.setProgress(overallPct);
+
+          if (dep.downloadUrl == null || dep.downloadUrl.isEmpty()) {
+            errorCount++;
+            continue;
+          }
+
+          File targetTmp = new File(modsDir, filename + ".tmp");
+          File targetFinal = new File(modsDir, filename);
+
+          try {
+            HttpRequest dlReq = HttpRequest.newBuilder()
+                .uri(URI.create(dep.downloadUrl))
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                .GET()
+                .build();
+            HttpResponse<InputStream> dlResp = NetworkUtils.attemptI(dlReq);
+            if (dlResp == null || dlResp.statusCode() != 200) {
+              errorCount++;
+              continue;
+            }
+
+            long filesize = dlResp.headers().firstValueAsLong("content-length").orElse(dep.sizeBytes);
+            long fileStart = System.currentTimeMillis();
+
+            try (InputStream in = dlResp.body(); FileOutputStream out = new FileOutputStream(targetTmp)) {
+              byte[] buf = new byte[8192];
+              int n;
+              long read = 0;
+              long lastCb = 0;
+              while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted() || trackedJob.isCancelled()) {
+                  targetTmp.delete();
+                  throw new InterruptedException("Download cancelled");
+                }
+                out.write(buf, 0, n);
+                read += n;
+                long now = System.currentTimeMillis();
+                if (now - lastCb >= 300 || (filesize > 0 && read == filesize)) {
+                  lastCb = now;
+                  double elapsed = Math.max(0.001, (now - fileStart) / 1000.0);
+                  double speed = (read / (1024.0 * 1024.0)) / elapsed;
+                  int eta = (filesize > read && speed > 0)
+                      ? (int) Math.round(((filesize - read) / (1024.0 * 1024.0)) / speed)
+                      : 0;
+                  double filePct = filesize > 0 ? (read * 100.0) / filesize : -1.0;
+                  if (fileProgressCallback != null) {
+                    fileProgressCallback.accept(new DownloadProgressInfo(filePct, read, filesize, speed, eta));
+                  }
+                }
+              }
+              out.flush();
+            }
+
+            try {
+              Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                  java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+              Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            installedCount++;
+            totalBytesDownloaded += targetFinal.length();
+            installedModNames.add(filename);
+
+            try {
+              ModUpdateManager.ModFileInfo parsed = ModUpdateManager.parseModFile(targetFinal);
+              if (parsed != null && !parsed.slug.isEmpty()) {
+                ModUpdateManager.cleanOldModVersions(parsed.slug, targetFinal.getName());
+              }
+            } catch (Exception ignored) {}
+
+          } catch (InterruptedException ie) {
+            targetTmp.delete();
+            throw ie;
+          } catch (Exception ex) {
+            targetTmp.delete();
+            errorCount++;
+          }
+        }
+
+        if (overallProgressCallback != null) {
+          overallProgressCallback.accept(100.0);
+        }
+        trackedJob.setProgress(100.0);
+        trackedJob.setStatus("Completed (" + installedCount + " installed)");
+
+        ModpackInstallSummary summary = new ModpackInstallSummary(
+            modpackName, totalDeps, installedCount, skippedClient, errorCount, totalBytesDownloaded, installedModNames);
+
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.complete(summary);
+
+      } catch (Exception e) {
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.completeExceptionally(e);
+      }
+    });
+
     return future;
   }
 
@@ -891,12 +1575,26 @@ public class OrchestratorBridge {
     }
   }
 
+  public static org.codeberg.DeployedReject.utils.ServerJarMetadata getInstalledServerMetadata() {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    File sDir = new File(cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty() ? cfg.getServerDir() : ".");
+    return org.codeberg.DeployedReject.utils.ServerJarMetadata.readServerMetadata(sDir);
+  }
+
+  public static org.codeberg.DeployedReject.utils.ServerJarMetadata.CompatibilityResult checkCompatibility(String targetLoader, String targetGameVersion) {
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = getInstalledServerMetadata();
+    return org.codeberg.DeployedReject.utils.ServerJarMetadata.checkCompatibility(meta, targetLoader, targetGameVersion);
+  }
+
   public static boolean isServerInstalled() {
     if (isServerDownloading()) {
       return false;
     }
     if (new File("server.jar.tmp").exists() || new File("BuildTools.jar").exists()) {
       return false;
+    }
+    if (getInstalledServerMetadata() != null) {
+      return true;
     }
 
     File fabricLaunch = new File("fabric-server-launch.jar");
@@ -1004,6 +1702,14 @@ public class OrchestratorBridge {
 
   public CompletableFuture<ModUpdateManager.UpdateSummary> updateAllMods(String gameVersion, String loader,
       Consumer<String> logCallback, Consumer<Double> progressCallback) {
+    var compat = checkCompatibility(loader, gameVersion);
+    if (!compat.isCompatible()) {
+      log("[ERR:] " + compat.getMessage());
+      CompletableFuture<ModUpdateManager.UpdateSummary> errFuture = new CompletableFuture<>();
+      errFuture.completeExceptionally(new IllegalArgumentException(compat.getMessage()));
+      return errFuture;
+    }
+
     CompletableFuture<ModUpdateManager.UpdateSummary> future = new CompletableFuture<>();
     String jobId = "mods-update-all";
 

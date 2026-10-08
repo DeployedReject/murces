@@ -361,6 +361,11 @@ public class ServerHandler {
           eulaWriter.write("eula=true\n");
         } catch (Exception ignored) {
         }
+        try {
+          File sDir = new File(serverDir != null ? serverDir : ".");
+          org.codeberg.DeployedReject.utils.ServerJarMetadata.recordServerMetadata(sDir, loader, gVersion, lVersion);
+        } catch (Exception ignored) {
+        }
         JsonObject comp = new JsonObject();
         comp.addProperty("status", 3);
         comp.addProperty("type", "server");

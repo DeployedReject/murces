@@ -262,7 +262,7 @@ public class ModUpdateManager {
 
       HttpRequest req = HttpRequest.newBuilder()
           .uri(URI.create(url))
-          .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + (email != null ? email : "user@murces.local") + ")")
+          .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + (email != null ? email : "user@murces.local") + ")")
           .GET()
           .build();
 
@@ -302,7 +302,7 @@ public class ModUpdateManager {
 
             HttpRequest dlReq = HttpRequest.newBuilder()
                 .uri(URI.create(downloadUrl))
-                .header("User-Agent", "DeployedReject/MurCes/1.2.0 (" + email + ")")
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
                 .GET()
                 .build();
             HttpResponse<InputStream> dlResp = NetworkUtils.attemptI(dlReq);

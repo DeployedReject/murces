@@ -41,11 +41,14 @@ public class Main {
                 System.out.println("  murces start [-p] [--session <s>]  Start server (-p for tunnel, custom tmux session)");
                 System.out.println("  murces stop [--session <s>]        Stop server");
                 System.out.println("  murces status [--session <s>]      Check server running status");
+                System.out.println("  murces server-name [name]          View or set the server name and tmux session");
                 System.out.println("  murces tunnel <setup|status|reset> Playit.gg tunnel native lifecycle management");
                 System.out.println("  murces server-port <port>          Update server.properties port");
                 System.out.println("  murces servers                     List configured server profiles");
                 System.out.println("  murces switch <profile>            Switch active server profile");
                 System.out.println("  murces backup                      Run world backup");
+                System.out.println("  murces search-modpacks <query>     Search modpacks on Modrinth");
+                System.out.println("  murces install-modpack <slug>      Download & install modpack with dependencies");
                 System.out.println("  murces update-mods                 Update all installed mods to latest versions");
                 System.out.println("  murces install-jdk [version]       Download portable OpenJDK (8/17/21)");
                 System.out.println("  murces --test-tui                  Run automated self-test of all TUI windows");
@@ -53,7 +56,84 @@ public class Main {
                 break;
             case "--version":
             case "-v":
-                System.out.println("murces v1.2.0 (production release)");
+                System.out.println("murces v1.6.0 (production release)");
+                break;
+            case "server-name":
+            case "rename":
+                if (args.length < 2) {
+                    System.out.println("Current server name / tmux session: " + ConfigManager.getInstance().getConfig().getServerName());
+                    System.out.println("Usage: murces server-name <new-name>");
+                    return;
+                }
+                String newSrvName = args[1];
+                ConfigManager.getInstance().getConfig().setServerName(newSrvName);
+                ConfigManager.getInstance().saveConfig();
+                System.out.println("Server name and tmux session updated to: " + ConfigManager.getInstance().getConfig().getServerName());
+                break;
+            case "search-modpacks":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces search-modpacks <query> [version] [loader]");
+                    System.exit(1);
+                }
+                String smQuery = args[1];
+                String smVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String smLdr = args.length > 3 ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
+                System.out.println("Searching modpacks for '" + smQuery + "' (" + smVer + " / " + smLdr + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.ModpackResult> smRes = OrchestratorBridge.getInstance().searchModpacks("modrinth", smQuery, smVer, smLdr).get();
+                    if (smRes.isEmpty()) {
+                        System.out.println("No modpacks found.");
+                    } else {
+                        System.out.println("Found " + smRes.size() + " modpacks:");
+                        for (OrchestratorBridge.ModpackResult mp : smRes) {
+                            System.out.println("  - " + mp.name + " (" + mp.slug + ") by " + mp.author + " [" + mp.downloads + " downloads]");
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Search failed: " + e.getMessage());
+                }
+                break;
+            case "install-modpack":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces install-modpack <slug-or-id> [version] [loader] [--include-client]");
+                    System.exit(1);
+                }
+                String mpSlug = args[1];
+                String mpVer = args.length > 2 && !args[2].startsWith("--") ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String mpLdr = args.length > 3 && !args[3].startsWith("--") ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
+                boolean mpIncClient = false;
+                for (String a : args) {
+                    if ("--include-client".equalsIgnoreCase(a)) mpIncClient = true;
+                }
+
+                org.codeberg.DeployedReject.utils.ServerJarMetadata mpMeta = OrchestratorBridge.getInstalledServerMetadata();
+                if (mpMeta == null) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing modpacks (launch TUI [I]).");
+                    System.exit(1);
+                }
+                var mpCompat = OrchestratorBridge.checkCompatibility(mpLdr, mpVer);
+                if (!mpCompat.isCompatible()) {
+                    System.err.println("[ERROR] " + mpCompat.getMessage());
+                    System.exit(1);
+                }
+
+                System.out.println("Resolving modpack '" + mpSlug + "' for MC " + mpVer + " (" + mpLdr + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.ModpackVersionInfo> vList = OrchestratorBridge.getInstance().getModpackVersions("modrinth", mpSlug, mpVer, mpLdr).get();
+                    String vId = !vList.isEmpty() ? vList.get(0).versionId : mpSlug;
+                    String mrpackUrl = !vList.isEmpty() ? vList.get(0).mrpackUrl : "";
+                    System.out.println("Installing modpack version: " + (!vList.isEmpty() ? vList.get(0).versionName : vId) + " (includeClient=" + mpIncClient + ")...");
+                    OrchestratorBridge.ModpackInstallSummary sum = OrchestratorBridge.getInstance().installModpack(
+                        "modrinth", mpSlug, vId, mrpackUrl, mpVer, mpLdr, mpIncClient,
+                        System.out::println,
+                        pct -> {},
+                        null
+                    ).get();
+                    System.out.println(sum.formattedSummary());
+                } catch (Exception e) {
+                    System.err.println("Failed to install modpack: " + e.getMessage());
+                    System.exit(1);
+                }
                 break;
             case "--test-tui":
                 runSelfTest();
@@ -115,6 +195,16 @@ public class Main {
             case "update-mods":
                 String uMc = args.length > 1 ? args[1] : ConfigManager.getInstance().getConfig().getGameVersion();
                 String uLd = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getLoader();
+                org.codeberg.DeployedReject.utils.ServerJarMetadata uMeta = OrchestratorBridge.getInstalledServerMetadata();
+                if (uMeta == null) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before updating mods (launch TUI [I]).");
+                    System.exit(1);
+                }
+                var uCompat = OrchestratorBridge.checkCompatibility(uLd, uMc);
+                if (!uCompat.isCompatible()) {
+                    System.err.println("[ERROR] " + uCompat.getMessage());
+                    System.exit(1);
+                }
                 System.out.println("Updating all mods for Minecraft " + uMc + " (" + uLd + ")...");
                 try {
                     org.codeberg.DeployedReject.tui.backend.ModUpdateManager.UpdateSummary uSum =
@@ -122,6 +212,7 @@ public class Main {
                     System.out.println(uSum.formattedSummary());
                 } catch (Exception e) {
                     System.err.println("Error updating mods: " + e.getMessage());
+                    System.exit(1);
                 }
                 break;
             case "install-jdk":
@@ -211,6 +302,8 @@ public class Main {
             mw.showModBrowse();
             gui.updateScreen();
             mw.showModManage();
+            gui.updateScreen();
+            mw.showModpackBrowse();
             gui.updateScreen();
             mw.showCustomization();
             gui.updateScreen();

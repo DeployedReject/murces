@@ -17,6 +17,7 @@ public class InstallServerView implements WorkspaceView {
     private final ComboBox<String> engineComboBox;
     private final ComboBox<String> gameVersionComboBox;
     private final TextBox loaderVersionBox;
+    private final TextBox serverNameBox;
     private final ComboBox<String> ramComboBox;
     private final CheckBox portableJdkCheck;
     private final ProgressBar progressBar;
@@ -35,6 +36,7 @@ public class InstallServerView implements WorkspaceView {
         engineComboBox.setPreferredSize(new TerminalSize(16, 1));
         gameVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(16, 1));
         loaderVersionBox = new TextBox(new TerminalSize(16, 1), "0.16.5");
+        serverNameBox = new TextBox(new TerminalSize(16, 1), org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().getServerName());
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
         ramComboBox.setSelectedIndex(1);
@@ -62,11 +64,23 @@ public class InstallServerView implements WorkspaceView {
 
         loaderVersionBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                ramComboBox.takeFocus();
+                serverNameBox.takeFocus();
                 return false;
             }
             if (keyStroke.getKeyType() == KeyType.ArrowUp) {
                 gameVersionComboBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        serverNameBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
+                ramComboBox.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                loaderVersionBox.takeFocus();
                 return false;
             }
             return true;
@@ -97,6 +111,8 @@ public class InstallServerView implements WorkspaceView {
         formPanel.addComponent(gameVersionComboBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " L[o]ader Version:")));
         formPanel.addComponent(loaderVersionBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server [N]ame / Session:")));
+        formPanel.addComponent(serverNameBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         formPanel.addComponent(ramComboBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Portable [J]DK:")));
@@ -130,6 +146,7 @@ public class InstallServerView implements WorkspaceView {
         hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox));
         hotkeys.put('C', () -> MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), gameVersionComboBox, gameVersionComboBox.getSelectedIndex()));
         hotkeys.put('O', loaderVersionBox::takeFocus);
+        hotkeys.put('N', serverNameBox::takeFocus);
         hotkeys.put('R', this::cycleRam);
         hotkeys.put('J', () -> {
             boolean val = !portableJdkCheck.isChecked();
@@ -225,6 +242,10 @@ public class InstallServerView implements WorkspaceView {
             return;
         }
 
+        String sName = serverNameBox.getText().trim();
+        if (!sName.isEmpty()) {
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setServerName(sName);
+        }
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setGameVersion(gameVer);
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setLoader(engine.toLowerCase());
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setPortableJdk(portableJdkCheck.isChecked());

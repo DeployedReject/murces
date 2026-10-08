@@ -5,7 +5,7 @@
 
     <groupId>org.codeberg.DeployedRejct</groupId>
     <artifactId>murces-orchestrator</artifactId>
-    <version>1.2</version>
+    <version>1.6</version>
 
     <dependencies>
         <dependency>

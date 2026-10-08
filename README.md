@@ -97,7 +97,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 3. In-TUI Mod Search & Downloader
+### 4. In-TUI Mod Search & Downloader
 
 > Search, inspect, and install mods from Modrinth and CurseForge without leaving your terminal.
 
@@ -113,7 +113,19 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 4. Installed Mods Manager
+### 5. Modpack Browser & Installer
+
+> Search, inspect dependencies, download, and extract complete modpacks directly to your server.
+
+- **Separate Dedicated Workspace**: Browse Modrinth and CurseForge modpacks without cluttering single mod management.
+- **Dependency Resolution**: Automatically inspects the modpack manifest dependencies, batch queries version metadata, and categorizes mods by environment (`server`, `client`, `both`).
+- **Client-Side Exclusion**: Defaults to omitting `client_only` mods to keep server instances lightweight and crash-free.
+- **Overrides & Config Unpacking**: Extracts modpack configuration overrides (`overrides/` / `client-overrides/`) directly to server root.
+- **Interactive Inspector**: View mod count, loader build, version changelogs, and individual mod dependencies before installing.
+
+---
+
+### 6. Installed Mods Manager
 
 > Audit, update, and maintain your active server mods directory cleanly.
 
@@ -128,7 +140,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 5. Searchable `server.properties` Editor
+### 7. Searchable `server.properties` Editor
 
 > Tweak server configuration with a keyboard-driven visual inspector.
 
@@ -143,7 +155,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 6. World Backups & Live Memory Flushing
+### 8. World Backups & Live Memory Flushing
 
 > Safe level snapshots that flush memory buffers first to guarantee zero world corruption.
 
@@ -203,7 +215,7 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ---
 
-### 7. Player UUID & Data Migration
+### 9. Player UUID & Data Migration
 
 > Seamlessly transfer inventories, stats, and advancements between player UUIDs.
 
@@ -217,7 +229,7 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ---
 
-### 8. Themes, Transparency & Glyphs
+### 10. Themes, Transparency & Glyphs
 
 > Complete visual customization to match your personal terminal setup.
 
@@ -232,7 +244,7 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ---
 
-### 9. Active Tasks & Job Telemetry
+### 11. Active Tasks & Job Telemetry
 
 > Monitor asynchronous background operations in real time.
 
@@ -292,6 +304,9 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `./murces start`                            | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_  |
 | `./murces stop`                             | Sends graceful `stop` command and terminates the session                | None                                          |
 | `./murces status`                           | Checks if the Minecraft server daemon is active                         | None                                          |
+| `./murces server-name [name]`               | Gets or sets the server name & synchronized `tmux` session name         | `[name]` _(optional)_                         |
+| `./murces search-modpacks <query> [ver] [loader]` | Searches Modrinth/CurseForge modpacks by game version and loader  | `[query] [version] [loader]`                  |
+| `./murces install-modpack <slug> [ver] [loader]`  | Resolves dependencies, downloads jars, & extracts modpack overrides | `[slug-or-id] [ver] [loader] [--include-client]` |
 | `./murces backup`                           | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                          |
 | `./murces update-mods [version] [loader]`   | Upgrades all installed server mods to latest compatible versions        | `[gameVersion] [loader]` _(optional)_         |
 | `./murces install-jdk [version]`            | Downloads and provisions portable OpenJDK for target MC/Java version    | `[mcVersion]` or `8|17|21`                    |
@@ -316,9 +331,11 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[B]`                   | Open **World Backups**                                         |
 | `[P]`                   | Open **Player UUID Migration**                                 |
 | `[D]`                   | Open **Download & Browse Mods**                                |
+| `[K]`                   | Open **Modpacks (Browse & Install)**                           |
 | `[M]`                   | Open **Manage Installed Mods**                                 |
 | `[U]`                   | **Update All Mods** (inside Manage Installed Mods view)        |
 | `[Z]`                   | Open **Customization & Themes**                                |
+| `[N]`                   | Edit **Server Name / tmux Session** (in Server Control & Setup) |
 | `[E]`                   | Exit MurCes                                                    |
 
 ---

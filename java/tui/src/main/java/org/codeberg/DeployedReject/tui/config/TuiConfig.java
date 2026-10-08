@@ -31,7 +31,11 @@ public class TuiConfig {
         }
 
         public void setName(String name) {
-            this.name = name;
+            if (name != null && !name.trim().isEmpty()) {
+                String clean = name.trim().replaceAll("[^a-zA-Z0-9_.-]", "_");
+                this.name = clean;
+                this.sessionName = clean;
+            }
         }
 
         public String getDirectory() {
@@ -47,7 +51,11 @@ public class TuiConfig {
         }
 
         public void setSessionName(String sessionName) {
-            this.sessionName = sessionName;
+            if (sessionName != null && !sessionName.trim().isEmpty()) {
+                String clean = sessionName.trim().replaceAll("[^a-zA-Z0-9_.-]", "_");
+                this.sessionName = clean;
+                this.name = clean;
+            }
         }
 
         public String getGameVersion() {
@@ -164,8 +172,24 @@ public class TuiConfig {
     }
 
     public void setSessionName(String sessionName) {
-        if (sessionName != null && !sessionName.trim().isEmpty()) {
-            this.sessionName = sessionName.trim();
+        setServerName(sessionName);
+    }
+
+    public String getServerName() {
+        return getSessionName();
+    }
+
+    public void setServerName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            name = "mcsv";
+        }
+        String clean = name.trim().replaceAll("[^a-zA-Z0-9_.-]", "_");
+        this.sessionName = clean;
+        this.activeServer = clean;
+        ServerProfile profile = getActiveServerProfile();
+        if (profile != null) {
+            profile.setName(clean);
+            profile.setSessionName(clean);
         }
     }
 

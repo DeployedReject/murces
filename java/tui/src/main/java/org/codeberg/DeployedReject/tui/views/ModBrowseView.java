@@ -313,6 +313,46 @@ public class ModBrowseView implements WorkspaceView {
   }
 
   @Override
+  public void onActivated() {
+    relayoutForCurrentMode();
+    checkInstalledServerState();
+  }
+
+  private void checkInstalledServerState() {
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = OrchestratorBridge.getInstalledServerMetadata();
+    if (meta == null) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] No server installed! Please install a server engine first [I]."));
+      statusLabel.setForegroundColor(Themes.getLogWarnColor());
+      ActivityLogger.warn("No Minecraft server is installed. You must install a server engine first from [I] Install Server Engine.");
+      downloadBtn.setEnabled(false);
+    } else {
+      downloadBtn.setEnabled(true);
+      String sType = meta.getServerType();
+      String sVer = meta.getGameVersion();
+      if ("fabric".equalsIgnoreCase(sType) || "quilt".equalsIgnoreCase(sType)) {
+        loaderBox.setSelectedItem("fabric");
+      } else if ("forge".equalsIgnoreCase(sType)) {
+        loaderBox.setSelectedItem("forge");
+      } else if ("neoforge".equalsIgnoreCase(sType)) {
+        loaderBox.setSelectedItem("neoforge");
+      }
+      if (sVer != null && !sVer.isEmpty() && !"unknown".equalsIgnoreCase(sVer)) {
+        MinecraftVersionHelper.setSelectedVersion(versionComboBox, sVer);
+      }
+      if ("vanilla".equalsIgnoreCase(sType)) {
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Vanilla server detected (" + sVer + "). Vanilla does not support mods."));
+        statusLabel.setForegroundColor(Themes.getLogWarnColor());
+      } else if ("paper".equalsIgnoreCase(sType) || "spigot".equalsIgnoreCase(sType)) {
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] " + meta.getFormattedTitle() + " detected (Plugins only, mods unsupported)."));
+        statusLabel.setForegroundColor(Themes.getLogWarnColor());
+      } else {
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [SERVER] " + meta.getFormattedTitle() + " detected. Ready for mod installation."));
+        statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+      }
+    }
+  }
+
+  @Override
   public void onDeactivated() {
     stopTicker();
   }
@@ -780,6 +820,21 @@ public class ModBrowseView implements WorkspaceView {
     }
     String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
     String loader = loaderBox.getSelectedItem();
+
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = OrchestratorBridge.getInstalledServerMetadata();
+    if (meta == null) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] No server installed! Install a server engine first [I]."));
+      statusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err("Cannot install mod: No Minecraft server is installed. Please install a server engine first from [I] Install Server Engine.");
+      return;
+    }
+    var compat = OrchestratorBridge.checkCompatibility(loader, version);
+    if (!compat.isCompatible()) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Incompatible: " + compat.getMessage()));
+      statusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err(compat.getMessage());
+      return;
+    }
 
     int verIndex = modVersionCombo.getSelectedIndex();
     OrchestratorBridge.ModVersionInfo chosenVer = null;

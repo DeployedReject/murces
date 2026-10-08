@@ -43,6 +43,7 @@ public class MainWindow extends BasicWindow {
     private final MigratePlayerView migratePlayerView;
     private final ModBrowseView modBrowseView;
     private final ModManageView modManageView;
+    private final ModpackBrowseView modpackBrowseView;
     private final CustomizationView customizationView;
     private final JobManagerView jobManagerView;
     private final TunnelConfigView tunnelConfigView;
@@ -135,6 +136,7 @@ public class MainWindow extends BasicWindow {
         this.migratePlayerView = new MigratePlayerView(this);
         this.modBrowseView = new ModBrowseView(this);
         this.modManageView = new ModManageView(this);
+        this.modpackBrowseView = new ModpackBrowseView(this);
         this.customizationView = new CustomizationView(this);
         this.jobManagerView = new JobManagerView(this);
         this.tunnelConfigView = new TunnelConfigView(this);
@@ -219,6 +221,7 @@ public class MainWindow extends BasicWindow {
     public void showMigratePlayer() { showView(migratePlayerView); }
     public void showModBrowse() { showView(modBrowseView); }
     public void showModManage() { showView(modManageView); }
+    public void showModpackBrowse() { showView(modpackBrowseView); }
     public void showCustomization() { showView(customizationView); }
     public void showJobManager() { showView(jobManagerView); }
     public void showTunnelConfig() { showView(tunnelConfigView); }
@@ -231,6 +234,7 @@ public class MainWindow extends BasicWindow {
     public MigratePlayerView getMigratePlayerView() { return migratePlayerView; }
     public ModBrowseView getModBrowseView() { return modBrowseView; }
     public ModManageView getModManageView() { return modManageView; }
+    public ModpackBrowseView getModpackBrowseView() { return modpackBrowseView; }
     public CustomizationView getCustomizationView() { return customizationView; }
     public JobManagerView getJobManagerView() { return jobManagerView; }
     public TunnelConfigView getTunnelConfigView() { return tunnelConfigView; }

@@ -97,4 +97,18 @@ public class MinecraftVersionHelper {
         }
         return v.trim();
     }
+
+    public static void setSelectedVersion(ComboBox<String> comboBox, String version) {
+        if (comboBox == null || version == null || version.trim().isEmpty()) return;
+        String target = version.trim();
+        for (int i = 0; i < comboBox.getItemCount(); i++) {
+            if (comboBox.getItem(i).equalsIgnoreCase(target)) {
+                comboBox.setSelectedIndex(i);
+                return;
+            }
+        }
+        int insertIdx = Math.max(0, comboBox.getItemCount() - 1);
+        comboBox.addItem(insertIdx, target);
+        comboBox.setSelectedIndex(insertIdx);
+    }
 }
