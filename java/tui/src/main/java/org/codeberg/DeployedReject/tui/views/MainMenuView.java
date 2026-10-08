@@ -49,30 +49,32 @@ public class MainMenuView implements WorkspaceView {
 
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
 
-        menuList = new MurcesListBox(new TerminalSize(48, 10));
+        menuList = new MurcesListBox(new TerminalSize(48, 11));
         menuList.addItem(GlyphHelper.apply("1.  " + GlyphHelper.ICON_SERVER + " [S]erver Control & Console"), mainWindow::showServerControl);
         menuList.addItem(GlyphHelper.apply("2.  " + GlyphHelper.ICON_PACKAGE + " [I]nstall Server Engine"), mainWindow::showInstallServer);
         menuList.addItem(GlyphHelper.apply("3.  " + GlyphHelper.ICON_CONFIG + " [C]onfigure Properties"), mainWindow::showConfigServer);
-        menuList.addItem(GlyphHelper.apply("4.  " + GlyphHelper.ICON_SAVE + " [B]ackups (World)"), mainWindow::showBackup);
-        menuList.addItem(GlyphHelper.apply("5.  " + GlyphHelper.ICON_USER + " [P]layer UUID Migration"), mainWindow::showMigratePlayer);
-        menuList.addItem(GlyphHelper.apply("6.  " + GlyphHelper.ICON_DOWNLOAD + " [D]ownload & Browse Mods"), mainWindow::showModBrowse);
-        menuList.addItem(GlyphHelper.apply("7.  " + GlyphHelper.ICON_MOD + " [M]anage Installed Mods"), mainWindow::showModManage);
-        menuList.addItem(GlyphHelper.apply("8.  " + GlyphHelper.ICON_THEME + " [Z] Customization & Themes"), mainWindow::showCustomization);
-        menuList.addItem(GlyphHelper.apply("9.  " + GlyphHelper.ICON_TASKS + " [J] Active Tasks & Job Manager"), mainWindow::showJobManager);
-        menuList.addItem(GlyphHelper.apply("10. " + GlyphHelper.ICON_POWER + " [E]xit Murces"), mainWindow::exit);
+        menuList.addItem(GlyphHelper.apply("4.  " + GlyphHelper.ICON_TUNNEL + " [N]etwork & Playit Tunnel"), mainWindow::showTunnelConfig);
+        menuList.addItem(GlyphHelper.apply("5.  " + GlyphHelper.ICON_SAVE + " [B]ackups (World)"), mainWindow::showBackup);
+        menuList.addItem(GlyphHelper.apply("6.  " + GlyphHelper.ICON_USER + " [P]layer UUID Migration"), mainWindow::showMigratePlayer);
+        menuList.addItem(GlyphHelper.apply("7.  " + GlyphHelper.ICON_DOWNLOAD + " [D]ownload & Browse Mods"), mainWindow::showModBrowse);
+        menuList.addItem(GlyphHelper.apply("8.  " + GlyphHelper.ICON_MOD + " [M]anage Installed Mods"), mainWindow::showModManage);
+        menuList.addItem(GlyphHelper.apply("9.  " + GlyphHelper.ICON_THEME + " [Z] Customization & Themes"), mainWindow::showCustomization);
+        menuList.addItem(GlyphHelper.apply("10. " + GlyphHelper.ICON_TASKS + " [J] Active Tasks & Job Manager"), mainWindow::showJobManager);
+        menuList.addItem(GlyphHelper.apply("11. " + GlyphHelper.ICON_POWER + " [E]xit Murces"), mainWindow::exit);
 
         root.addComponent(menuList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Main Navigation (Enter to select)"))));
 
         Runnable openSvCtrlItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(0); mainWindow.showServerControl(); };
         Runnable openInstallItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(1); mainWindow.showInstallServer(); };
         Runnable openConfigItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(2); mainWindow.showConfigServer(); };
-        Runnable openBackupItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(3); mainWindow.showBackup(); };
-        Runnable openMigrateItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(4); mainWindow.showMigratePlayer(); };
-        Runnable openBrowseItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(5); mainWindow.showModBrowse(); };
-        Runnable openManageItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(6); mainWindow.showModManage(); };
-        Runnable openCustomizationItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(7); mainWindow.showCustomization(); };
-        Runnable openJobManagerItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(8); mainWindow.showJobManager(); };
-        Runnable doExitItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(9); mainWindow.exit(); };
+        Runnable openTunnelItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(3); mainWindow.showTunnelConfig(); };
+        Runnable openBackupItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(4); mainWindow.showBackup(); };
+        Runnable openMigrateItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(5); mainWindow.showMigratePlayer(); };
+        Runnable openBrowseItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(6); mainWindow.showModBrowse(); };
+        Runnable openManageItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(7); mainWindow.showModManage(); };
+        Runnable openCustomizationItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(8); mainWindow.showCustomization(); };
+        Runnable openJobManagerItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(9); mainWindow.showJobManager(); };
+        Runnable doExitItem = () -> { menuList.takeFocus(); menuList.setSelectedIndex(10); mainWindow.exit(); };
 
         hotkeys.put('S', openSvCtrlItem);
         hotkeys.put('1', openSvCtrlItem);
@@ -80,18 +82,19 @@ public class MainMenuView implements WorkspaceView {
         hotkeys.put('2', openInstallItem);
         hotkeys.put('C', openConfigItem);
         hotkeys.put('3', openConfigItem);
+        hotkeys.put('N', openTunnelItem);
+        hotkeys.put('4', openTunnelItem);
         hotkeys.put('B', openBackupItem);
-        hotkeys.put('4', openBackupItem);
+        hotkeys.put('5', openBackupItem);
         hotkeys.put('P', openMigrateItem);
-        hotkeys.put('5', openMigrateItem);
+        hotkeys.put('6', openMigrateItem);
         hotkeys.put('D', openBrowseItem);
-        hotkeys.put('6', openBrowseItem);
+        hotkeys.put('7', openBrowseItem);
         hotkeys.put('M', openManageItem);
-        hotkeys.put('7', openManageItem);
+        hotkeys.put('8', openManageItem);
         hotkeys.put('Z', openCustomizationItem);
-        hotkeys.put('8', openCustomizationItem);
+        hotkeys.put('9', openCustomizationItem);
         hotkeys.put('J', openJobManagerItem);
-        hotkeys.put('9', openJobManagerItem);
         hotkeys.put('E', doExitItem);
         hotkeys.put('0', doExitItem);
         hotkeys.put('Q', doExitItem);

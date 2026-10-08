@@ -44,6 +44,8 @@ public class ServerHandler {
   public boolean cloudSync = false;
   public String cloudRemote = "minecraftdrive";
   public boolean portableJdk = false;
+  public String sessionName = "mcsv";
+  public String serverDir = ".";
   public JsonArray list = new JsonArray();
 
   public ServerHandler(String type, String loader, String gVersion, String lVersion, int ram, int job) {
@@ -65,35 +67,53 @@ public class ServerHandler {
   }
 
   public static boolean isServerRunning() {
+    return isServerRunning("mcsv");
+  }
+
+  public static boolean isServerRunning(String sessionName) {
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
       if (p.waitFor() == 0)
         return true;
-      p = new ProcessBuilder("tmux", "has-session", "-t", "mcServer").start();
-      if (p.waitFor() == 0)
-        return true;
-      p = new ProcessBuilder("pgrep", "-f", "server.jar").start();
-      if (p.waitFor() == 0)
-        return true;
-      p = new ProcessBuilder("pgrep", "-f", "fabric-server-launch.jar").start();
-      return p.waitFor() == 0;
+      if ("mcsv".equals(sess)) {
+        p = new ProcessBuilder("tmux", "has-session", "-t", "mcServer").start();
+        if (p.waitFor() == 0)
+          return true;
+        p = new ProcessBuilder("pgrep", "-f", "server.jar").start();
+        if (p.waitFor() == 0)
+          return true;
+        p = new ProcessBuilder("pgrep", "-f", "fabric-server-launch.jar").start();
+        return p.waitFor() == 0;
+      }
+      return false;
     } catch (Exception e) {
       return false;
     }
   }
 
   public static ProcessResult startServer(boolean publicTunnel) {
-    return startServer(publicTunnel, "4G", null, null);
+    return startServer(publicTunnel, "4G", null, null, "mcsv", ".");
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram) {
-    return startServer(publicTunnel, ram, null, null);
+    return startServer(publicTunnel, ram, null, null, "mcsv", ".");
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram, String javaBinOverride, String jdkHomeOverride) {
+    return startServer(publicTunnel, ram, javaBinOverride, jdkHomeOverride, "mcsv", ".");
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel, String ram, String javaBinOverride, String jdkHomeOverride, String sessionName, String workingDir) {
     if (!isCommandAvailable("tmux")) {
       return new ProcessResult(1,
           "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
+    }
+
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    File workDir = (workingDir != null && !workingDir.trim().isEmpty()) ? new File(workingDir) : new File(".");
+    if (!workDir.exists()) {
+      workDir.mkdirs();
     }
 
     String javaExec = javaBinOverride;
@@ -116,11 +136,12 @@ public class ServerHandler {
       javaExec = "java";
     }
 
-    if (isServerRunning()) {
-      return new ProcessResult(1, "Minecraft server session 'mcsv' is already running.");
+    if (isServerRunning(sess)) {
+      return new ProcessResult(1, "Minecraft server session '" + sess + "' is already running.");
     }
 
-    try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
+    File eulaFile = new File(workDir, "eula.txt");
+    try (FileWriter eulaWriter = new FileWriter(eulaFile)) {
       eulaWriter.write("eula=true\n");
     } catch (Exception ignored) {
     }
@@ -132,17 +153,12 @@ public class ServerHandler {
 
     if (publicTunnel) {
       try {
-        Process p = new ProcessBuilder("tmux", "has-session", "-t", "playit").start();
-        if (p.waitFor() != 0) {
-          String playitBin = new File("./playit").canExecute() ? "./playit" : "playit";
-          new ProcessBuilder("tmux", "new-session", "-d", "-s", "playit",
-              playitBin + " --secret_path ./playit.toml start").start().waitFor();
-        }
+        Tunnel.startDaemon();
       } catch (Exception ignored) {
       }
     }
 
-    File userJvmArgs = new File("user_jvm_args.txt");
+    File userJvmArgs = new File(workDir, "user_jvm_args.txt");
     if (userJvmArgs.exists()) {
       try {
         String content = Files.readString(userJvmArgs.toPath(), StandardCharsets.UTF_8);
@@ -153,22 +169,23 @@ public class ServerHandler {
       }
     }
 
-    File runSh = new File("run.sh");
+    File runSh = new File(workDir, "run.sh");
     if (runSh.exists()) {
       try {
-        new ProcessBuilder("chmod", "+x", "run.sh").start().waitFor();
+        new ProcessBuilder("chmod", "+x", runSh.getAbsolutePath()).start().waitFor();
         ProcessBuilder pb;
         if (jdkHome != null && !jdkHome.isEmpty()) {
           String binPath = new File(jdkHome, "bin").getAbsolutePath();
-          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv",
+          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", sess,
               "env", "PATH=" + binPath + ":" + System.getenv("PATH"), "JAVA_HOME=" + jdkHome, "./run.sh", "nogui");
         } else {
-          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui");
+          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", sess, "./run.sh", "nogui");
         }
+        pb.directory(workDir);
         Process p = pb.start();
         int code = p.waitFor();
         if (code == 0) {
-          return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
+          return new ProcessResult(0, "Minecraft server started in tmux session '" + sess + "'.");
         } else {
           return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
         }
@@ -178,12 +195,12 @@ public class ServerHandler {
     }
 
     String targetJar = "server.jar";
-    if (new File("fabric-server-launch.jar").exists()) {
+    if (new File(workDir, "fabric-server-launch.jar").exists()) {
       targetJar = "fabric-server-launch.jar";
     }
 
     List<String> cmd = new ArrayList<>(Arrays.asList(
-        "tmux", "new-session", "-d", "-s", "mcsv",
+        "tmux", "new-session", "-d", "-s", sess,
         javaExec,
         "-Xmx" + ramArg,
         "-Xms" + ramArg,
@@ -213,6 +230,7 @@ public class ServerHandler {
 
     try {
       ProcessBuilder pb = new ProcessBuilder(cmd);
+      pb.directory(workDir);
       if (jdkHome != null && !jdkHome.isEmpty()) {
         String binPath = new File(jdkHome, "bin").getAbsolutePath();
         pb.environment().put("JAVA_HOME", jdkHome);
@@ -221,7 +239,7 @@ public class ServerHandler {
       Process p = pb.start();
       int code = p.waitFor();
       if (code == 0) {
-        return new ProcessResult(0, "Minecraft server started in tmux session 'mcsv'.");
+        return new ProcessResult(0, "Minecraft server started in tmux session '" + sess + "'.");
       } else {
         return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
       }
@@ -231,33 +249,39 @@ public class ServerHandler {
   }
 
   public static ProcessResult stopServer() {
+    return stopServer("mcsv");
+  }
+
+  public static ProcessResult stopServer(String sessionName) {
     if (!isCommandAvailable("tmux")) {
       return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
     }
 
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+
     boolean hasSession = false;
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
       hasSession = (p.waitFor() == 0);
     } catch (Exception ignored) {
     }
 
     if (!hasSession) {
-      return new ProcessResult(0, "Minecraft server session 'mcsv' is not running.");
+      return new ProcessResult(0, "Minecraft server session '" + sess + "' is not running.");
     }
 
     try {
-      new ProcessBuilder("tmux", "send-keys", "-t", "mcsv", "stop", "C-m").start().waitFor();
+      new ProcessBuilder("tmux", "send-keys", "-t", sess, "stop", "C-m").start().waitFor();
 
       for (int i = 0; i < 30; i++) {
         Thread.sleep(500);
-        Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+        Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
         if (p.waitFor() != 0) {
           return new ProcessResult(0, "Minecraft server stopped.");
         }
       }
 
-      new ProcessBuilder("tmux", "kill-session", "-t", "mcsv").start().waitFor();
+      new ProcessBuilder("tmux", "kill-session", "-t", sess).start().waitFor();
       return new ProcessResult(0, "Minecraft server session terminated.");
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to stop server: " + e.getMessage());
@@ -265,15 +289,20 @@ public class ServerHandler {
   }
 
   public static ProcessResult sendConsoleCommand(String cmd) {
+    return sendConsoleCommand("mcsv", cmd);
+  }
+
+  public static ProcessResult sendConsoleCommand(String sessionName, String cmd) {
     if (!isCommandAvailable("tmux")) {
       return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
     }
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", "mcsv").start();
+      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
       if (p.waitFor() != 0) {
-        return new ProcessResult(1, "Minecraft server session 'mcsv' not found.");
+        return new ProcessResult(1, "Minecraft server session '" + sess + "' not found.");
       }
-      new ProcessBuilder("tmux", "send-keys", "-t", "mcsv", cmd, "C-m").start().waitFor();
+      new ProcessBuilder("tmux", "send-keys", "-t", sess, cmd, "C-m").start().waitFor();
       return new ProcessResult(0, "Command dispatched to Minecraft server.");
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to send command: " + e.getMessage());
@@ -327,7 +356,8 @@ public class ServerHandler {
     }
     switch (job) {
       case 0:
-        try (FileWriter eulaWriter = new FileWriter("eula.txt")) {
+        File eulaFile = new File(serverDir != null ? serverDir : ".", "eula.txt");
+        try (FileWriter eulaWriter = new FileWriter(eulaFile)) {
           eulaWriter.write("eula=true\n");
         } catch (Exception ignored) {
         }
@@ -337,10 +367,10 @@ public class ServerHandler {
         Communicator.printer(comp);
         break;
       case 1:
-        startServer(false, String.valueOf(ram) + "G");
+        startServer(false, String.valueOf(ram) + "G", null, null, sessionName, serverDir);
         break;
       case 2:
-        stopServer();
+        stopServer(sessionName);
         JsonObject stopResp = new JsonObject();
         stopResp.addProperty("status", 0);
         stopResp.addProperty("type", "server");
@@ -363,22 +393,22 @@ public class ServerHandler {
         JsonObject statusResp = new JsonObject();
         statusResp.addProperty("status", 0);
         statusResp.addProperty("type", "server");
-        statusResp.addProperty("running", isServerRunning());
+        statusResp.addProperty("running", isServerRunning(sessionName));
         Communicator.printer(statusResp);
         break;
       case 5:
-        startServer(false, String.valueOf(ram) + "G");
+        startServer(false, String.valueOf(ram) + "G", null, null, sessionName, serverDir);
         break;
       case 6:
-        stopServer();
+        stopServer(sessionName);
         try {
           Thread.sleep(1000);
         } catch (Exception ignored) {
         }
-        startServer(false, String.valueOf(ram) + "G");
+        startServer(false, String.valueOf(ram) + "G", null, null, sessionName, serverDir);
         break;
       case 7:
-        ProcessResult cmdRes = sendConsoleCommand(command != null ? command : "");
+        ProcessResult cmdRes = sendConsoleCommand(sessionName, command != null ? command : "");
         JsonObject cmdResp = new JsonObject();
         cmdResp.addProperty("status", cmdRes.exitCode == 0 ? 0 : 1);
         cmdResp.addProperty("type", "server");
@@ -386,7 +416,7 @@ public class ServerHandler {
         Communicator.printer(cmdResp);
         break;
       case 8:
-        ProcessResult migRes = MigrationHandler.migratePlayer(oldName, newName);
+        ProcessResult migRes = MigrationHandler.migratePlayer(oldName, newName, sessionName, serverDir);
         JsonObject migResp = new JsonObject();
         migResp.addProperty("status", migRes.exitCode == 0 ? 0 : 1);
         migResp.addProperty("type", "server");
@@ -394,7 +424,7 @@ public class ServerHandler {
         Communicator.printer(migResp);
         break;
       case 9:
-        ProcessResult bakRes = BackupHandler.runBackup(sourceFolder, targetFolder, retentionLimit, cloudSync, cloudRemote);
+        ProcessResult bakRes = BackupHandler.runBackup(sourceFolder, targetFolder, retentionLimit, cloudSync, cloudRemote, sessionName, serverDir);
         JsonObject bakResp = new JsonObject();
         bakResp.addProperty("status", bakRes.exitCode == 0 ? 0 : 1);
         bakResp.addProperty("type", "server");

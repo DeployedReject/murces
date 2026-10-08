@@ -16,33 +16,38 @@ import java.util.List;
 public class MigrationHandler {
 
   public static ProcessResult migratePlayer(String oldName, String newName) {
+    return migratePlayer(oldName, newName, "mcsv", ".");
+  }
+
+  public static ProcessResult migratePlayer(String oldName, String newName, String sessionName, String serverDir) {
     if (oldName == null || oldName.trim().isEmpty() || newName == null || newName.trim().isEmpty()) {
       return new ProcessResult(1, "Missing arguments.\nUsage: migrate <old-name> <new-name>");
     }
     oldName = oldName.trim();
     newName = newName.trim();
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    File workDir = (serverDir != null && !serverDir.trim().isEmpty()) ? new File(serverDir) : new File(".");
 
     String worldName = "world";
-    File worldDir = new File(worldName);
+    File worldDir = new File(workDir, worldName);
     File playerdataDir = new File(worldDir, "playerdata");
     File statsDir = new File(worldDir, "stats");
     File advancementsDir = new File(worldDir, "advancements");
-    File usercacheFile = new File("usercache.json");
+    File usercacheFile = new File(workDir, "usercache.json");
 
     if (!usercacheFile.exists()) {
       return new ProcessResult(1, "usercache.json not found in server root.");
     }
 
-    boolean wasRunning = ServerHandler.isServerRunning();
+    boolean wasRunning = ServerHandler.isServerRunning(sess);
     if (wasRunning) {
-      ServerHandler.stopServer();
+      ServerHandler.stopServer(sess);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException ignored) {
       }
     }
 
-    // Safety archive
     long epoch = System.currentTimeMillis() / 1000;
     String bakName = "migration_bak_" + epoch + ".tar";
     List<String> tarArgs = new ArrayList<>(Arrays.asList("tar", "-cf", bakName));
@@ -122,7 +127,7 @@ public class MigrationHandler {
     }
 
     if (wasRunning) {
-      ServerHandler.startServer(false, "4G");
+      ServerHandler.startServer(false, "4G", null, null, sess, serverDir);
       log.append("Server restarted.\n");
     }
 

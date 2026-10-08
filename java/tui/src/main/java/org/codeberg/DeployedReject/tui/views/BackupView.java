@@ -59,7 +59,6 @@ public class BackupView implements WorkspaceView {
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         root.addComponent(statusLabel);
 
-        // Backup Options Panel
         Panel optionsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
 
         Panel row1 = new Panel(new LinearLayout(Direction.HORIZONTAL));

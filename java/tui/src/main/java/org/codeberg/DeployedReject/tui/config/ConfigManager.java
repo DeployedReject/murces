@@ -2,6 +2,7 @@ package org.codeberg.DeployedReject.tui.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -9,6 +10,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class ConfigManager {
 
@@ -45,6 +48,10 @@ public class ConfigManager {
         }
     }
 
+    public synchronized void saveConfig() {
+        save();
+    }
+
     public synchronized void load() {
         if (configFile.exists() && configFile.isFile()) {
             try (FileReader reader = new FileReader(configFile, StandardCharsets.UTF_8)) {
@@ -70,6 +77,28 @@ public class ConfigManager {
                 }
                 if (obj.has("nerdFontMode") && !obj.get("nerdFontMode").isJsonNull()) {
                     loaded.setNerdFontMode(obj.get("nerdFontMode").getAsString().trim());
+                }
+                if (obj.has("sessionName") && !obj.get("sessionName").isJsonNull()) {
+                    loaded.setSessionName(obj.get("sessionName").getAsString().trim());
+                }
+                if (obj.has("serverDir") && !obj.get("serverDir").isJsonNull()) {
+                    loaded.setServerDir(obj.get("serverDir").getAsString().trim());
+                }
+                if (obj.has("activeServer") && !obj.get("activeServer").isJsonNull()) {
+                    loaded.setActiveServer(obj.get("activeServer").getAsString().trim());
+                }
+                if (obj.has("serverProfiles") && obj.get("serverProfiles").isJsonObject()) {
+                    JsonObject profObj = obj.getAsJsonObject("serverProfiles");
+                    Map<String, TuiConfig.ServerProfile> profiles = new LinkedHashMap<>();
+                    for (Map.Entry<String, JsonElement> entry : profObj.entrySet()) {
+                        if (entry.getValue().isJsonObject()) {
+                            TuiConfig.ServerProfile sp = GSON.fromJson(entry.getValue(), TuiConfig.ServerProfile.class);
+                            profiles.put(entry.getKey(), sp);
+                        }
+                    }
+                    if (!profiles.isEmpty()) {
+                        loaded.setServerProfiles(profiles);
+                    }
                 }
                 if (obj.has("portableJdk")) {
                     loaded.setPortableJdk(obj.get("portableJdk").getAsBoolean());
@@ -114,6 +143,13 @@ public class ConfigManager {
             obj.addProperty("enforceMinSize", config.isEnforceMinSize());
             obj.addProperty("pickaxeAnimation", config.isPickaxeAnimation());
             obj.addProperty("nerdFontMode", config.getNerdFontMode());
+            obj.addProperty("sessionName", config.getSessionName());
+            obj.addProperty("serverDir", config.getServerDir());
+            obj.addProperty("activeServer", config.getActiveServer());
+            obj.add("serverProfiles", GSON.toJsonTree(config.getServerProfiles()));
+            obj.addProperty("portableJdk", config.isPortableJdk());
+            obj.addProperty("gameVersion", config.getGameVersion());
+            obj.addProperty("loader", config.getLoader());
             obj.addProperty("backupSourceFolder", config.getBackupSourceFolder());
             obj.addProperty("backupTargetFolder", config.getBackupTargetFolder());
             obj.addProperty("backupRetentionLimit", config.getBackupRetentionLimit());

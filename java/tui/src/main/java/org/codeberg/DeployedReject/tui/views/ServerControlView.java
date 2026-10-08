@@ -16,7 +16,8 @@ public class ServerControlView implements WorkspaceView {
     private final MainWindow mainWindow;
     private final Panel root;
     private final Label statusLabel;
-    private final CheckBox publicTunnelCheckBox;
+    private final Label tunnelStatusLabel;
+    private final Button configTunnelBtn;
     private final ComboBox<String> ramComboBox;
     private final TextBox commandInput;
     private final Button startBtn;
@@ -32,7 +33,8 @@ public class ServerControlView implements WorkspaceView {
         this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
         refreshBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_RESTART + " [U]pdate Status"), this::updateStatus);
-        publicTunnelCheckBox = new CheckBox(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [P]layit Tunnel (--public)"));
+        configTunnelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_TUNNEL + " [K] Playit Config"), mainWindow::showTunnelConfig);
+        tunnelStatusLabel = new Label("");
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(8, 1));
         ramComboBox.setSelectedIndex(1);
@@ -42,15 +44,6 @@ public class ServerControlView implements WorkspaceView {
         commandInput = new TextBox(new TerminalSize(26, 1));
         sendBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [D]ispatch"), this::onSendCommand);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
-
-        publicTunnelCheckBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter) {
-                publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked());
-                ramComboBox.takeFocus();
-                return false;
-            }
-            return true;
-        });
 
         ramComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
             if (changedByUserInteraction) {
@@ -82,10 +75,12 @@ public class ServerControlView implements WorkspaceView {
         root.addComponent(statusPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server State"))));
 
         Panel launchOptionsPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        launchOptionsPanel.addComponent(publicTunnelCheckBox);
-        launchOptionsPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
         launchOptionsPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [M]emory (RAM): ")));
         launchOptionsPanel.addComponent(ramComboBox);
+        launchOptionsPanel.addComponent(new EmptySpace(new TerminalSize(2, 1)));
+        launchOptionsPanel.addComponent(configTunnelBtn);
+        launchOptionsPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        launchOptionsPanel.addComponent(tunnelStatusLabel);
         root.addComponent(launchOptionsPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Launch Options (Enter advances)"))));
 
         Panel actionPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
@@ -111,7 +106,7 @@ public class ServerControlView implements WorkspaceView {
         hotkeys.put('T', KeyboardNavigationHelper.action(stopBtn, this::onStop));
         hotkeys.put('R', KeyboardNavigationHelper.action(restartBtn, this::onRestart));
         hotkeys.put('U', KeyboardNavigationHelper.action(refreshBtn, this::updateStatus));
-        hotkeys.put('P', () -> publicTunnelCheckBox.setChecked(!publicTunnelCheckBox.isChecked()));
+        hotkeys.put('K', KeyboardNavigationHelper.action(configTunnelBtn, mainWindow::showTunnelConfig));
         hotkeys.put('M', this::cycleRam);
         hotkeys.put('D', KeyboardNavigationHelper.action(sendBtn, this::onSendCommand));
         hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
@@ -201,19 +196,31 @@ public class ServerControlView implements WorkspaceView {
             boolean downloading = OrchestratorBridge.isServerDownloading();
             boolean running = OrchestratorBridge.isServerRunning();
             boolean installed = OrchestratorBridge.isServerInstalled();
+            org.codeberg.DeployedReject.tui.config.TuiConfig cfg = org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig();
+            String sess = cfg.getSessionName();
+            org.codeberg.DeployedReject.tui.backend.ServerPropertiesManager spm = new org.codeberg.DeployedReject.tui.backend.ServerPropertiesManager(cfg.getServerDir());
+            String port = spm.get("server-port", "25565");
+            boolean tunnelLinked = OrchestratorBridge.isTunnelLinked();
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 applyButtonStates(installed, running, downloading);
+                if (tunnelLinked) {
+                    tunnelStatusLabel.setText(GlyphHelper.apply("● [Linked]"));
+                    tunnelStatusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+                } else {
+                    tunnelStatusLabel.setText(GlyphHelper.apply("○ [Unlinked]"));
+                    tunnelStatusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
+                }
                 if (downloading) {
                     statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [INSTALLING...]"));
                     statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
                 } else if (running) {
-                    statusLabel.setText(GlyphHelper.apply("● [RUNNING] - Port 25565"));
+                    statusLabel.setText(GlyphHelper.apply("● [RUNNING] (" + sess + ") - Port " + port));
                     statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
                 } else if (!installed) {
-                    statusLabel.setText(GlyphHelper.apply("✕ [NOT INSTALLED]"));
+                    statusLabel.setText(GlyphHelper.apply("✕ [NOT INSTALLED] (" + sess + ")"));
                     statusLabel.setForegroundColor(MinecraftTheme.STONE_GRAY);
                 } else {
-                    statusLabel.setText(GlyphHelper.apply("○ [STOPPED]"));
+                    statusLabel.setText(GlyphHelper.apply("○ [STOPPED] (" + sess + ")"));
                     statusLabel.setForegroundColor(MinecraftTheme.REDSTONE_RED);
                 }
             });
@@ -237,17 +244,16 @@ public class ServerControlView implements WorkspaceView {
             return;
         }
 
-        boolean pub = publicTunnelCheckBox.isChecked();
         String selectedRam = ramComboBox.getSelectedItem();
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [STARTING...]"));
         statusLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
         startBtn.setEnabled(false);
         stopBtn.setEnabled(false);
         restartBtn.setEnabled(false);
-        ActivityLogger.info("Starting server (public=" + pub + ", RAM=" + selectedRam + ")...");
+        ActivityLogger.info("Starting server (RAM=" + selectedRam + ")...");
 
         new Thread(() -> {
-            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub, selectedRam);
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(false, selectedRam);
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 if (res.exitCode == 0) {
                     ActivityLogger.ok(res.output.isEmpty() ? "Server started successfully." : res.output);
@@ -310,9 +316,8 @@ public class ServerControlView implements WorkspaceView {
             try {
                 Thread.sleep(1500);
             } catch (InterruptedException ignored) {}
-            boolean pub = publicTunnelCheckBox.isChecked();
             String selectedRam = ramComboBox.getSelectedItem();
-            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(pub, selectedRam);
+            OrchestratorBridge.ProcessResult res = OrchestratorBridge.startServer(false, selectedRam);
             mainWindow.getGui().getGUIThread().invokeLater(() -> {
                 if (res.exitCode == 0) {
                     ActivityLogger.ok(res.output.isEmpty() ? "Server restarted." : res.output);

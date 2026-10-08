@@ -16,6 +16,28 @@ Valid `type` values:
 - `"server"`: Manages server instance installation, lifecycle (start/stop), commands, and deployment.
 - `"modding"`: Manages mod querying and downloading.
 - `"backup"`: Flushes memory, creates `.tar` world snapshots, manages retention rotation, and cloud syncs.
+- `"tunnel"`: Manages native Playit.gg tunnel claim lifecycle, agent identity, and route discovery.
+
+---
+
+## Type: `tunnel`
+
+Manages Playit.gg agent claim handshakes, route queries, and credential resets.
+
+**Parameters:**
+- `action`: The tunnel operation to perform:
+  - `"setup"`: Initiates claim setup, prints claim verification URL (`https://playit.gg/claim/<code>`), and begins background exchange polling.
+  - `"status"`: Queries agent rundata via `GET /agents/rundata` to inspect assigned routes, public domains, and local ports.
+  - `"reset"`: Removes local credentials (`playitagent.txt`) and cache (`tunnels.json`).
+
+**Example (Setup Tunnel):**
+`{"type": "tunnel", "action": "setup"}`
+
+**Example (Query Status):**
+`{"type": "tunnel", "action": "status"}`
+
+**Example (Reset Credentials):**
+`{"type": "tunnel", "action": "reset"}`
 
 ---
 
@@ -29,9 +51,11 @@ Triggers live memory flushing (`save-all` & `save-off`), creates a timestamped `
 - `retentionLimit`: Number of newest backups to retain (e.g., `3`, optional, default `3`).
 - `cloudSync`: Boolean toggle to sync via rclone (`true` / `false`, default `false`).
 - `cloudRemote`: Rclone remote name (e.g., `"minecraftdrive"`, default `"minecraftdrive"`).
+- `sessionName`: Target tmux session name (e.g., `"mcsv"`, optional, default `"mcsv"`).
+- `serverDir`: Target server root directory (e.g., `"."` or `"servers/survival"`, optional, default `"."`).
 
 **Example:**
-`{"type": "backup", "sourceFolder": "world", "targetFolder": "backup", "retentionLimit": 3, "cloudSync": false, "cloudRemote": "minecraftdrive"}`
+`{"type": "backup", "sourceFolder": "world", "targetFolder": "backup", "retentionLimit": 3, "cloudSync": false, "cloudRemote": "minecraftdrive", "sessionName": "mcsv", "serverDir": "."}`
 
 ---
 
@@ -42,6 +66,13 @@ The server module manages the download, installation, and background process exe
 **Required Parameters:**
 `type`, `gameVersion`, `loaderVersion`, `serverType`, `ram`, `job`
 
+**Optional Parameters:**
+- `sessionName`: Name of the background tmux session (default: `"mcsv"`).
+- `serverDir`: Working directory for the server instance (default: `"."`).
+- `command`: In-game console command for `job: 7`.
+- `oldName` / `newName`: Old and new account usernames for player UUID migration (`job: 8`).
+- `portableJdk`: Boolean toggle to use portable Adoptium OpenJDK.
+
 - `serverType`: The backend engine ("fabric", "spigot", "paper", "forge", "vanilla").
 - `gameVersion`: The Minecraft version (e.g., "1.20.4").
 - `loaderVersion`: The specific build of the server type (e.g., "0.15.7"). Used primarily for Fabric. If using other engines, pass "none".
@@ -49,9 +80,9 @@ The server module manages the download, installation, and background process exe
 - `job`: An integer defining the lifecycle action.
   - `0` : **Install Only** (Downloads/compiles the server but does not start it).
   - `1` : **Install & Start** (Downloads/compiles and immediately spawns the `tmux` session).
-  - `2` : **Stop** (Gracefully stops the active `mcsv` Minecraft server session).
+  - `2` : **Stop** (Gracefully stops the active Minecraft server tmux session).
   - `3` : **Check Supported Engines** (Returns a list of currently implemented server types).
-  - `4` : **Check Status** (Returns whether the `mcsv` tmux session is currently active).
+  - `4` : **Check Status** (Returns whether the server tmux session is currently active).
   - `5` : **Start Only** (Spawns the `tmux` session for an already installed server without reinstalling).
   - `6` : **Restart** (Stops the active server session, waits briefly, and launches it again).
   - `7` : **Console Command** (Dispatches in-game command specified in `"command"` parameter).

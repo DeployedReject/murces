@@ -147,6 +147,20 @@ public class OrchestratorBridge {
     }
   }
 
+  public static class TunnelInfo {
+    public final String id;
+    public final String proto;
+    public final String publicAddress;
+    public final int localPort;
+
+    public TunnelInfo(String id, String proto, String publicAddress, int localPort) {
+      this.id = id != null ? id : "";
+      this.proto = proto != null ? proto : "tcp";
+      this.publicAddress = publicAddress != null ? publicAddress : "";
+      this.localPort = localPort;
+    }
+  }
+
   public static class ProcessResult {
     public final int exitCode;
     public final String output;
@@ -250,6 +264,33 @@ public class OrchestratorBridge {
           JsonObject json = Communicator.printBuffer.take();
           if (json.has("error")) {
             log("[ERR:] " + json.get("error").getAsString());
+          }
+          if (json.has("type") && "tunnel".equals(json.get("type").getAsString())) {
+            String action = json.has("action") ? json.get("action").getAsString() : "";
+            if (json.has("url")) {
+              log("[TUNNEL] Claim Agent URL: " + json.get("url").getAsString());
+            } else if (json.has("message")) {
+              log("[TUNNEL] " + json.get("message").getAsString());
+            } else if ("status".equals(action)) {
+              boolean linked = json.has("linked") && json.get("linked").getAsBoolean();
+              if (linked && json.has("tunnels")) {
+                JsonArray arr = json.getAsJsonArray("tunnels");
+                if (arr.size() > 0) {
+                  for (JsonElement el : arr) {
+                    if (el.isJsonObject()) {
+                      JsonObject tObj = el.getAsJsonObject();
+                      String pub = tObj.has("publicAddress") ? tObj.get("publicAddress").getAsString() : "";
+                      int port = tObj.has("localPort") ? tObj.get("localPort").getAsInt() : 25565;
+                      log("[TUNNEL] Route: " + pub + " -> localhost:" + port);
+                    }
+                  }
+                } else {
+                  log("[TUNNEL] Agent is linked, but no tunnels active.");
+                }
+              } else {
+                log("[TUNNEL] Agent is not linked.");
+              }
+            }
           }
           for (Consumer<JsonObject> l : listeners) {
             try {
@@ -881,30 +922,45 @@ public class OrchestratorBridge {
   }
 
   public static boolean isServerRunning() {
-    ProcessResult res = runShell("tmux", "has-session", "-t", "mcsv");
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return isServerRunning(cfg.getSessionName());
+  }
+
+  public static boolean isServerRunning(String sessionName) {
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    ProcessResult res = runShell("tmux", "has-session", "-t", sess);
     if (res.exitCode == 0)
       return true;
-    res = runShell("tmux", "has-session", "-t", "mcServer");
-    if (res.exitCode == 0)
-      return true;
-    res = runShell("pgrep", "-f", "server.jar");
-    if (res.exitCode == 0)
-      return true;
-    res = runShell("pgrep", "-f", "fabric-server-launch.jar");
-    return res.exitCode == 0;
+    if ("mcsv".equals(sess)) {
+      res = runShell("tmux", "has-session", "-t", "mcServer");
+      if (res.exitCode == 0)
+        return true;
+      res = runShell("pgrep", "-f", "server.jar");
+      if (res.exitCode == 0)
+        return true;
+      res = runShell("pgrep", "-f", "fabric-server-launch.jar");
+      return res.exitCode == 0;
+    }
+    return false;
   }
 
   public static String getLiveConsoleOutput(int maxLines) {
-    if (!isServerRunning()) {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return getLiveConsoleOutput(maxLines, cfg.getSessionName(), cfg.getServerDir());
+  }
+
+  public static String getLiveConsoleOutput(int maxLines, String sessionName, String serverDir) {
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    if (!isServerRunning(sess)) {
       return "[Server not started - Start server from Server Control [S] to view live output]";
     }
-    ProcessResult res = runShell("tmux", "capture-pane", "-t", "mcsv", "-p", "-S", "-" + maxLines);
+    ProcessResult res = runShell("tmux", "capture-pane", "-t", sess, "-p", "-S", "-" + maxLines);
     if (res.exitCode == 0 && res.output != null && !res.output.trim().isEmpty()) {
       return res.output.trim();
     }
-    File logFile = new File("logs/latest.log");
+    File logFile = new File(serverDir != null && !serverDir.trim().isEmpty() ? serverDir : ".", "logs/latest.log");
     if (logFile.exists() && logFile.canRead()) {
-      ProcessResult tailRes = runShell("tail", "-n", String.valueOf(maxLines), "logs/latest.log");
+      ProcessResult tailRes = runShell("tail", "-n", String.valueOf(maxLines), logFile.getPath());
       if (tailRes.exitCode == 0 && tailRes.output != null && !tailRes.output.trim().isEmpty()) {
         return tailRes.output.trim();
       }
@@ -927,6 +983,11 @@ public class OrchestratorBridge {
 
   public static ProcessResult startServer(boolean publicTunnel, String ram) {
     TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return startServer(publicTunnel, ram, cfg.getSessionName(), cfg.getServerDir());
+  }
+
+  public static ProcessResult startServer(boolean publicTunnel, String ram, String sessionName, String serverDir) {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
     boolean usePortable = cfg.isPortableJdk();
     String javaCmd = null;
     String jdkHome = null;
@@ -937,7 +998,7 @@ public class OrchestratorBridge {
         jdkHome = org.codeberg.DeployedReject.device.JdkManager.getJdkHome(reqJdk).getAbsolutePath();
       }
     }
-    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.startServer(publicTunnel, ram, javaCmd, jdkHome);
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.startServer(publicTunnel, ram, javaCmd, jdkHome, sessionName, serverDir);
     return new ProcessResult(res.exitCode, res.output);
   }
 
@@ -976,30 +1037,102 @@ public class OrchestratorBridge {
   }
 
   public static ProcessResult stopServer() {
-    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.stopServer();
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return stopServer(cfg.getSessionName());
+  }
+
+  public static ProcessResult stopServer(String sessionName) {
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.stopServer(sessionName);
     return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult sendConsoleCommand(String cmd) {
-    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.sendConsoleCommand(cmd);
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return sendConsoleCommand(cfg.getSessionName(), cmd);
+  }
+
+  public static ProcessResult sendConsoleCommand(String sessionName, String cmd) {
+    org.codeberg.DeployedReject.utils.ProcessResult res = ServerHandler.sendConsoleCommand(sessionName, cmd);
     return new ProcessResult(res.exitCode, res.output);
   }
 
+  public static void setupTunnel() {
+    org.codeberg.DeployedReject.device.Tunnel.setup();
+  }
+
+  public static void statusTunnel() {
+    org.codeberg.DeployedReject.device.Tunnel.status();
+  }
+
+  public static void resetTunnel() {
+    org.codeberg.DeployedReject.device.Tunnel.reset();
+  }
+
+  public static void startTunnelDaemon() {
+    org.codeberg.DeployedReject.device.Tunnel.startDaemon();
+  }
+
+  public static void stopTunnelDaemon() {
+    org.codeberg.DeployedReject.device.Tunnel.stopDaemon();
+  }
+
+  public static boolean isTunnelDaemonRunning() {
+    return org.codeberg.DeployedReject.device.Tunnel.isDaemonRunning();
+  }
+
+  public static boolean isTunnelLinked() {
+    File f = new File("playitagent.txt");
+    return f.exists() && f.length() > 0;
+  }
+
+  public static List<TunnelInfo> getStoredTunnels() {
+    List<TunnelInfo> list = new ArrayList<>();
+    File f = new File("tunnels.json");
+    if (!f.exists() || f.length() == 0) return list;
+    try {
+      String content = Files.readString(f.toPath(), StandardCharsets.UTF_8);
+      JsonArray arr = com.google.gson.JsonParser.parseString(content).getAsJsonArray();
+      for (JsonElement el : arr) {
+        if (el.isJsonObject()) {
+          JsonObject obj = el.getAsJsonObject();
+          String id = obj.has("id") ? obj.get("id").getAsString() : "";
+          String proto = obj.has("proto") ? obj.get("proto").getAsString() : "tcp";
+          String pub = obj.has("publicAddress") ? obj.get("publicAddress").getAsString() : "";
+          int port = obj.has("localPort") ? obj.get("localPort").getAsInt() : 25565;
+          list.add(new TunnelInfo(id, proto, pub, port));
+        }
+      }
+    } catch (Exception ignored) {}
+    return list;
+  }
+
   public static ProcessResult migratePlayer(String oldName, String newName) {
-    org.codeberg.DeployedReject.utils.ProcessResult res = MigrationHandler.migratePlayer(oldName, newName);
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return migratePlayer(oldName, newName, cfg.getSessionName(), cfg.getServerDir());
+  }
+
+  public static ProcessResult migratePlayer(String oldName, String newName, String sessionName, String serverDir) {
+    org.codeberg.DeployedReject.utils.ProcessResult res = MigrationHandler.migratePlayer(oldName, newName, sessionName, serverDir);
     return new ProcessResult(res.exitCode, res.output);
   }
 
   public static ProcessResult runBackup() {
     TuiConfig cfg = ConfigManager.getInstance().getConfig();
     return runBackup(cfg.getBackupSourceFolder(), cfg.getBackupTargetFolder(),
-        cfg.getBackupRetentionLimit(), cfg.isBackupCloudSync(), cfg.getBackupCloudRemote());
+        cfg.getBackupRetentionLimit(), cfg.isBackupCloudSync(), cfg.getBackupCloudRemote(),
+        cfg.getSessionName(), cfg.getServerDir());
   }
 
   public static ProcessResult runBackup(String sourceFolder, String targetFolder, int retentionLimit,
       boolean cloudSync, String cloudRemote) {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    return runBackup(sourceFolder, targetFolder, retentionLimit, cloudSync, cloudRemote, cfg.getSessionName(), cfg.getServerDir());
+  }
+
+  public static ProcessResult runBackup(String sourceFolder, String targetFolder, int retentionLimit,
+      boolean cloudSync, String cloudRemote, String sessionName, String serverDir) {
     org.codeberg.DeployedReject.utils.ProcessResult res = BackupHandler.runBackup(sourceFolder, targetFolder,
-        retentionLimit, cloudSync, cloudRemote);
+        retentionLimit, cloudSync, cloudRemote, sessionName, serverDir);
     return new ProcessResult(res.exitCode, res.output);
   }
 

@@ -91,8 +91,36 @@ public class Main {
           if (request.has("cloudSync")) sh.cloudSync = request.get("cloudSync").getAsBoolean();
           if (request.has("cloudRemote")) sh.cloudRemote = request.get("cloudRemote").getAsString();
           if (request.has("portableJdk")) sh.portableJdk = request.get("portableJdk").getAsBoolean();
+          if (request.has("sessionName")) sh.sessionName = request.get("sessionName").getAsString();
+          if (request.has("serverDir")) sh.serverDir = request.get("serverDir").getAsString();
 
           sh.serverHandler();
+
+        } else if (type.equals("tunnel")) {
+          if (!request.has("action")) {
+            ErrorHelper.errorJson("Missing 'action' parameter for tunnel operation.");
+            return;
+          }
+          String action = request.get("action").getAsString();
+          switch (action) {
+            case "setup":
+              org.codeberg.DeployedReject.device.Tunnel.setup();
+              break;
+            case "status":
+              org.codeberg.DeployedReject.device.Tunnel.status();
+              break;
+            case "start":
+              org.codeberg.DeployedReject.device.Tunnel.startDaemon();
+              break;
+            case "stop":
+              org.codeberg.DeployedReject.device.Tunnel.stopDaemon();
+              break;
+            case "reset":
+              org.codeberg.DeployedReject.device.Tunnel.reset();
+              break;
+            default:
+              ErrorHelper.errorJson("Unsupported tunnel action: " + action);
+          }
 
         } else if (type.equals("backup")) {
           String src = request.has("sourceFolder") ? request.get("sourceFolder").getAsString() : "world";
@@ -100,8 +128,10 @@ public class Main {
           int ret = request.has("retentionLimit") ? request.get("retentionLimit").getAsInt() : 3;
           boolean sync = request.has("cloudSync") && request.get("cloudSync").getAsBoolean();
           String remote = request.has("cloudRemote") ? request.get("cloudRemote").getAsString() : "minecraftdrive";
+          String sessionName = request.has("sessionName") ? request.get("sessionName").getAsString() : "mcsv";
+          String serverDir = request.has("serverDir") ? request.get("serverDir").getAsString() : ".";
           org.codeberg.DeployedReject.utils.ProcessResult res =
-              org.codeberg.DeployedReject.device.BackupHandler.runBackup(src, tgt, ret, sync, remote);
+              org.codeberg.DeployedReject.device.BackupHandler.runBackup(src, tgt, ret, sync, remote, sessionName, serverDir);
           JsonObject resp = new JsonObject();
           resp.addProperty("status", res.exitCode == 0 ? 0 : 1);
           resp.addProperty("type", "backup");

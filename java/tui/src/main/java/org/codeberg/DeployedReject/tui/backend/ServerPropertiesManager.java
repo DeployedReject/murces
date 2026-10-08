@@ -162,9 +162,11 @@ public class ServerPropertiesManager {
         this("server.properties");
     }
 
-    public ServerPropertiesManager(String filename) {
-        Path path = Paths.get(filename);
-        if (!path.toFile().exists()) {
+    public ServerPropertiesManager(String dirOrFilename) {
+        Path path = Paths.get(dirOrFilename != null && !dirOrFilename.trim().isEmpty() ? dirOrFilename.trim() : "server.properties");
+        if (path.toFile().isDirectory()) {
+            path = path.resolve("server.properties");
+        } else if (!path.toFile().exists()) {
             Path cPath = Paths.get("c/manager/server.properties");
             if (cPath.toFile().exists()) {
                 path = cPath;
@@ -172,6 +174,12 @@ public class ServerPropertiesManager {
         }
         this.filePath = path;
         load();
+    }
+
+    public static void updateServerPort(String dirOrFilename, int port) throws IOException {
+        ServerPropertiesManager spm = new ServerPropertiesManager(dirOrFilename);
+        spm.set("server-port", String.valueOf(port));
+        spm.save();
     }
 
     public synchronized void load() {

@@ -45,6 +45,7 @@ public class MainWindow extends BasicWindow {
     private final ModManageView modManageView;
     private final CustomizationView customizationView;
     private final JobManagerView jobManagerView;
+    private final TunnelConfigView tunnelConfigView;
 
     private WorkspaceView currentView;
     private TerminalSize lastKnownTermSize = null;
@@ -136,6 +137,7 @@ public class MainWindow extends BasicWindow {
         this.modManageView = new ModManageView(this);
         this.customizationView = new CustomizationView(this);
         this.jobManagerView = new JobManagerView(this);
+        this.tunnelConfigView = new TunnelConfigView(this);
 
         applyConfig(ConfigManager.getInstance().getConfig());
 
@@ -219,6 +221,7 @@ public class MainWindow extends BasicWindow {
     public void showModManage() { showView(modManageView); }
     public void showCustomization() { showView(customizationView); }
     public void showJobManager() { showView(jobManagerView); }
+    public void showTunnelConfig() { showView(tunnelConfigView); }
 
     public MainMenuView getMainMenuView() { return mainMenuView; }
     public ServerControlView getServerControlView() { return serverControlView; }
@@ -230,6 +233,7 @@ public class MainWindow extends BasicWindow {
     public ModManageView getModManageView() { return modManageView; }
     public CustomizationView getCustomizationView() { return customizationView; }
     public JobManagerView getJobManagerView() { return jobManagerView; }
+    public TunnelConfigView getTunnelConfigView() { return tunnelConfigView; }
 
     public void applyConfig(TuiConfig config) {
         if (config == null) return;
@@ -384,7 +388,6 @@ public class MainWindow extends BasicWindow {
                         c = Character.toUpperCase(keyStroke.getCharacter());
                     }
                     if (c != null) {
-                        // Current view hotkeys have first priority
                         if (currentView != null && currentView.getHotkeys() != null) {
                             Map<Character, Runnable> hotkeys = currentView.getHotkeys();
                             if (hotkeys.containsKey(c)) {
@@ -394,7 +397,6 @@ public class MainWindow extends BasicWindow {
                             }
                         }
 
-                        // Global navigation fallbacks
                         if (c == 'A') {
                             deliver.set(false);
                             activityLogView.takeFocus();

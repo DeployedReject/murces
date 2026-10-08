@@ -37,15 +37,19 @@ public class Main {
             case "-h":
                 System.out.println("Murces - Minecraft Server Manager TUI");
                 System.out.println("Usage:");
-                System.out.println("  murces              Launch interactive Minecraft TUI");
-                System.out.println("  murces start [-p]   Start server (--public for Playit tunnel)");
-                System.out.println("  murces stop         Stop server");
-                System.out.println("  murces status       Check server running status");
-                System.out.println("  murces backup       Run world backup");
-                System.out.println("  murces update-mods  Update all installed mods to latest compatible versions");
-                System.out.println("  murces install-jdk  Download portable OpenJDK (8/17/21)");
-                System.out.println("  murces --test-tui   Run automated self-test of all TUI windows");
-                System.out.println("  murces --version    Show version");
+                System.out.println("  murces                             Launch interactive Minecraft TUI");
+                System.out.println("  murces start [-p] [--session <s>]  Start server (-p for tunnel, custom tmux session)");
+                System.out.println("  murces stop [--session <s>]        Stop server");
+                System.out.println("  murces status [--session <s>]      Check server running status");
+                System.out.println("  murces tunnel <setup|status|reset> Playit.gg tunnel native lifecycle management");
+                System.out.println("  murces server-port <port>          Update server.properties port");
+                System.out.println("  murces servers                     List configured server profiles");
+                System.out.println("  murces switch <profile>            Switch active server profile");
+                System.out.println("  murces backup                      Run world backup");
+                System.out.println("  murces update-mods                 Update all installed mods to latest versions");
+                System.out.println("  murces install-jdk [version]       Download portable OpenJDK (8/17/21)");
+                System.out.println("  murces --test-tui                  Run automated self-test of all TUI windows");
+                System.out.println("  murces --version                   Show version");
                 break;
             case "--version":
             case "-v":
@@ -53,6 +57,60 @@ public class Main {
                 break;
             case "--test-tui":
                 runSelfTest();
+                break;
+            case "tunnel":
+                String tAct = args.length > 1 ? args[1] : "status";
+                switch (tAct) {
+                    case "setup":
+                        org.codeberg.DeployedReject.device.Tunnel.setup();
+                        break;
+                    case "status":
+                        org.codeberg.DeployedReject.device.Tunnel.status();
+                        break;
+                    case "reset":
+                        org.codeberg.DeployedReject.device.Tunnel.reset();
+                        break;
+                    default:
+                        System.err.println("Unknown tunnel action: " + tAct + ". Valid actions: setup, status, reset");
+                }
+                break;
+            case "server-port":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces server-port <port> [dirOrFile]");
+                    System.exit(1);
+                }
+                try {
+                    int pNum = Integer.parseInt(args[1]);
+                    String pDir = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getServerDir();
+                    org.codeberg.DeployedReject.tui.backend.ServerPropertiesManager.updateServerPort(pDir, pNum);
+                    System.out.println("Updated server-port to " + pNum + " in " + pDir);
+                } catch (Exception e) {
+                    System.err.println("Failed to update server-port: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "servers":
+                TuiConfig cfgSrv = ConfigManager.getInstance().getConfig();
+                System.out.println("Active Server Profile: " + cfgSrv.getActiveServer());
+                System.out.println("Configured Server Profiles:");
+                for (TuiConfig.ServerProfile sp : cfgSrv.getServerProfiles().values()) {
+                    System.out.println("  - " + sp.getName() + " [session=" + sp.getSessionName() + ", dir=" + sp.getDirectory() + ", port=" + sp.getPort() + "]");
+                }
+                break;
+            case "switch":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces switch <profile-name>");
+                    System.exit(1);
+                }
+                TuiConfig cfgSw = ConfigManager.getInstance().getConfig();
+                if (cfgSw.getServerProfiles().containsKey(args[1])) {
+                    cfgSw.switchServer(args[1]);
+                    ConfigManager.getInstance().saveConfig();
+                    System.out.println("Switched active server profile to: " + args[1]);
+                } else {
+                    System.err.println("Server profile '" + args[1] + "' not found.");
+                    System.exit(1);
+                }
                 break;
             case "update-mods":
                 String uMc = args.length > 1 ? args[1] : ConfigManager.getInstance().getConfig().getGameVersion();
@@ -78,16 +136,39 @@ public class Main {
                 System.out.println("Portable JDK installation: " + (jOk ? "SUCCESS" : "FAILED"));
                 break;
             case "status":
-                boolean running = OrchestratorBridge.isServerRunning();
-                System.out.println("Server status: " + (running ? "RUNNING" : "STOPPED"));
+                String stSess = ConfigManager.getInstance().getConfig().getSessionName();
+                for (int i = 1; i < args.length; i++) {
+                    if ("--session".equals(args[i]) && i + 1 < args.length) {
+                        stSess = args[i + 1];
+                    }
+                }
+                boolean running = OrchestratorBridge.isServerRunning(stSess);
+                System.out.println("Server status (" + stSess + "): " + (running ? "RUNNING" : "STOPPED"));
                 break;
             case "start":
-                boolean pub = args.length > 1 && ("-p".equals(args[1]) || "--public".equals(args[1]));
-                OrchestratorBridge.ProcessResult startRes = OrchestratorBridge.startServer(pub);
+                boolean pub = false;
+                String startSess = ConfigManager.getInstance().getConfig().getSessionName();
+                String startDir = ConfigManager.getInstance().getConfig().getServerDir();
+                for (int i = 1; i < args.length; i++) {
+                    if ("-p".equals(args[i]) || "--public".equals(args[i])) {
+                        pub = true;
+                    } else if ("--session".equals(args[i]) && i + 1 < args.length) {
+                        startSess = args[++i];
+                    } else if ("--dir".equals(args[i]) && i + 1 < args.length) {
+                        startDir = args[++i];
+                    }
+                }
+                OrchestratorBridge.ProcessResult startRes = OrchestratorBridge.startServer(pub, "4G", startSess, startDir);
                 System.out.println(startRes.output);
                 break;
             case "stop":
-                OrchestratorBridge.ProcessResult stopRes = OrchestratorBridge.stopServer();
+                String stopSess = ConfigManager.getInstance().getConfig().getSessionName();
+                for (int i = 1; i < args.length; i++) {
+                    if ("--session".equals(args[i]) && i + 1 < args.length) {
+                        stopSess = args[++i];
+                    }
+                }
+                OrchestratorBridge.ProcessResult stopRes = OrchestratorBridge.stopServer(stopSess);
                 System.out.println(stopRes.output);
                 break;
             case "backup":

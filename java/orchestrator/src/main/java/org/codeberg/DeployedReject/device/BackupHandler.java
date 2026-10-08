@@ -39,6 +39,14 @@ public class BackupHandler {
 
   public static ProcessResult runBackup(String sourceFolder, String targetFolder, int retentionLimit,
       boolean cloudSync, String cloudRemote) {
+    return runBackup(sourceFolder, targetFolder, retentionLimit, cloudSync, cloudRemote, "mcsv", ".");
+  }
+
+  public static ProcessResult runBackup(String sourceFolder, String targetFolder, int retentionLimit,
+      boolean cloudSync, String cloudRemote, String sessionName, String serverDir) {
+    String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    File workDir = (serverDir != null && !serverDir.trim().isEmpty()) ? new File(serverDir) : new File(".");
+
     if (sourceFolder == null || sourceFolder.trim().isEmpty()) {
       sourceFolder = "world";
     } else {
@@ -58,7 +66,7 @@ public class BackupHandler {
     }
 
     StringBuilder logOutput = new StringBuilder();
-    File sourceDir = new File(sourceFolder);
+    File sourceDir = new File(sourceFolder).isAbsolute() ? new File(sourceFolder) : new File(workDir, sourceFolder);
     if (!sourceDir.exists() || !sourceDir.isDirectory()) {
       String err = "Error: Could not find a folder named '" + sourceFolder + "'.\n";
       appendToLog("backup.log", err);
@@ -66,15 +74,15 @@ public class BackupHandler {
       return new ProcessResult(1, err.trim());
     }
 
-    String startMsg = "Success: The folder '" + sourceFolder + "' exists in the current directory.\n";
+    String startMsg = "Success: The folder '" + sourceFolder + "' exists in the directory.\n";
     logOutput.append(startMsg);
     appendToLog("backup.log", startMsg);
     writeStatus("backup.status.log", startMsg);
 
-    boolean serverWasRunning = ServerHandler.isServerRunning();
+    boolean serverWasRunning = ServerHandler.isServerRunning(sess);
     if (serverWasRunning) {
-      ServerHandler.sendConsoleCommand("save-all");
-      ServerHandler.sendConsoleCommand("save-off");
+      ServerHandler.sendConsoleCommand(sess, "save-all");
+      ServerHandler.sendConsoleCommand(sess, "save-off");
       try {
         Thread.sleep(1500);
       } catch (InterruptedException ignored) {
@@ -85,7 +93,7 @@ public class BackupHandler {
     }
 
     try {
-      File targetDir = new File(targetFolder);
+      File targetDir = new File(targetFolder).isAbsolute() ? new File(targetFolder) : new File(workDir, targetFolder);
       if (!targetDir.exists()) {
         targetDir.mkdirs();
       }
@@ -94,20 +102,20 @@ public class BackupHandler {
       String archiveName = timestamp + ".tar";
       File archiveFile = new File(targetDir, archiveName);
 
-      List<String> tarArgs = new ArrayList<>(Arrays.asList("tar", "-cf", archiveFile.getPath(), sourceFolder));
+      List<String> tarArgs = new ArrayList<>(Arrays.asList("tar", "-cf", archiveFile.getAbsolutePath(), sourceFolder));
 
-      File netherDir = new File(sourceFolder + "_nether");
+      File netherDir = new File(sourceDir.getParentFile(), sourceFolder + "_nether");
       if (netherDir.exists() && netherDir.isDirectory()) {
-        tarArgs.add(netherDir.getPath());
+        tarArgs.add(sourceFolder + "_nether");
         String netherMsg = "Included Bukkit/Paper Nether folder: '" + netherDir.getPath() + "'\n";
         logOutput.append(netherMsg);
         appendToLog("backup.log", netherMsg);
         writeStatus("backup.status.log", netherMsg);
       }
 
-      File endDir = new File(sourceFolder + "_the_end");
+      File endDir = new File(sourceDir.getParentFile(), sourceFolder + "_the_end");
       if (endDir.exists() && endDir.isDirectory()) {
-        tarArgs.add(endDir.getPath());
+        tarArgs.add(sourceFolder + "_the_end");
         String endMsg = "Included Bukkit/Paper The End folder: '" + endDir.getPath() + "'\n";
         logOutput.append(endMsg);
         appendToLog("backup.log", endMsg);
@@ -115,6 +123,7 @@ public class BackupHandler {
       }
 
       ProcessBuilder pb = new ProcessBuilder(tarArgs);
+      pb.directory(workDir);
       pb.redirectErrorStream(true);
       Process p = pb.start();
       int tarCode = p.waitFor();
@@ -130,7 +139,6 @@ public class BackupHandler {
       appendToLog("backup.log", "Bundling Done\n");
       writeStatus("backup.status.log", "Bundling Done\n");
 
-      // Retention cleanup
       File[] archives = targetDir.listFiles((dir, name) -> {
         String l = name.toLowerCase();
         return l.endsWith(".tar") || l.endsWith(".tar.gz") || l.endsWith(".tgz");
@@ -148,14 +156,13 @@ public class BackupHandler {
         }
       }
 
-      // Cloud sync via rclone
       if (cloudSync) {
         logOutput.append("Upload Started\n");
         appendToLog("backup.log", "Upload Started\n");
         writeStatus("backup.status.log", "Upload Started\n");
 
         if (ServerHandler.isCommandAvailable("rclone")) {
-          ProcessBuilder rclonePb = new ProcessBuilder("rclone", "sync", targetFolder,
+          ProcessBuilder rclonePb = new ProcessBuilder("rclone", "sync", targetDir.getAbsolutePath(),
               cloudRemote + ":" + targetFolder);
           rclonePb.redirectErrorStream(true);
           Process rcloneProc = rclonePb.start();
@@ -188,7 +195,7 @@ public class BackupHandler {
       return new ProcessResult(1, logOutput.toString().trim());
     } finally {
       if (serverWasRunning) {
-        ServerHandler.sendConsoleCommand("save-on");
+        ServerHandler.sendConsoleCommand(sess, "save-on");
       }
     }
   }
