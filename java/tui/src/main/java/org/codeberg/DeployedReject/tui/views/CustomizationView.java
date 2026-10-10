@@ -28,6 +28,7 @@ public class CustomizationView implements WorkspaceView {
     private final Button resetBtn;
     private final Button backBtn;
     private final Label statusLabel;
+    private final TextBox assetDirBox;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
 
     private static final String[] TRANSPARENCY_OPTIONS = {
