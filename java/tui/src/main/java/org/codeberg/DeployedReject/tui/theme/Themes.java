@@ -260,6 +260,35 @@ public class Themes {
         theme.addOverride(Window.class, fg, baseBg);
         theme.addOverride(Border.class, border, baseBg);
 
+        // On Windows or when Unicode box characters cannot be reliably rendered by the console host,
+        // provide clean, crisp ASCII box borders to prevent 'ΓöîΓöÇ' CP437 font garbling.
+        if (org.codeberg.DeployedReject.utils.Platform.isWindows() ||
+            "disabled".equalsIgnoreCase(System.getenv("MURCES_UNICODE_BORDERS"))) {
+            try {
+                Class<?> singleLineCls = Class.forName("com.googlecode.lanterna.gui2.Borders$SingleLine");
+                theme.addOverride(singleLineCls, border, baseBg)
+                        .setCharacter("HORIZONTAL_LINE", '-')
+                        .setCharacter("VERTICAL_LINE", '|')
+                        .setCharacter("TOP_LEFT_CORNER", '+')
+                        .setCharacter("TOP_RIGHT_CORNER", '+')
+                        .setCharacter("BOTTOM_LEFT_CORNER", '+')
+                        .setCharacter("BOTTOM_RIGHT_CORNER", '+')
+                        .setCharacter("TITLE_LEFT", '-')
+                        .setCharacter("TITLE_RIGHT", '-');
+
+                Class<?> doubleLineCls = Class.forName("com.googlecode.lanterna.gui2.Borders$DoubleLine");
+                theme.addOverride(doubleLineCls, border, baseBg)
+                        .setCharacter("HORIZONTAL_LINE", '=')
+                        .setCharacter("VERTICAL_LINE", '|')
+                        .setCharacter("TOP_LEFT_CORNER", '+')
+                        .setCharacter("TOP_RIGHT_CORNER", '+')
+                        .setCharacter("BOTTOM_LEFT_CORNER", '+')
+                        .setCharacter("BOTTOM_RIGHT_CORNER", '+')
+                        .setCharacter("TITLE_LEFT", '=')
+                        .setCharacter("TITLE_RIGHT", '=');
+            } catch (Throwable ignored) {}
+        }
+
         return theme;
     }
 

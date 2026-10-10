@@ -431,6 +431,12 @@ public class Main {
     }
 
     private static void launchTui() {
+        if (Platform.isWindows()) {
+            try {
+                new ProcessBuilder("cmd.exe", "/c", "chcp 65001 >nul").inheritIO().start().waitFor();
+            } catch (Exception ignored) {}
+        }
+
         ResponsiveTerminal terminal;
         if (Platform.isWindows()) {
             terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);

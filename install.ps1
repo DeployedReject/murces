@@ -241,13 +241,19 @@ if (Test-Path $murcesExe) {
     $murcesBat = Join-Path $InstallDir "murces.bat"
     if (Ask-Consent "Create murces.bat launcher for locally built JAR in $InstallDir?" $true) {
         $jarPath = (Resolve-Path "java\tui\target\murces-tui-1.6.jar").Path
-        "@echo off`njava -jar `"$jarPath`" %*" | Out-File -FilePath $murcesBat -Encoding ascii
+        "@echo off`nchcp 65001 >nul`njava -Dfile.encoding=UTF-8 -jar `"$jarPath`" %*" | Out-File -FilePath $murcesBat -Encoding ascii
         Write-Color "  ✔ Created $murcesBat launcher wrapper." "Green"
     }
 } else {
     if (Ask-Consent "Download and install MurCes native executable to $InstallDir?" $true) {
         Download-FileWithProgress "https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe" $murcesExe "MurCes Windows Native Executable" | Out-Null
     }
+}
+
+# Create companion murces.cmd helper in InstallDir to ensure chcp 65001 before executing murces.exe
+$murcesCmd = Join-Path $InstallDir "murces.cmd"
+if (Test-Path $murcesExe) {
+    "@echo off`nchcp 65001 >nul`n`"%~dp0murces.exe`" %*" | Out-File -FilePath $murcesCmd -Encoding ascii
 }
 
 # Ensure InstallDir is added to User PATH environment variable

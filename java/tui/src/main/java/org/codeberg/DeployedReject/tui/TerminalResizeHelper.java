@@ -50,6 +50,11 @@ public class TerminalResizeHelper {
                     }
                 }
             } catch (Exception ignored) {}
+        } else {
+            TerminalSize winSize = queryWindowsTerminalSize();
+            if (winSize != null) {
+                return winSize;
+            }
         }
 
         try {
@@ -64,6 +69,40 @@ public class TerminalResizeHelper {
             }
         } catch (Exception ignored) {}
 
+        return null;
+    }
+
+    private static TerminalSize queryWindowsTerminalSize() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", "mode con");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output;
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+                output = sb.toString();
+            }
+            p.waitFor(150, TimeUnit.MILLISECONDS);
+
+            int cols = -1;
+            int rows = -1;
+            java.util.regex.Matcher mCols = java.util.regex.Pattern.compile("Columns:\\s*(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(output);
+            if (mCols.find()) {
+                cols = Integer.parseInt(mCols.group(1));
+            }
+            java.util.regex.Matcher mLines = java.util.regex.Pattern.compile("Lines:\\s*(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(output);
+            if (mLines.find()) {
+                rows = Integer.parseInt(mLines.group(1));
+            }
+
+            if (cols >= 20 && rows >= 5) {
+                return new TerminalSize(cols, rows);
+            }
+        } catch (Exception ignored) {}
         return null;
     }
 
