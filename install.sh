@@ -516,7 +516,17 @@ echo ""
 
 # 4. MurCes Standalone Executable Installation
 echo -e "${BOLD}[4/4] MurCes Standalone Executable${RESET}"
-MURCES_BIN="$([ "$OS" = "windows" ] && echo "./murces.exe" || echo "./murces")"
+
+DEFAULT_INSTALL_DIR="$HOME/.local/bin"
+if [ "$OS" = "windows" ]; then
+    DEFAULT_INSTALL_DIR="$HOME/bin"
+fi
+
+INSTALL_DIR="${MURCES_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+
+BINARY_NAME="$([ "$OS" = "windows" ] && echo "murces.exe" || echo "murces")"
+MURCES_BIN="${INSTALL_DIR}/${BINARY_NAME}"
 
 download_murces() {
     if [ "$ARCH" = "unsupported" ]; then
@@ -542,8 +552,10 @@ download_murces() {
     fi
 }
 
+echo -e "  Install location: ${CYAN}${INSTALL_DIR}${RESET}"
+
 if [ -f "$MURCES_BIN" ] && ([ -x "$MURCES_BIN" ] || [ "$OS" = "windows" ]); then
-    echo -e "${GREEN}  ✔${RESET} $MURCES_BIN executable is already present in this directory."
+    echo -e "${GREEN}  ✔${RESET} $BINARY_NAME is already present in ${INSTALL_DIR}."
     if ask_consent "Re-download and overwrite with the latest release from GitHub?" "n"; then
         download_murces
     fi
@@ -552,13 +564,35 @@ elif [ -f "java/tui/target/murces" ] || [ -f "java/tui/target/murces.exe" ]; the
     if ask_consent "Deploy locally built native binary '$LOCAL_SRC' to $MURCES_BIN?" "y"; then
         cp "$LOCAL_SRC" "$MURCES_BIN"
         chmod +x "$MURCES_BIN" 2>/dev/null || true
-        echo -e "${GREEN}  ✔ Local murces binary deployed successfully.${RESET}"
+        echo -e "${GREEN}  ✔ Local murces binary deployed to ${MURCES_BIN} successfully.${RESET}"
     fi
 else
-    if ask_consent "Download and install MurCes native executable from GitHub Releases (${ARCH_LABEL})?" "y"; then
+    if ask_consent "Download and install MurCes native executable to ${INSTALL_DIR} (${ARCH_LABEL})?" "y"; then
         download_murces
     fi
 fi
+
+# Ensure install directory is in PATH
+PATH_UPDATED=0
+case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
+        if [ "$OS" = "windows" ]; then
+            export PATH="$INSTALL_DIR:$PATH"
+            PATH_UPDATED=1
+        else
+            export PATH="$INSTALL_DIR:$PATH"
+            # Attempt to add to shell RC files if not present
+            for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+                if [ -f "$rc_file" ] && ! grep -q "$INSTALL_DIR" "$rc_file" 2>/dev/null; then
+                    echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$rc_file"
+                    PATH_UPDATED=1
+                fi
+            done
+        fi
+        ;;
+esac
+
 echo ""
 
 # Verification Summary
@@ -573,9 +607,9 @@ check_tool() {
 
     if command -v "$cmd" >/dev/null 2>&1 || command -v "${cmd}.exe" >/dev/null 2>&1; then
         printf "  %-12s %-38s ${GREEN}✔ Ready${RESET}\n" "$cmd" "($desc)"
+    elif [ -x "$MURCES_BIN" ] && ([ "$cmd" = "murces" ] || [ "$cmd" = "murces.exe" ]); then
+        printf "  %-12s %-38s ${GREEN}✔ Ready (${INSTALL_DIR})${RESET}\n" "$cmd" "($desc)"
     elif ([ "$cmd" = "playit" ] || [ "$cmd" = "playit.exe" ]) && ([ -x "./playit" ] || [ -f "./playit.exe" ]); then
-        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./${cmd}" "($desc)"
-    elif ([ "$cmd" = "murces" ] || [ "$cmd" = "murces.exe" ]) && ([ -x "./murces" ] || [ -f "./murces.exe" ]); then
         printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./${cmd}" "($desc)"
     elif [ "$cmd" = "psmux" ] && [ -f "./psmux.exe" ]; then
         printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./psmux.exe" "($desc)"
@@ -598,7 +632,15 @@ check_tool "$PLAYIT_BIN" "Zero-Config Public Tunnels" "opt"
 echo ""
 echo -e "${GREEN}${BOLD}✦ Setup complete!${RESET}"
 if [ -f "$MURCES_BIN" ]; then
-    echo -e "Launch the interactive dashboard anytime with: ${BOLD}${CYAN}${MURCES_BIN}${RESET}"
+    echo -e "Installed to: ${BOLD}${CYAN}${MURCES_BIN}${RESET}"
+    if command -v murces >/dev/null 2>&1; then
+        echo -e "Launch the interactive dashboard anywhere with: ${BOLD}${CYAN}murces${RESET}"
+    else
+        echo -e "Launch the interactive dashboard with: ${BOLD}${CYAN}${MURCES_BIN}${RESET}"
+        if [ "$PATH_UPDATED" -eq 1 ]; then
+            echo -e "${DIM}Note: Restart your terminal or run 'source ~/.bashrc' to use 'murces' directly from any folder.${RESET}"
+        fi
+    fi
 else
     echo -e "You can launch MurCes once the executable is present."
 fi

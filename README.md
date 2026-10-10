@@ -267,22 +267,22 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 Run the interactive installer to set up system dependencies (`tmux`, `curl`, `tar`, optional `rclone`, `playit`) with per-package consent prompts and fetch the latest `murces` standalone executable:
 
 ```bash
-# Run the interactive installer (authenticates sudo upfront, prompts for each tool, and installs murces)
+# Run the interactive installer (authenticates sudo upfront, prompts for each tool, and installs murces to ~/.local/bin)
 curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash
 
-# Launch the interactive dashboard
-./murces
+# Launch the interactive dashboard from any folder
+murces
 ```
 
 #### Windows (PowerShell)
-Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe`:
+Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe` to `%LOCALAPPDATA%\MurCes`:
 
 ```powershell
 # Run the automated PowerShell installer
 irm https://raw.githubusercontent.com/DeployedReject/murces/main/install.ps1 | iex
 
-# Launch the interactive dashboard
-.\murces.exe
+# Launch the interactive dashboard from any folder
+murces
 ```
 
 Alternatively, to download the precompiled binary directly without the installer:

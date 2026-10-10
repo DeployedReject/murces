@@ -15,7 +15,8 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Unattended = $false
+    [switch]$Unattended = $false,
+    [string]$InstallDir = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -196,27 +197,59 @@ Write-Host ""
 
 # 5. MurCes Standalone Executable
 Write-Color "[4/4] MurCes Standalone Executable" "White"
-$murcesExe = ".\murces.exe"
+
+if ([string]::IsNullOrWhiteSpace($InstallDir)) {
+    if ($env:LOCALAPPDATA) {
+        $InstallDir = Join-Path $env:LOCALAPPDATA "MurCes"
+    } else {
+        $InstallDir = Join-Path $HOME ".murces"
+    }
+}
+
+if (-not (Test-Path $InstallDir)) {
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+}
+
+$murcesExe = Join-Path $InstallDir "murces.exe"
+Write-Color "  Install location: $InstallDir" "Cyan"
 
 if (Test-Path $murcesExe) {
-    Write-Color "  ✔ murces.exe executable is already present in this directory." "Green"
+    Write-Color "  ✔ murces.exe is already present in $InstallDir." "Green"
     if (Ask-Consent "Re-download and overwrite with the latest release from GitHub?" $false) {
         Download-FileWithProgress "https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe" $murcesExe "MurCes Windows Native Executable" | Out-Null
     }
 } elseif (Test-Path "java\tui\target\murces.exe") {
-    if (Ask-Consent "Deploy locally built native binary 'java\tui\target\murces.exe' to .\murces.exe?" $true) {
+    if (Ask-Consent "Deploy locally built native binary 'java\tui\target\murces.exe' to $murcesExe?" $true) {
         Copy-Item "java\tui\target\murces.exe" $murcesExe -Force
-        Write-Color "  ✔ Local murces.exe deployed successfully." "Green"
+        Write-Color "  ✔ Local murces.exe deployed to $murcesExe successfully." "Green"
     }
 } elseif (Test-Path "java\tui\target\murces-tui-1.6.jar") {
-    if (Ask-Consent "Create murces.bat launcher for locally built JAR 'java\tui\target\murces-tui-1.6.jar'?" $true) {
-        "@echo off`njava -jar `"%~dp0java\tui\target\murces-tui-1.6.jar`" %*" | Out-File -FilePath ".\murces.bat" -Encoding ascii
-        Write-Color "  ✔ Created .\murces.bat launcher wrapper." "Green"
+    $murcesBat = Join-Path $InstallDir "murces.bat"
+    if (Ask-Consent "Create murces.bat launcher for locally built JAR in $InstallDir?" $true) {
+        $jarPath = (Resolve-Path "java\tui\target\murces-tui-1.6.jar").Path
+        "@echo off`njava -jar `"$jarPath`" %*" | Out-File -FilePath $murcesBat -Encoding ascii
+        Write-Color "  ✔ Created $murcesBat launcher wrapper." "Green"
     }
 } else {
-    if (Ask-Consent "Download and install MurCes native executable from GitHub Releases?" $true) {
+    if (Ask-Consent "Download and install MurCes native executable to $InstallDir?" $true) {
         Download-FileWithProgress "https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe" $murcesExe "MurCes Windows Native Executable" | Out-Null
     }
+}
+
+# Ensure InstallDir is added to User PATH environment variable
+$pathUpdated = $false
+try {
+    $currentPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
+    $pathParts = if ($currentPath) { $currentPath -split ";" } else { @() }
+    if ($pathParts -notcontains $InstallDir) {
+        $newPath = ($pathParts + $InstallDir) -join ";"
+        [Environment]::SetEnvironmentVariable("Path", $newPath, [EnvironmentVariableTarget]::User)
+        $env:Path = "$env:Path;$InstallDir"
+        $pathUpdated = $true
+        Write-Color "  ✔ Added $InstallDir to user PATH environment variable." "Green"
+    }
+} catch {
+    Write-Color "  ⚠ Could not automatically update user PATH: $_" "Yellow"
 }
 Write-Host ""
 
@@ -232,7 +265,8 @@ function Check-Component([string]$name, [string]$desc, [bool]$condition, [bool]$
     Write-Color $statusText $color
 }
 
-Check-Component "murces" "MurCes Native Manager" ((Test-Path ".\murces.exe") -or (Test-Path ".\murces.bat") -or (Get-Command "murces" -ErrorAction SilentlyContinue)) $true
+$hasMurcesReady = (Test-Path $murcesExe) -or (Test-Path (Join-Path $InstallDir "murces.bat")) -or [bool](Get-Command "murces" -ErrorAction SilentlyContinue)
+Check-Component "murces" "MurCes Native Manager" $hasMurcesReady $true
 Check-Component "psmux" "Windows Process Multiplexer" ((Get-Command "psmux" -ErrorAction SilentlyContinue) -or (Test-Path ".\psmux.exe")) $true
 Check-Component "curl" "HTTP Package Downloader" [bool](Get-Command "curl.exe" -ErrorAction SilentlyContinue) $true
 Check-Component "tar" "World Archive Bundler" [bool](Get-Command "tar.exe" -ErrorAction SilentlyContinue) $true
@@ -241,11 +275,16 @@ Check-Component "playit" "Zero-Config Public Tunnels" ([bool](Get-Command "playi
 
 Write-Host ""
 Write-Color "✦ Setup complete!" "Green"
-if (Test-Path ".\murces.exe") {
-    Write-Host "Launch the interactive dashboard anytime with: " -NoNewline
-    Write-Color ".\murces.exe" "Cyan"
-} elseif (Test-Path ".\murces.bat") {
-    Write-Host "Launch the interactive dashboard anytime with: " -NoNewline
-    Write-Color ".\murces.bat" "Cyan"
+if (Test-Path $murcesExe) {
+    Write-Color "Installed to: $murcesExe" "Cyan"
+    Write-Host "Launch the interactive dashboard anywhere with: " -NoNewline
+    Write-Color "murces" "Cyan"
+    if ($pathUpdated) {
+        Write-Color "Note: Open a new terminal window to use 'murces' directly from any folder." "DarkGray"
+    }
+} elseif (Test-Path (Join-Path $InstallDir "murces.bat")) {
+    Write-Color "Installed to: $(Join-Path $InstallDir 'murces.bat')" "Cyan"
+    Write-Host "Launch the interactive dashboard with: " -NoNewline
+    Write-Color "murces" "Cyan"
 }
 Write-Host ""
