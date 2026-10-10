@@ -28,7 +28,7 @@ public class CustomizationView implements WorkspaceView {
     private final Button resetBtn;
     private final Button backBtn;
     private final Label statusLabel;
-    private final TextBox assetDirBox;
+    private TextBox assetDirBox;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
 
     private static final String[] TRANSPARENCY_OPTIONS = {
@@ -48,7 +48,10 @@ public class CustomizationView implements WorkspaceView {
         root.addComponent(header);
         root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-
+        root.addComponent(new Label("Assets directory:"));
+        assetDirBox = new TextBox(new TerminalSize(30, 1));
+        assetDirBox.setText(ConfigManager.getInstance().getConfig().getServerDir());
+        root.addComponent(assetDirBox);
         themeCombo = new ComboBox<>();
         List<String> themeNames = Themes.getAvailableThemeNames();
         for (String t : themeNames) {
@@ -221,7 +224,11 @@ public class CustomizationView implements WorkspaceView {
         config.setPickaxeAnimation(animationCheck.isChecked());
         config.setPortableJdk(portableJdkCheck.isChecked());
 
-        ConfigManager.getInstance().save();
+        // Save assets directory path
+        String assetPath = assetDirBox.getText();
+        if (assetPath != null && !assetPath.isBlank()) {
+            config.setServerDir(assetPath.trim());
+        }
 
         mainWindow.applyConfig(config);
         header.setForegroundColor(Themes.getAccentColor());
