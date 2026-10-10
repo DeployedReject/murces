@@ -7,11 +7,12 @@
 # |_|  |_|\__,_|_|  \___\___||___/
 #    Minecraft Server Manager - Installer
 #
-# Interactive, consent-driven installer for MurCes:
-# - Authenticates sudo at startup before executing installation tasks
+# Interactive, consent-driven cross-platform installer for MurCes:
+# - Supports Linux, macOS, and Windows (Git Bash / MSYS2 / MINGW)
+# - Automatically detects platform and selects tmux (Linux/macOS) or psmux (Windows)
 # - Asks for user consent before installing each package / tool
 # - Shows real-time progress for every package and download
-# - Installs core packages: tmux, curl, tar, rclone, playit, and MurCes binary
+# - Installs core packages: multiplexer (tmux/psmux), curl, tar, rclone, playit, and MurCes
 # ==============================================================================
 
 set -uo pipefail
@@ -67,9 +68,24 @@ EOF
 
 print_banner
 
-# Prompt for sudo privileges upfront before doing anything
+# Detect OS
+detect_os() {
+    local uname_s
+    uname_s=$(uname -s 2>/dev/null || echo "Unknown")
+    case "$uname_s" in
+        Linux*)  echo "linux" ;;
+        Darwin*) echo "mac" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        *) echo "linux" ;;
+    esac
+}
+
+OS=$(detect_os)
+
+# Prompt for sudo privileges upfront before doing anything (Unix only)
 SUDO=""
-if [ "$(id -u)" -ne 0 ]; then
+SUDO_KEEP_ALIVE_PID=""
+if [ "$OS" != "windows" ] && [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
         echo -e "${YELLOW}${BOLD}Authentication Required${RESET}"
@@ -122,10 +138,10 @@ ARCH=$(detect_arch)
 
 case "$ARCH" in
     amd64)
-        ARCH_LABEL="Linux x86_64"
+        ARCH_LABEL="$([ "$OS" = "windows" ] && echo "Windows x86_64" || echo "Linux x86_64")"
         ;;
     arm64)
-        ARCH_LABEL="Linux arm64"
+        ARCH_LABEL="$([ "$OS" = "windows" ] && echo "Windows arm64" || echo "Linux arm64")"
         ;;
     *)
         ARCH_LABEL="Unsupported (${RAW_ARCH})"
@@ -134,26 +150,46 @@ esac
 
 # Detect package manager
 detect_pm() {
-    if command -v pacman >/dev/null 2>&1; then
-        echo "pacman"
-    elif command -v apt-get >/dev/null 2>&1; then
-        echo "apt"
-    elif command -v dnf >/dev/null 2>&1; then
-        echo "dnf"
-    elif command -v yum >/dev/null 2>&1; then
-        echo "yum"
-    elif command -v zypper >/dev/null 2>&1; then
-        echo "zypper"
-    elif command -v apk >/dev/null 2>&1; then
-        echo "apk"
+    if [ "$OS" = "windows" ]; then
+        if command -v winget.exe >/dev/null 2>&1 || command -v winget >/dev/null 2>&1; then
+            echo "winget"
+        elif command -v scoop >/dev/null 2>&1; then
+            echo "scoop"
+        elif command -v choco >/dev/null 2>&1; then
+            echo "choco"
+        elif command -v pacman >/dev/null 2>&1; then
+            echo "pacman"
+        else
+            echo "unknown"
+        fi
     else
-        echo "unknown"
+        if command -v pacman >/dev/null 2>&1; then
+            echo "pacman"
+        elif command -v apt-get >/dev/null 2>&1; then
+            echo "apt"
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "dnf"
+        elif command -v yum >/dev/null 2>&1; then
+            echo "yum"
+        elif command -v zypper >/dev/null 2>&1; then
+            echo "zypper"
+        elif command -v apk >/dev/null 2>&1; then
+            echo "apk"
+        elif command -v brew >/dev/null 2>&1; then
+            echo "brew"
+        else
+            echo "unknown"
+        fi
     fi
 }
 
 PM=$(detect_pm)
-echo -e "${MAGENTA}✦${RESET} Architecture detected:    ${BOLD}${RAW_ARCH}${RESET} (${ARCH_LABEL})"
-echo -e "${MAGENTA}✦${RESET} Package manager detected: ${BOLD}${PM}${RESET}"
+MUX_NAME="$([ "$OS" = "windows" ] && echo "psmux" || echo "tmux")"
+
+echo -e "${MAGENTA}✦${RESET} Operating system detected: ${BOLD}${OS}${RESET}"
+echo -e "${MAGENTA}✦${RESET} Architecture detected:     ${BOLD}${RAW_ARCH}${RESET} (${ARCH_LABEL})"
+echo -e "${MAGENTA}✦${RESET} Package manager detected:  ${BOLD}${PM}${RESET}"
+echo -e "${MAGENTA}✦${RESET} Multiplexer target:        ${BOLD}${MUX_NAME}${RESET}"
 echo ""
 
 # Helper to read user input even when piped from curl (reads from /dev/tty if available)
@@ -251,7 +287,7 @@ run_with_ansi_bar() {
     local label="$1"
     shift
     local log_file
-    log_file=$(mktemp)
+    log_file=$(mktemp 2>/dev/null || echo "tmp_install.log")
 
     echo -ne "$HIDE_CURSOR"
 
@@ -335,8 +371,21 @@ run_with_ansi_bar() {
 run_pm_install() {
     local pkg="$1"
     case "$PM" in
+        winget)
+            winget install "$pkg" --accept-source-agreements --accept-package-agreements
+            ;;
+        scoop)
+            scoop install "$pkg"
+            ;;
+        choco)
+            choco install "$pkg" -y
+            ;;
         pacman)
-            $SUDO pacman -S --needed --noconfirm "$pkg"
+            if [ "$OS" = "windows" ]; then
+                pacman -S --needed --noconfirm "$pkg"
+            else
+                $SUDO pacman -S --needed --noconfirm "$pkg"
+            fi
             ;;
         apt)
             $SUDO apt-get install -y "$pkg"
@@ -353,6 +402,9 @@ run_pm_install() {
         apk)
             $SUDO apk add "$pkg"
             ;;
+        brew)
+            brew install "$pkg"
+            ;;
         *)
             return 1
             ;;
@@ -366,7 +418,7 @@ install_single_package() {
     local required="$3" # "req" or "opt"
 
     # Check if already installed
-    if command -v "$pkg" >/dev/null 2>&1; then
+    if command -v "$pkg" >/dev/null 2>&1 || command -v "${pkg}.exe" >/dev/null 2>&1; then
         echo -e "${GREEN}  ✔${RESET} ${BOLD}${pkg}${RESET} (${label}) is already installed."
         return 0
     fi
@@ -393,7 +445,7 @@ install_single_package() {
 
 # 1. Update Repositories
 echo -e "${BOLD}[1/4] Repository Index Sync${RESET}"
-if [ "$PM" != "unknown" ]; then
+if [ "$PM" != "unknown" ] && [ "$OS" != "windows" ]; then
     if ask_consent "Sync and update package repositories?" "y"; then
         echo -e "${CYAN}  ➔ Updating package repositories...${RESET}"
         sync_repo() {
@@ -415,12 +467,14 @@ if [ "$PM" != "unknown" ]; then
     else
         echo -e "${DIM}  - Skipped repository refresh.${RESET}"
     fi
+else
+    echo -e "${GREEN}  ✔ Repository sync skipped on ${OS}.${RESET}"
 fi
 echo ""
 
 # 2. Individual Package Installation (Consented with live download progress)
 echo -e "${BOLD}[2/4] Package Dependencies${RESET}"
-install_single_package "tmux" "Detached Process Multiplexer" "req"
+install_single_package "$MUX_NAME" "$([ "$OS" = "windows" ] && echo "Windows Process Multiplexer" || echo "Detached Process Multiplexer")" "req"
 install_single_package "curl" "HTTP Downloader" "req"
 install_single_package "tar" "World Archive Bundler" "req"
 install_single_package "rclone" "Google Drive & Cloud Sync" "opt"
@@ -428,23 +482,29 @@ echo ""
 
 # 3. Public Tunnels (playit.gg)
 echo -e "${BOLD}[3/4] Public Tunnels (playit.gg)${RESET}"
-if command -v playit >/dev/null 2>&1 || [ -x "./playit" ]; then
+PLAYIT_BIN="$([ "$OS" = "windows" ] && echo "playit.exe" || echo "playit")"
+
+if command -v playit >/dev/null 2>&1 || command -v playit.exe >/dev/null 2>&1 || [ -x "./playit" ] || [ -f "./playit.exe" ]; then
     echo -e "${GREEN}  ✔${RESET} playit CLI is already installed."
 else
     PLAYIT_URL=""
-    case "$ARCH" in
-        amd64)
-            PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64"
-            ;;
-        arm64)
-            PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64"
-            ;;
-    esac
+    if [ "$OS" = "windows" ]; then
+        PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64.exe"
+    else
+        case "$ARCH" in
+            amd64)
+                PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64"
+                ;;
+            arm64)
+                PLAYIT_URL="https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64"
+                ;;
+        esac
+    fi
 
     if [ -n "$PLAYIT_URL" ]; then
         if ask_consent "Install playit client binary for zero-config public tunnels?" "y"; then
-            download_with_progress "$PLAYIT_URL" "playit" "playit tunnel agent (${RAW_ARCH})"
-            chmod +x playit 2>/dev/null || true
+            download_with_progress "$PLAYIT_URL" "$PLAYIT_BIN" "playit tunnel agent (${ARCH_LABEL})"
+            chmod +x "$PLAYIT_BIN" 2>/dev/null || true
         else
             echo -e "${DIM}  - Skipped playit setup.${RESET}"
         fi
@@ -456,7 +516,7 @@ echo ""
 
 # 4. MurCes Standalone Executable Installation
 echo -e "${BOLD}[4/4] MurCes Standalone Executable${RESET}"
-MURCES_BIN="./murces"
+MURCES_BIN="$([ "$OS" = "windows" ] && echo "./murces.exe" || echo "./murces")"
 
 download_murces() {
     if [ "$ARCH" = "unsupported" ]; then
@@ -465,7 +525,12 @@ download_murces() {
         return 1
     fi
 
-    local target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
+    local target_url
+    if [ "$OS" = "windows" ]; then
+        target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-${ARCH}.exe"
+    else
+        target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
+    fi
     local desc="MurCes native binary (${ARCH_LABEL})"
 
     if download_with_progress "$target_url" "$MURCES_BIN" "$desc"; then
@@ -477,15 +542,16 @@ download_murces() {
     fi
 }
 
-if [ -f "$MURCES_BIN" ] && [ -x "$MURCES_BIN" ]; then
-    echo -e "${GREEN}  ✔${RESET} ./murces executable is already present in this directory."
+if [ -f "$MURCES_BIN" ] && ([ -x "$MURCES_BIN" ] || [ "$OS" = "windows" ]); then
+    echo -e "${GREEN}  ✔${RESET} $MURCES_BIN executable is already present in this directory."
     if ask_consent "Re-download and overwrite with the latest release from GitHub?" "n"; then
         download_murces
     fi
-elif [ -f "java/tui/target/murces" ]; then
-    if ask_consent "Deploy locally built native binary 'java/tui/target/murces' to ./murces?" "y"; then
-        cp "java/tui/target/murces" "$MURCES_BIN"
-        chmod +x "$MURCES_BIN"
+elif [ -f "java/tui/target/murces" ] || [ -f "java/tui/target/murces.exe" ]; then
+    LOCAL_SRC="$([ -f "java/tui/target/murces.exe" ] && echo "java/tui/target/murces.exe" || echo "java/tui/target/murces")"
+    if ask_consent "Deploy locally built native binary '$LOCAL_SRC' to $MURCES_BIN?" "y"; then
+        cp "$LOCAL_SRC" "$MURCES_BIN"
+        chmod +x "$MURCES_BIN" 2>/dev/null || true
         echo -e "${GREEN}  ✔ Local murces binary deployed successfully.${RESET}"
     fi
 else
@@ -505,12 +571,14 @@ check_tool() {
     local desc="$2"
     local req="$3"
 
-    if command -v "$cmd" >/dev/null 2>&1; then
+    if command -v "$cmd" >/dev/null 2>&1 || command -v "${cmd}.exe" >/dev/null 2>&1; then
         printf "  %-12s %-38s ${GREEN}✔ Ready${RESET}\n" "$cmd" "($desc)"
-    elif [ "$cmd" = "playit" ] && [ -x "./playit" ]; then
-        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./playit" "($desc)"
-    elif [ "$cmd" = "murces" ] && [ -x "./murces" ]; then
-        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./murces" "($desc)"
+    elif ([ "$cmd" = "playit" ] || [ "$cmd" = "playit.exe" ]) && ([ -x "./playit" ] || [ -f "./playit.exe" ]); then
+        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./${cmd}" "($desc)"
+    elif ([ "$cmd" = "murces" ] || [ "$cmd" = "murces.exe" ]) && ([ -x "./murces" ] || [ -f "./murces.exe" ]); then
+        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./${cmd}" "($desc)"
+    elif [ "$cmd" = "psmux" ] && [ -f "./psmux.exe" ]; then
+        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./psmux.exe" "($desc)"
     else
         if [ "$req" = "req" ]; then
             printf "  %-12s %-38s ${RED}✖ Missing (Required)${RESET}\n" "$cmd" "($desc)"
@@ -520,17 +588,17 @@ check_tool() {
     fi
 }
 
-check_tool "murces" "MurCes Native Manager" "req"
-check_tool "tmux" "Detached Process Supervision" "req"
+check_tool "$([ "$OS" = "windows" ] && echo "murces.exe" || echo "murces")" "MurCes Native Manager" "req"
+check_tool "$MUX_NAME" "$([ "$OS" = "windows" ] && echo "Windows Process Multiplexer" || echo "Detached Process Supervision")" "req"
 check_tool "curl" "HTTP Package Downloader" "req"
 check_tool "tar" "World Archive Bundler" "req"
 check_tool "rclone" "Cloud Sync & Google Drive" "opt"
-check_tool "playit" "Zero-Config Public Tunnels" "opt"
+check_tool "$PLAYIT_BIN" "Zero-Config Public Tunnels" "opt"
 
 echo ""
 echo -e "${GREEN}${BOLD}✦ Setup complete!${RESET}"
-if [ -x "./murces" ]; then
-    echo -e "Launch the interactive dashboard anytime with: ${BOLD}${CYAN}./murces${RESET}"
+if [ -f "$MURCES_BIN" ]; then
+    echo -e "Launch the interactive dashboard anytime with: ${BOLD}${CYAN}${MURCES_BIN}${RESET}"
 else
     echo -e "You can launch MurCes once the executable is present."
 fi

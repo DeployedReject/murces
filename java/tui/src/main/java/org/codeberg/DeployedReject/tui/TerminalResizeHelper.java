@@ -25,30 +25,32 @@ public class TerminalResizeHelper {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public static TerminalSize queryPhysicalTerminalSize() {
-        try {
-            File tty = new File("/dev/tty");
-            ProcessBuilder pb = new ProcessBuilder("stty", "size");
-            if (tty.exists() && tty.canRead()) {
-                pb.redirectInput(tty);
-            }
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String line;
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                line = r.readLine();
-            }
-            p.waitFor(100, TimeUnit.MILLISECONDS);
-            if (line != null) {
-                String[] parts = line.trim().split("\\s+");
-                if (parts.length >= 2) {
-                    int rows = Integer.parseInt(parts[0]);
-                    int cols = Integer.parseInt(parts[1]);
-                    if (cols >= 20 && rows >= 5) {
-                        return new TerminalSize(cols, rows);
+        if (!org.codeberg.DeployedReject.utils.Platform.isWindows()) {
+            try {
+                File tty = new File("/dev/tty");
+                ProcessBuilder pb = new ProcessBuilder("stty", "size");
+                if (tty.exists() && tty.canRead()) {
+                    pb.redirectInput(tty);
+                }
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                String line;
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                    line = r.readLine();
+                }
+                p.waitFor(100, TimeUnit.MILLISECONDS);
+                if (line != null) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length >= 2) {
+                        int rows = Integer.parseInt(parts[0]);
+                        int cols = Integer.parseInt(parts[1]);
+                        if (cols >= 20 && rows >= 5) {
+                            return new TerminalSize(cols, rows);
+                        }
                     }
                 }
-            }
-        } catch (Exception ignored) {}
+            } catch (Exception ignored) {}
+        }
 
         try {
             String colsStr = System.getenv("COLUMNS");

@@ -15,6 +15,7 @@ import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.tui.theme.Themes;
 import org.codeberg.DeployedReject.tui.theme.MinecraftTheme;
 import org.codeberg.DeployedReject.tui.views.*;
+import org.codeberg.DeployedReject.utils.Platform;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +50,10 @@ public class Main {
                 System.out.println("  murces backup                      Run world backup");
                 System.out.println("  murces search-modpacks <query>     Search modpacks on Modrinth");
                 System.out.println("  murces install-modpack <slug>      Download & install modpack with dependencies");
+                System.out.println("  murces search-plugins <query>      Search plugins on Modrinth/CurseForge");
+                System.out.println("  murces install-plugin <slug>       Download & install plugin into plugins/");
+                System.out.println("  murces list-plugins                List installed plugins in plugins/");
+                System.out.println("  murces delete-plugin <file>        Delete an installed plugin");
                 System.out.println("  murces update-mods                 Update all installed mods to latest versions");
                 System.out.println("  murces install-jdk [version]       Download portable OpenJDK (8/17/21)");
                 System.out.println("  murces --test-tui                  Run automated self-test of all TUI windows");
@@ -132,6 +137,105 @@ public class Main {
                     System.out.println(sum.formattedSummary());
                 } catch (Exception e) {
                     System.err.println("Failed to install modpack: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "search-plugins":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces search-plugins <query> [version] [server-type] [modrinth|curseforge]");
+                    System.exit(1);
+                }
+                String spQuery = args[1];
+                String spVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String spType = args.length > 3 ? args[3] : "paper";
+                String spPlat = args.length > 4 ? args[4] : "modrinth";
+                System.out.println("Searching plugins for '" + spQuery + "' (" + spVer + " / " + spType + " on " + spPlat + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.PluginResult> pRes = OrchestratorBridge.getInstance().searchPlugins(spPlat, spQuery, spVer, spType).get();
+                    if (pRes.isEmpty()) {
+                        System.out.println("No plugins found.");
+                    } else {
+                        System.out.println("Found " + pRes.size() + " plugins:");
+                        for (OrchestratorBridge.PluginResult p : pRes) {
+                            System.out.println("  - " + p.name + " (" + p.slug + ") by " + p.author + " [" + p.downloads + " downloads]");
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Search failed: " + e.getMessage());
+                }
+                break;
+            case "install-plugin":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces install-plugin <slug-or-id> [version] [server-type] [modrinth|curseforge]");
+                    System.exit(1);
+                }
+                String plSlug = args[1];
+                String plVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String plType = args.length > 3 ? args[3] : "paper";
+                String plPlat = args.length > 4 ? args[4] : "modrinth";
+
+                org.codeberg.DeployedReject.utils.ServerJarMetadata plMeta = OrchestratorBridge.getInstalledServerMetadata();
+                if (plMeta == null) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing plugins (launch TUI [I]).");
+                    System.exit(1);
+                }
+                var plCompat = OrchestratorBridge.checkPluginCompatibility(plPlat, plVer);
+                if (!plCompat.isCompatible()) {
+                    System.err.println("[ERROR] " + plCompat.getMessage());
+                    System.exit(1);
+                }
+
+                System.out.println("Resolving plugin '" + plSlug + "' on " + plPlat + " for MC " + plVer + " (" + plType + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.PluginVersionInfo> pvList = OrchestratorBridge.getInstance().getPluginVersions(plPlat, plSlug, plVer, plType).get();
+                    if (pvList.isEmpty()) {
+                        System.err.println("No compatible versions found for plugin '" + plSlug + "' on " + plPlat + ".");
+                        System.exit(1);
+                    }
+                    OrchestratorBridge.PluginVersionInfo topVer = pvList.get(0);
+                    System.out.println("Downloading plugin: " + topVer.versionName + " (" + topVer.filename + ")...");
+                    boolean dlOk = OrchestratorBridge.getInstance().downloadPluginDirect(
+                        topVer.downloadUrl, topVer.filename, plPlat, plVer,
+                        dpi -> {
+                            System.out.print("\rProgress: " + (int)dpi.percent + "% [" + dpi.formattedSpeed() + " | ETA: " + dpi.formattedEta() + "]");
+                        }
+                    ).get();
+                    if (dlOk) {
+                        System.out.println("\nPlugin '" + topVer.filename + "' installed successfully into plugins/.");
+                    } else {
+                        System.err.println("\nFailed to download plugin.");
+                        System.exit(1);
+                    }
+                } catch (Exception e) {
+                    System.err.println("\nFailed to install plugin: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "list-plugins":
+                java.util.List<OrchestratorBridge.PluginFileInfo> installedPlugins = OrchestratorBridge.getInstance().listInstalledPlugins();
+                if (installedPlugins.isEmpty()) {
+                    System.out.println("No plugins found in plugins/ directory.");
+                } else {
+                    System.out.println("Installed plugins (" + installedPlugins.size() + "):");
+                    for (OrchestratorBridge.PluginFileInfo pfi : installedPlugins) {
+                        System.out.println("  - " + pfi.filename + " | Name: " + pfi.name + " | Ver: " + pfi.version + " | Size: " + (pfi.sizeBytes / 1024) + " KB");
+                        if (!pfi.description.isEmpty()) {
+                            System.out.println("    " + pfi.description);
+                        }
+                    }
+                }
+                break;
+            case "delete-plugin":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces delete-plugin <filename>");
+                    System.exit(1);
+                }
+                String delFile = args[1];
+                boolean delOk = OrchestratorBridge.getInstance().deletePlugin(delFile);
+                if (delOk) {
+                    System.out.println("Plugin '" + delFile + "' deleted successfully.");
+                } else {
+                    System.err.println("Failed to delete plugin '" + delFile + "'. File may not exist.");
                     System.exit(1);
                 }
                 break;
@@ -305,6 +409,8 @@ public class Main {
             gui.updateScreen();
             mw.showModpackBrowse();
             gui.updateScreen();
+            mw.showPluginBrowse();
+            gui.updateScreen();
             mw.showCustomization();
             gui.updateScreen();
             mw.showJobManager();
@@ -326,10 +432,14 @@ public class Main {
 
     private static void launchTui() {
         ResponsiveTerminal terminal;
-        try {
-            terminal = new ResponsiveUnixTerminal();
-        } catch (Exception ttyEx) {
+        if (Platform.isWindows()) {
             terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);
+        } else {
+            try {
+                terminal = new ResponsiveUnixTerminal();
+            } catch (Exception ttyEx) {
+                terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);
+            }
         }
 
         final ResponsiveTerminal termRef = terminal;
@@ -375,9 +485,14 @@ public class Main {
             }, "MurcesShutdown");
             Runtime.getRuntime().addShutdownHook(shutdownHook);
 
-            if (!OrchestratorBridge.isCommandAvailable("tmux")) {
-                ActivityLogger.warn("[WARN] 'tmux' is not found in PATH! Background server execution requires tmux.");
-                ActivityLogger.warn("[WARN] Install tmux via: sudo apt install tmux (or brew install tmux / pacman -S tmux)");
+            String mux = Platform.getMultiplexer();
+            if (!OrchestratorBridge.isCommandAvailable(mux)) {
+                ActivityLogger.warn("[WARN] '" + mux + "' is not found in PATH! Background server execution requires " + mux + ".");
+                if (Platform.isWindows()) {
+                    ActivityLogger.warn("[WARN] Install psmux via: winget install psmux (or scoop install psmux)");
+                } else {
+                    ActivityLogger.warn("[WARN] Install tmux via: sudo apt install tmux (or pacman -S tmux / brew install tmux)");
+                }
             }
             if (!OrchestratorBridge.isCommandAvailable("java")) {
                 ActivityLogger.warn("[WARN] 'java' is not found in PATH! Minecraft server execution requires Java 17/21+.");
@@ -411,9 +526,11 @@ public class Main {
                 terminal.close();
             } catch (Exception ignored) {}
         }
-        try {
-            new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
-        } catch (Exception ignored) {}
+        if (!Platform.isWindows()) {
+            try {
+                new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
+            } catch (Exception ignored) {}
+        }
         System.out.print("\033[?1000l\033[?1002l\033[?1006l\033[?25h\033[0m");
         System.out.flush();
     }

@@ -358,6 +358,43 @@ public class ServerJarMetadata {
         return CompatibilityResult.accepted();
     }
 
+    /**
+     * Checks if a plugin is compatible with the installed server.
+     */
+    public static CompatibilityResult checkPluginCompatibility(ServerJarMetadata installed, String targetPlatform, String targetGameVersion) {
+        if (installed == null) {
+            return CompatibilityResult.rejected(
+                    "No Minecraft server is installed. You must install a Paper or Spigot server engine first from [I] Install Server Engine before installing plugins."
+            );
+        }
+
+        String sType = installed.getServerType().toLowerCase();
+        String sVer = installed.getGameVersion();
+
+        // 1. Vanilla Server Check
+        if ("vanilla".equals(sType)) {
+            return CompatibilityResult.rejected(
+                    "Installed server is Vanilla Minecraft (" + sVer + "). Vanilla servers do not support plugins. Please install Paper or Spigot [I] first."
+            );
+        }
+
+        // 2. Fabric / Forge / NeoForge Server Check
+        if ("fabric".equals(sType) || "quilt".equals(sType) || "forge".equals(sType) || "neoforge".equals(sType)) {
+            return CompatibilityResult.rejected(
+                    "Installed server is " + installed.getFormattedTitle() + ". Fabric/Forge servers use mods (in mods/), not Paper/Spigot plugins. Please install Paper or Spigot [I] to run plugins."
+            );
+        }
+
+        // 3. Paper / Spigot
+        if (!"paper".equals(sType) && !"spigot".equals(sType)) {
+            return CompatibilityResult.rejected(
+                    "Installed server is " + installed.getFormattedTitle() + " which does not support Bukkit/Paper plugins. Please install Paper or Spigot [I]."
+            );
+        }
+
+        return CompatibilityResult.accepted();
+    }
+
     public static class CompatibilityResult {
         private final boolean compatible;
         private final String message;

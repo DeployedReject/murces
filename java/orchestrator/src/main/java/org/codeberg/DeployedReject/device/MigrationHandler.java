@@ -60,7 +60,9 @@ public class MigrationHandler {
     tarArgs.add("usercache.json");
 
     try {
-      Process p = new ProcessBuilder(tarArgs).start();
+      ProcessBuilder pb = new ProcessBuilder(tarArgs);
+      pb.directory(workDir);
+      Process p = pb.start();
       p.waitFor();
     } catch (Exception ignored) {
     }

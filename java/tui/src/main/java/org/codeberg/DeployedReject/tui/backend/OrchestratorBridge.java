@@ -12,6 +12,7 @@ import org.codeberg.DeployedReject.tui.config.ConfigManager;
 import org.codeberg.DeployedReject.tui.config.TuiConfig;
 import org.codeberg.DeployedReject.utils.Communicator;
 import org.codeberg.DeployedReject.utils.NetworkUtils;
+import org.codeberg.DeployedReject.utils.Platform;
 
 import java.io.*;
 import java.net.URI;
@@ -247,6 +248,116 @@ public class OrchestratorBridge {
       if (etaSeconds < 60)
         return etaSeconds + "s";
       return (etaSeconds / 60) + "m " + (etaSeconds % 60) + "s";
+    }
+  }
+
+  public static class PluginResult {
+    public final String id;
+    public final String slug;
+    public final String name;
+    public final String author;
+    public final String description;
+    public final int downloads;
+    public final List<String> categories;
+
+    public PluginResult(String id, String slug, String name, String author, String description, int downloads, List<String> categories) {
+      this.id = id != null ? id : "";
+      this.slug = slug != null ? slug : "";
+      this.name = name != null ? name : "";
+      this.author = author != null ? author : "";
+      this.description = description != null ? description : "";
+      this.downloads = downloads;
+      this.categories = categories != null ? categories : Collections.emptyList();
+    }
+
+    @Override
+    public String toString() {
+      if (author != null && !author.isEmpty()) {
+        return name + " by " + author;
+      }
+      return name + " (" + slug + ")";
+    }
+  }
+
+  public static class PluginVersionInfo {
+    public final String versionId;
+    public final String versionName;
+    public final String versionNumber;
+    public final String downloadUrl;
+    public final String filename;
+    public final long sizeBytes;
+
+    public PluginVersionInfo(String versionId, String versionName, String versionNumber, String downloadUrl,
+        String filename, long sizeBytes) {
+      this.versionId = versionId != null ? versionId : "";
+      this.versionName = versionName != null ? versionName : "";
+      this.versionNumber = versionNumber != null ? versionNumber : "";
+      this.downloadUrl = downloadUrl != null ? downloadUrl : "";
+      this.filename = filename != null ? filename : "";
+      this.sizeBytes = sizeBytes;
+    }
+
+    @Override
+    public String toString() {
+      if (versionNumber != null && !versionNumber.isEmpty()) {
+        return versionNumber;
+      }
+      if (versionName != null && !versionName.isEmpty()) {
+        return versionName;
+      }
+      return versionId;
+    }
+  }
+
+  public static class PluginInstallSummary {
+    public final String pluginName;
+    public final String version;
+    public final String filename;
+    public final long sizeBytes;
+
+    public PluginInstallSummary(String pluginName, String version, String filename, long sizeBytes) {
+      this.pluginName = pluginName;
+      this.version = version;
+      this.filename = filename;
+      this.sizeBytes = sizeBytes;
+    }
+
+    public String formattedSummary() {
+      return String.format("Plugin '%s' (%s) installed to plugins/%s (%s)", pluginName, version, filename, formatBytes(sizeBytes));
+    }
+
+    private static String formatBytes(long bytes) {
+      if (bytes < 1024) return bytes + " B";
+      int exp = (int) (Math.log(bytes) / Math.log(1024));
+      char unit = "KMGTPE".charAt(exp - 1);
+      return String.format("%.1f %cB", bytes / Math.pow(1024, exp), unit);
+    }
+  }
+
+  public static class PluginFileInfo {
+    public final String filename;
+    public final String name;
+    public final String version;
+    public final String author;
+    public final String description;
+    public final long sizeBytes;
+    public final long lastModified;
+
+    public PluginFileInfo(String filename, String name, String version, String author, String description, long sizeBytes, long lastModified) {
+      this.filename = filename;
+      this.name = name != null && !name.isEmpty() ? name : filename;
+      this.version = version != null ? version : "";
+      this.author = author != null ? author : "";
+      this.description = description != null ? description : "";
+      this.sizeBytes = sizeBytes;
+      this.lastModified = lastModified;
+    }
+
+    public String getDisplayName() {
+      if (!version.isEmpty()) {
+        return name + " (v" + version + ")";
+      }
+      return name;
     }
   }
 
@@ -1626,18 +1737,21 @@ public class OrchestratorBridge {
 
   public static boolean isServerRunning(String sessionName) {
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
-    ProcessResult res = runShell("tmux", "has-session", "-t", sess);
+    String mux = Platform.getMultiplexer();
+    ProcessResult res = runShell(mux, "has-session", "-t", sess);
     if (res.exitCode == 0)
       return true;
     if ("mcsv".equals(sess)) {
-      res = runShell("tmux", "has-session", "-t", "mcServer");
+      res = runShell(mux, "has-session", "-t", "mcServer");
       if (res.exitCode == 0)
         return true;
-      res = runShell("pgrep", "-f", "server.jar");
-      if (res.exitCode == 0)
-        return true;
-      res = runShell("pgrep", "-f", "fabric-server-launch.jar");
-      return res.exitCode == 0;
+      if (!Platform.isWindows()) {
+        res = runShell("pgrep", "-f", "server.jar");
+        if (res.exitCode == 0)
+          return true;
+        res = runShell("pgrep", "-f", "fabric-server-launch.jar");
+        return res.exitCode == 0;
+      }
     }
     return false;
   }
@@ -1652,27 +1766,29 @@ public class OrchestratorBridge {
     if (!isServerRunning(sess)) {
       return "[Server not started - Start server from Server Control [S] to view live output]";
     }
-    ProcessResult res = runShell("tmux", "capture-pane", "-t", sess, "-p", "-S", "-" + maxLines);
+    String mux = Platform.getMultiplexer();
+    ProcessResult res = runShell(mux, "capture-pane", "-t", sess, "-p", "-S", "-" + maxLines);
     if (res.exitCode == 0 && res.output != null && !res.output.trim().isEmpty()) {
       return res.output.trim();
     }
     File logFile = new File(serverDir != null && !serverDir.trim().isEmpty() ? serverDir : ".", "logs/latest.log");
     if (logFile.exists() && logFile.canRead()) {
-      ProcessResult tailRes = runShell("tail", "-n", String.valueOf(maxLines), logFile.getPath());
-      if (tailRes.exitCode == 0 && tailRes.output != null && !tailRes.output.trim().isEmpty()) {
-        return tailRes.output.trim();
+      try {
+        List<String> lines = Files.readAllLines(logFile.toPath(), StandardCharsets.UTF_8);
+        int start = Math.max(0, lines.size() - maxLines);
+        List<String> sub = lines.subList(start, lines.size());
+        String out = String.join("\n", sub).trim();
+        if (!out.isEmpty()) {
+          return out;
+        }
+      } catch (Exception ignored) {
       }
     }
     return "[Server running - Waiting for console output...]";
   }
 
   public static boolean isCommandAvailable(String cmd) {
-    try {
-      Process p = new ProcessBuilder("which", cmd).start();
-      return p.waitFor() == 0;
-    } catch (Exception e) {
-      return false;
-    }
+    return Platform.isCommandAvailable(cmd);
   }
 
   public static ProcessResult startServer(boolean publicTunnel) {
@@ -1887,5 +2003,370 @@ public class OrchestratorBridge {
 
   public static boolean deleteBackup(String targetFolder, String filename) {
     return BackupHandler.deleteBackup(targetFolder, filename);
+  }
+
+  public static org.codeberg.DeployedReject.utils.ServerJarMetadata.CompatibilityResult checkPluginCompatibility(String serverPlatform, String gameVersion) {
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = getInstalledServerMetadata();
+    return org.codeberg.DeployedReject.utils.ServerJarMetadata.checkPluginCompatibility(meta, serverPlatform, gameVersion);
+  }
+
+  public CompletableFuture<List<PluginResult>> searchPlugins(String platform, String query, String version, String serverPlatform) {
+    CompletableFuture<List<PluginResult>> future = new CompletableFuture<>();
+    workerPool.submit(() -> {
+      try {
+        List<PluginResult> list = new ArrayList<>();
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+          String q = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
+          String gVer = version != null && !"any".equalsIgnoreCase(version) ? URLEncoder.encode(version.trim(), StandardCharsets.UTF_8) : "";
+          String url = "https://api.curseforge.com/v1/mods/search?gameId=432&classId=5&searchFilter=" + q;
+          if (!gVer.isEmpty()) url += "&gameVersion=" + gVer;
+          url += "&pageSize=15";
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("x-api-key", curseAPI != null ? curseAPI : "")
+              .header("Accept", "application/json")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("data") && root.get("data").isJsonArray()) {
+              JsonArray arr = root.getAsJsonArray("data");
+              for (JsonElement el : arr) {
+                if (el.isJsonObject()) {
+                  JsonObject o = el.getAsJsonObject();
+                  String id = o.has("id") ? o.get("id").getAsString() : "";
+                  String slug = o.has("slug") ? o.get("slug").getAsString() : id;
+                  String name = o.has("name") ? o.get("name").getAsString() : "";
+                  String author = "";
+                  if (o.has("authors") && o.get("authors").isJsonArray() && o.getAsJsonArray("authors").size() > 0) {
+                    JsonObject firstAuthor = o.getAsJsonArray("authors").get(0).getAsJsonObject();
+                    if (firstAuthor.has("name") && !firstAuthor.get("name").isJsonNull()) {
+                      author = firstAuthor.get("name").getAsString();
+                    }
+                  }
+                  String summary = o.has("summary") && !o.get("summary").isJsonNull() ? o.get("summary").getAsString() : "";
+                  int dls = o.has("downloadCount") ? o.get("downloadCount").getAsInt() : 0;
+                  list.add(new PluginResult(id, slug, name, author, summary, dls, Collections.singletonList("bukkit")));
+                }
+              }
+            }
+          }
+        } else {
+          // Modrinth
+          String encQuery = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
+          String facets;
+          if (version != null && !version.isEmpty() && !"any".equalsIgnoreCase(version)) {
+            facets = "[[\"project_type:plugin\"],[\"versions:" + version + "\"]]";
+          } else {
+            facets = "[[\"project_type:plugin\"]]";
+          }
+          String encFacets = URLEncoder.encode(facets, StandardCharsets.UTF_8);
+          String url = "https://api.modrinth.com/v2/search?query=" + encQuery + "&facets=" + encFacets + "&limit=15";
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("hits") && root.get("hits").isJsonArray()) {
+              JsonArray arr = root.getAsJsonArray("hits");
+              for (JsonElement el : arr) {
+                if (el.isJsonObject()) {
+                  JsonObject o = el.getAsJsonObject();
+                  String id = o.has("project_id") ? o.get("project_id").getAsString() : "";
+                  String slug = o.has("slug") && !o.get("slug").isJsonNull() ? o.get("slug").getAsString() : id;
+                  String name = o.has("title") && !o.get("title").isJsonNull() ? o.get("title").getAsString() : slug;
+                  String author = o.has("author") && !o.get("author").isJsonNull() ? o.get("author").getAsString() : "";
+                  String desc = o.has("description") && !o.get("description").isJsonNull() ? o.get("description").getAsString() : "";
+                  int dls = o.has("downloads") ? o.get("downloads").getAsInt() : 0;
+                  List<String> cats = new ArrayList<>();
+                  if (o.has("categories") && o.get("categories").isJsonArray()) {
+                    for (JsonElement ce : o.getAsJsonArray("categories")) {
+                      cats.add(ce.getAsString());
+                    }
+                  }
+                  list.add(new PluginResult(id, slug, name, author, desc, dls, cats));
+                }
+              }
+            }
+          }
+        }
+        future.complete(list);
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public CompletableFuture<List<PluginVersionInfo>> getPluginVersions(String platform, String pluginIdOrSlug,
+      String gameVersion, String serverPlatform) {
+    CompletableFuture<List<PluginVersionInfo>> future = new CompletableFuture<>();
+    workerPool.submit(() -> {
+      try {
+        List<PluginVersionInfo> list = new ArrayList<>();
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
+          String url = "https://api.curseforge.com/v1/mods/" + pluginIdOrSlug + "/files";
+          if (gameVersion != null && !gameVersion.isEmpty() && !"any".equalsIgnoreCase(gameVersion)) {
+            url += "?gameVersion=" + URLEncoder.encode(gameVersion.trim(), StandardCharsets.UTF_8);
+          }
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("x-api-key", curseAPI != null ? curseAPI : "")
+              .header("Accept", "application/json")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+            if (root.has("data") && root.get("data").isJsonArray()) {
+              JsonArray data = root.getAsJsonArray("data");
+              for (JsonElement el : data) {
+                if (el.isJsonObject()) {
+                  JsonObject obj = el.getAsJsonObject();
+                  String vId = obj.get("id").getAsString();
+                  String vName = obj.has("displayName") ? obj.get("displayName").getAsString() : "";
+                  String fn = obj.has("fileName") ? obj.get("fileName").getAsString() : "";
+                  String dUrl = (obj.has("downloadUrl") && !obj.get("downloadUrl").isJsonNull())
+                      ? obj.get("downloadUrl").getAsString() : "";
+                  long sz = obj.has("fileLength") ? obj.get("fileLength").getAsLong() : -1;
+                  list.add(new PluginVersionInfo(vId, vName, fn, dUrl, fn, sz));
+                }
+              }
+            }
+          }
+        } else {
+          // Modrinth
+          String url = "https://api.modrinth.com/v2/project/" + pluginIdOrSlug + "/version";
+          HttpRequest req = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+              .GET()
+              .build();
+          HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp != null && resp.statusCode() == 200) {
+            JsonArray arr = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonArray();
+            for (JsonElement el : arr) {
+              if (el.isJsonObject()) {
+                JsonObject obj = el.getAsJsonObject();
+                String vId = obj.get("id").getAsString();
+                String vName = obj.has("name") ? obj.get("name").getAsString() : "";
+                String vNum = obj.has("version_number") ? obj.get("version_number").getAsString() : "";
+                String dUrl = "";
+                String fn = "";
+                long sz = -1;
+                if (obj.has("files") && obj.getAsJsonArray("files").size() > 0) {
+                  for (JsonElement fe : obj.getAsJsonArray("files")) {
+                    if (fe.isJsonObject()) {
+                      JsonObject fo = fe.getAsJsonObject();
+                      boolean isPrimary = fo.has("primary") && fo.get("primary").getAsBoolean();
+                      String fname = fo.has("filename") ? fo.get("filename").getAsString() : "";
+                      if (isPrimary || fname.endsWith(".jar") || dUrl.isEmpty()) {
+                        dUrl = fo.has("url") ? fo.get("url").getAsString() : "";
+                        fn = fname;
+                        sz = fo.has("size") ? fo.get("size").getAsLong() : -1;
+                        if (isPrimary || fname.endsWith(".jar")) break;
+                      }
+                    }
+                  }
+                }
+                list.add(new PluginVersionInfo(vId, vName, vNum, dUrl, fn, sz));
+              }
+            }
+          }
+        }
+        future.complete(list);
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public CompletableFuture<String> getPluginFullDescription(String platform, String pluginIdOrSlug) {
+    return getModFullDescription(platform, pluginIdOrSlug);
+  }
+
+  public CompletableFuture<Boolean> downloadPluginDirect(String downloadUrl, String filename,
+      String serverPlatform, String gameVersion,
+      Consumer<DownloadProgressInfo> richProgressCallback) {
+
+    var compat = checkPluginCompatibility(serverPlatform, gameVersion);
+    if (!compat.isCompatible()) {
+      log("[ERR:] " + compat.getMessage());
+      CompletableFuture<Boolean> errFuture = new CompletableFuture<>();
+      errFuture.completeExceptionally(new IllegalArgumentException(compat.getMessage()));
+      return errFuture;
+    }
+
+    CompletableFuture<Boolean> future = new CompletableFuture<>();
+    String jobId = "plugin-direct-" + filename;
+    File pluginsDir = new File("plugins");
+    if (!pluginsDir.exists()) {
+      pluginsDir.mkdirs();
+    }
+    File targetTmp = new File(pluginsDir, filename + ".tmp");
+    File targetFinal = new File(pluginsDir, filename);
+
+    final Thread[] workerThread = new Thread[1];
+    final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
+        jobId,
+        "Download Plugin: " + filename,
+        "Plugin",
+        () -> {
+          if (workerThread[0] != null) {
+            workerThread[0].interrupt();
+          }
+          if (targetTmp.exists()) {
+            try {
+              targetTmp.delete();
+            } catch (Exception ignored) {}
+          }
+        });
+    trackedJob.addFileToCleanup(targetTmp);
+
+    workerPool.submit(() -> {
+      workerThread[0] = Thread.currentThread();
+      boolean finishedSuccessfully = false;
+      try {
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create(downloadUrl))
+            .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+            .GET()
+            .build();
+        HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
+        if (resp == null || resp.statusCode() != 200) {
+          JobTracker.getInstance().unregisterJob(jobId);
+          future.completeExceptionally(
+              new IOException("Failed to download plugin file: HTTP " + (resp != null ? resp.statusCode() : "null")));
+          return;
+        }
+        long filesize = resp.headers().firstValueAsLong("content-length").orElse(-1L);
+        long startTime = System.currentTimeMillis();
+
+        try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(targetTmp)) {
+          byte[] buf = new byte[8192];
+          int n;
+          long totalRead = 0;
+          long lastCallback = 0;
+          while ((n = in.read(buf)) != -1) {
+            if (Thread.currentThread().isInterrupted() || trackedJob.isCancelled()) {
+              throw new InterruptedException("Plugin download cancelled");
+            }
+            out.write(buf, 0, n);
+            totalRead += n;
+            long now = System.currentTimeMillis();
+            if (now - lastCallback >= 500 || (filesize > 0 && totalRead == filesize)) {
+              lastCallback = now;
+              double elapsedSec = Math.max(0.001, (now - startTime) / 1000.0);
+              double speedMBps = (totalRead / (1024.0 * 1024.0)) / elapsedSec;
+              int eta = (filesize > totalRead && speedMBps > 0)
+                  ? (int) Math.round(((filesize - totalRead) / (1024.0 * 1024.0)) / speedMBps)
+                  : 0;
+              double pct = filesize > 0 ? (totalRead * 100.0) / filesize : -1.0;
+              if (pct >= 0) {
+                trackedJob.setProgress(pct);
+                trackedJob.setStatus(String.format("%.1f%% (ETA: %ds @ %.1f MB/s)", pct, eta, speedMBps));
+              }
+              if (richProgressCallback != null) {
+                richProgressCallback.accept(new DownloadProgressInfo(pct, totalRead, filesize, speedMBps, eta));
+              }
+            }
+          }
+          out.flush();
+        }
+
+        try {
+          Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+              java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (Exception moveEx) {
+          Files.move(targetTmp.toPath(), targetFinal.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        finishedSuccessfully = true;
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.complete(true);
+      } catch (Exception e) {
+        if (!finishedSuccessfully && targetTmp.exists()) {
+          try {
+            targetTmp.delete();
+          } catch (Exception ignored) {}
+        }
+        JobTracker.getInstance().unregisterJob(jobId);
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  public static PluginFileInfo parsePluginJar(File jarFile) {
+    if (jarFile == null || !jarFile.exists() || jarFile.length() < 100) return null;
+    String name = jarFile.getName();
+    String version = "";
+    String author = "";
+    String desc = "";
+
+    try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jarFile)) {
+      java.util.zip.ZipEntry ze = zip.getEntry("plugin.yml");
+      if (ze == null) ze = zip.getEntry("paper-plugin.yml");
+      if (ze != null) {
+        try (InputStream in = zip.getInputStream(ze);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            line = line.trim();
+            if (line.startsWith("#") || line.isEmpty()) continue;
+            if (line.startsWith("name:")) {
+              name = line.substring("name:".length()).trim().replace("\"", "").replace("'", "");
+            } else if (line.startsWith("version:")) {
+              version = line.substring("version:".length()).trim().replace("\"", "").replace("'", "");
+            } else if (line.startsWith("author:")) {
+              author = line.substring("author:".length()).trim().replace("\"", "").replace("'", "");
+            } else if (line.startsWith("description:")) {
+              desc = line.substring("description:".length()).trim().replace("\"", "").replace("'", "");
+            }
+          }
+        }
+      }
+    } catch (Exception ignored) {}
+
+    if (version.isEmpty()) {
+      java.util.regex.Matcher m = java.util.regex.Pattern.compile("^([a-zA-Z0-9_.-]+?)-([vV]?\\d[a-zA-Z0-9_.+-]*)\\.jar$").matcher(jarFile.getName());
+      if (m.matches()) {
+        name = m.group(1);
+        version = m.group(2);
+      }
+    }
+    return new PluginFileInfo(jarFile.getName(), name, version, author, desc, jarFile.length(), jarFile.lastModified());
+  }
+
+  public static List<PluginFileInfo> listInstalledPlugins() {
+    List<PluginFileInfo> list = new ArrayList<>();
+    File pluginsDir = new File("plugins");
+    if (!pluginsDir.exists() || !pluginsDir.isDirectory()) {
+      return list;
+    }
+    File[] files = pluginsDir.listFiles((dir, name) -> name.endsWith(".jar") && !name.endsWith(".tmp"));
+    if (files != null) {
+      Arrays.sort(files, Comparator.comparing(File::getName));
+      for (File f : files) {
+        PluginFileInfo info = parsePluginJar(f);
+        if (info != null) {
+          list.add(info);
+        }
+      }
+    }
+    return list;
+  }
+
+  public static boolean deletePlugin(String filename) {
+    File file = new File("plugins", filename);
+    if (file.exists()) {
+      return file.delete();
+    }
+    return false;
   }
 }

@@ -206,7 +206,7 @@ public class Tunnel {
 
     public static boolean isDaemonRunning() {
         try {
-            Process p = new ProcessBuilder("tmux", "has-session", "-t", "playit").start();
+            Process p = new ProcessBuilder(org.codeberg.DeployedReject.utils.Platform.getMultiplexer(), "has-session", "-t", "playit").start();
             return p.waitFor() == 0;
         } catch (Exception e) {
             return false;
@@ -234,14 +234,24 @@ public class Tunnel {
                 return;
             }
 
-            String cmd = "playitd --secret-path playit.toml --socket-path ./playit.sock";
-            if (new File("./playitd").canExecute()) {
-                cmd = "./playitd --secret-path playit.toml --socket-path ./playit.sock";
-            } else if (new File("./playit").canExecute()) {
-                cmd = "./playit start";
+            String cmd = "playit start";
+            if (org.codeberg.DeployedReject.utils.Platform.isWindows()) {
+                if (new File("./playit.exe").exists()) {
+                    cmd = ".\\playit.exe start";
+                } else if (new File("./playitd.exe").exists()) {
+                    cmd = ".\\playitd.exe --secret-path playit.toml --socket-path ./playit.sock";
+                } else {
+                    cmd = "playit start";
+                }
+            } else {
+                if (new File("./playitd").canExecute()) {
+                    cmd = "./playitd --secret-path playit.toml --socket-path ./playit.sock";
+                } else if (new File("./playit").canExecute()) {
+                    cmd = "./playit start";
+                }
             }
 
-            ProcessBuilder pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", "playit", cmd);
+            ProcessBuilder pb = new ProcessBuilder(org.codeberg.DeployedReject.utils.Platform.getMultiplexer(), "new-session", "-d", "-s", "playit", cmd);
             pb.start().waitFor();
 
             JsonObject res = new JsonObject();
@@ -259,7 +269,7 @@ public class Tunnel {
     public static void stopDaemon() {
         try {
             if (isDaemonRunning()) {
-                Process p = new ProcessBuilder("tmux", "kill-session", "-t", "playit").start();
+                Process p = new ProcessBuilder(org.codeberg.DeployedReject.utils.Platform.getMultiplexer(), "kill-session", "-t", "playit").start();
                 p.waitFor();
             }
             Files.deleteIfExists(Paths.get("playit.sock"));

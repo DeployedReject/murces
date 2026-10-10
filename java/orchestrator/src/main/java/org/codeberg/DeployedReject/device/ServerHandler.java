@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.codeberg.DeployedReject.utils.Platform;
+
 public class ServerHandler {
 
   public String type;
@@ -58,12 +60,7 @@ public class ServerHandler {
   }
 
   public static boolean isCommandAvailable(String cmd) {
-    try {
-      Process p = new ProcessBuilder("which", cmd).start();
-      return p.waitFor() == 0;
-    } catch (Exception e) {
-      return false;
-    }
+    return Platform.isCommandAvailable(cmd);
   }
 
   public static boolean isServerRunning() {
@@ -72,19 +69,22 @@ public class ServerHandler {
 
   public static boolean isServerRunning(String sessionName) {
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
+    String mux = Platform.getMultiplexer();
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
+      Process p = new ProcessBuilder(mux, "has-session", "-t", sess).start();
       if (p.waitFor() == 0)
         return true;
       if ("mcsv".equals(sess)) {
-        p = new ProcessBuilder("tmux", "has-session", "-t", "mcServer").start();
+        p = new ProcessBuilder(mux, "has-session", "-t", "mcServer").start();
         if (p.waitFor() == 0)
           return true;
-        p = new ProcessBuilder("pgrep", "-f", "server.jar").start();
-        if (p.waitFor() == 0)
-          return true;
-        p = new ProcessBuilder("pgrep", "-f", "fabric-server-launch.jar").start();
-        return p.waitFor() == 0;
+        if (!Platform.isWindows()) {
+          p = new ProcessBuilder("pgrep", "-f", "server.jar").start();
+          if (p.waitFor() == 0)
+            return true;
+          p = new ProcessBuilder("pgrep", "-f", "fabric-server-launch.jar").start();
+          return p.waitFor() == 0;
+        }
       }
       return false;
     } catch (Exception e) {
@@ -105,9 +105,13 @@ public class ServerHandler {
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram, String javaBinOverride, String jdkHomeOverride, String sessionName, String workingDir) {
-    if (!isCommandAvailable("tmux")) {
+    String mux = Platform.getMultiplexer();
+    if (!Platform.isCommandAvailable(mux)) {
+      String installHint = Platform.isWindows()
+          ? "winget install psmux (or 'scoop install psmux')"
+          : "sudo apt install tmux (or 'pacman -S tmux')";
       return new ProcessResult(1,
-          "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
+          "[ERROR] '" + mux + "' is not installed or not in PATH.\nMurces requires " + mux + " to manage background Minecraft sessions.\nPlease install it (e.g. '" + installHint + "').");
     }
 
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
@@ -129,7 +133,7 @@ public class ServerHandler {
           jdkHome = parent.getParent();
         }
       }
-    } else if (!isCommandAvailable("java")) {
+    } else if (!Platform.isCommandAvailable("java")) {
       return new ProcessResult(1,
           "[ERROR] Neither 'java' in PATH nor an executable portable JDK was found.\nPlease install Java or enable Portable JDK in Murces.");
     } else {
@@ -169,28 +173,48 @@ public class ServerHandler {
       }
     }
 
-    File runSh = new File(workDir, "run.sh");
-    if (runSh.exists()) {
+    File runScript = Platform.isWindows()
+        ? (new File(workDir, "run.bat").exists() ? new File(workDir, "run.bat")
+            : (new File(workDir, "run.cmd").exists() ? new File(workDir, "run.cmd") : new File(workDir, "run.sh")))
+        : new File(workDir, "run.sh");
+
+    if (runScript.exists()) {
       try {
-        new ProcessBuilder("chmod", "+x", runSh.getAbsolutePath()).start().waitFor();
+        if (!Platform.isWindows()) {
+          new ProcessBuilder("chmod", "+x", runScript.getAbsolutePath()).start().waitFor();
+        }
         ProcessBuilder pb;
+        List<String> scriptCmd = new ArrayList<>(Arrays.asList(mux, "new-session", "-d", "-s", sess));
+        if (Platform.isWindows()) {
+          if (runScript.getName().endsWith(".sh")) {
+            scriptCmd.addAll(Arrays.asList("sh", runScript.getName(), "nogui"));
+          } else {
+            scriptCmd.addAll(Arrays.asList("cmd.exe", "/c", runScript.getName(), "nogui"));
+          }
+        } else {
+          if (jdkHome != null && !jdkHome.isEmpty()) {
+            String binPath = new File(jdkHome, "bin").getAbsolutePath();
+            scriptCmd.addAll(Arrays.asList("env", "PATH=" + binPath + ":" + System.getenv("PATH"), "JAVA_HOME=" + jdkHome, "./" + runScript.getName(), "nogui"));
+          } else {
+            scriptCmd.addAll(Arrays.asList("./" + runScript.getName(), "nogui"));
+          }
+        }
+        pb = new ProcessBuilder(scriptCmd);
+        pb.directory(workDir);
         if (jdkHome != null && !jdkHome.isEmpty()) {
           String binPath = new File(jdkHome, "bin").getAbsolutePath();
-          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", sess,
-              "env", "PATH=" + binPath + ":" + System.getenv("PATH"), "JAVA_HOME=" + jdkHome, "./run.sh", "nogui");
-        } else {
-          pb = new ProcessBuilder("tmux", "new-session", "-d", "-s", sess, "./run.sh", "nogui");
+          pb.environment().put("JAVA_HOME", jdkHome);
+          pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
         }
-        pb.directory(workDir);
         Process p = pb.start();
         int code = p.waitFor();
         if (code == 0) {
-          return new ProcessResult(0, "Minecraft server started in tmux session '" + sess + "'.");
+          return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "'.");
         } else {
-          return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
+          return new ProcessResult(code, "Failed to start server " + mux + " session (code " + code + ").");
         }
       } catch (Exception e) {
-        return new ProcessResult(1, "Failed to launch run.sh: " + e.getMessage());
+        return new ProcessResult(1, "Failed to launch " + runScript.getName() + ": " + e.getMessage());
       }
     }
 
@@ -200,7 +224,7 @@ public class ServerHandler {
     }
 
     List<String> cmd = new ArrayList<>(Arrays.asList(
-        "tmux", "new-session", "-d", "-s", sess,
+        mux, "new-session", "-d", "-s", sess,
         javaExec,
         "-Xmx" + ramArg,
         "-Xms" + ramArg,
@@ -234,14 +258,14 @@ public class ServerHandler {
       if (jdkHome != null && !jdkHome.isEmpty()) {
         String binPath = new File(jdkHome, "bin").getAbsolutePath();
         pb.environment().put("JAVA_HOME", jdkHome);
-        pb.environment().put("PATH", binPath + ":" + System.getenv("PATH"));
+        pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
       }
       Process p = pb.start();
       int code = p.waitFor();
       if (code == 0) {
-        return new ProcessResult(0, "Minecraft server started in tmux session '" + sess + "'.");
+        return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "'.");
       } else {
-        return new ProcessResult(code, "Failed to start server tmux session (code " + code + ").");
+        return new ProcessResult(code, "Failed to start server " + mux + " session (code " + code + ").");
       }
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to launch server session: " + e.getMessage());
@@ -253,15 +277,16 @@ public class ServerHandler {
   }
 
   public static ProcessResult stopServer(String sessionName) {
-    if (!isCommandAvailable("tmux")) {
-      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+    String mux = Platform.getMultiplexer();
+    if (!Platform.isCommandAvailable(mux)) {
+      return new ProcessResult(1, "[ERROR] '" + mux + "' is not installed or not in PATH.");
     }
 
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
 
     boolean hasSession = false;
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
+      Process p = new ProcessBuilder(mux, "has-session", "-t", sess).start();
       hasSession = (p.waitFor() == 0);
     } catch (Exception ignored) {
     }
@@ -271,17 +296,17 @@ public class ServerHandler {
     }
 
     try {
-      new ProcessBuilder("tmux", "send-keys", "-t", sess, "stop", "C-m").start().waitFor();
+      new ProcessBuilder(mux, "send-keys", "-t", sess, "stop", "C-m").start().waitFor();
 
       for (int i = 0; i < 30; i++) {
         Thread.sleep(500);
-        Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
+        Process p = new ProcessBuilder(mux, "has-session", "-t", sess).start();
         if (p.waitFor() != 0) {
           return new ProcessResult(0, "Minecraft server stopped.");
         }
       }
 
-      new ProcessBuilder("tmux", "kill-session", "-t", sess).start().waitFor();
+      new ProcessBuilder(mux, "kill-session", "-t", sess).start().waitFor();
       return new ProcessResult(0, "Minecraft server session terminated.");
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to stop server: " + e.getMessage());
@@ -293,16 +318,17 @@ public class ServerHandler {
   }
 
   public static ProcessResult sendConsoleCommand(String sessionName, String cmd) {
-    if (!isCommandAvailable("tmux")) {
-      return new ProcessResult(1, "[ERROR] 'tmux' is not installed or not in PATH.");
+    String mux = Platform.getMultiplexer();
+    if (!Platform.isCommandAvailable(mux)) {
+      return new ProcessResult(1, "[ERROR] '" + mux + "' is not installed or not in PATH.");
     }
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
     try {
-      Process p = new ProcessBuilder("tmux", "has-session", "-t", sess).start();
+      Process p = new ProcessBuilder(mux, "has-session", "-t", sess).start();
       if (p.waitFor() != 0) {
         return new ProcessResult(1, "Minecraft server session '" + sess + "' not found.");
       }
-      new ProcessBuilder("tmux", "send-keys", "-t", sess, cmd, "C-m").start().waitFor();
+      new ProcessBuilder(mux, "send-keys", "-t", sess, cmd, "C-m").start().waitFor();
       return new ProcessResult(0, "Command dispatched to Minecraft server.");
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to send command: " + e.getMessage());
@@ -682,17 +708,16 @@ public class ServerHandler {
   }
 
   private boolean checkCommand(String cmd) {
-    try {
-      Process p = new ProcessBuilder("which", cmd).start();
-      return p.waitFor() == 0;
-    } catch (Exception e) {
-      return false;
-    }
+    return Platform.isCommandAvailable(cmd);
   }
 
   private void spawnServer() {
-    if (!checkCommand("tmux")) {
-      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
+    String mux = Platform.getMultiplexer();
+    if (!checkCommand(mux)) {
+      String installHint = Platform.isWindows()
+          ? "winget install psmux (or 'scoop install psmux')"
+          : "sudo apt install tmux (e.g. 'pacman -S tmux')";
+      ErrorHelper.errorJson(mux + " is not installed or not in PATH. Please install " + mux + " (e.g. " + installHint + ").");
       return;
     }
     String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
@@ -707,7 +732,7 @@ public class ServerHandler {
     }
 
     String[] command = new String[] {
-        "tmux",
+        mux,
         "new-session",
         "-d",
         "-s",
@@ -754,7 +779,7 @@ public class ServerHandler {
       Communicator.printer(response);
 
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Minecraft server tmux session 'mcsv' is already running.");
+        ErrorHelper.errorJson("Minecraft server " + mux + " session 'mcsv' is already running.");
       } else {
         JsonObject serverDone = new JsonObject();
         serverDone.addProperty("status", 3);
@@ -844,8 +869,12 @@ public class ServerHandler {
   }
 
   private void spawnServer(boolean x) {
-    if (!checkCommand("tmux")) {
-      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
+    String mux = Platform.getMultiplexer();
+    if (!checkCommand(mux)) {
+      String installHint = Platform.isWindows()
+          ? "winget install psmux (or 'scoop install psmux')"
+          : "sudo apt install tmux (e.g. 'pacman -S tmux')";
+      ErrorHelper.errorJson(mux + " is not installed or not in PATH. Please install " + mux + " (e.g. " + installHint + ").");
       return;
     }
     String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
@@ -895,16 +924,31 @@ public class ServerHandler {
     }
 
     try {
-      String[] command = new String[] { "chmod", "+x", "run.sh" };
-      if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Permission denied: Unable to make run.sh executable.");
-        return;
+      File runScript = Platform.isWindows()
+          ? (new File("run.bat").exists() ? new File("run.bat") : (new File("run.cmd").exists() ? new File("run.cmd") : new File("run.sh")))
+          : new File("run.sh");
+
+      if (!Platform.isWindows() && runScript.exists()) {
+        String[] chmodCmd = new String[] { "chmod", "+x", runScript.getName() };
+        if (Shell.execute(chmodCmd).waitFor() != 0) {
+          ErrorHelper.errorJson("Permission denied: Unable to make " + runScript.getName() + " executable.");
+          return;
+        }
       }
 
-      command = new String[] { "tmux", "new-session", "-d", "-s", "mcsv", "./run.sh", "nogui" };
+      String[] command;
+      if (Platform.isWindows()) {
+        if (runScript.getName().endsWith(".sh")) {
+          command = new String[] { mux, "new-session", "-d", "-s", "mcsv", "sh", runScript.getName(), "nogui" };
+        } else {
+          command = new String[] { mux, "new-session", "-d", "-s", "mcsv", "cmd.exe", "/c", runScript.getName(), "nogui" };
+        }
+      } else {
+        command = new String[] { mux, "new-session", "-d", "-s", "mcsv", "./" + runScript.getName(), "nogui" };
+      }
 
       if (Shell.execute(command).waitFor() != 0) {
-        ErrorHelper.errorJson("Minecraft server tmux session 'mcsv' is already running.");
+        ErrorHelper.errorJson("Minecraft server " + mux + " session 'mcsv' is already running.");
         return;
       }
 

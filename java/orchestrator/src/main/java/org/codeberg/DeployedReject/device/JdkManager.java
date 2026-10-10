@@ -4,9 +4,12 @@ import com.google.gson.JsonObject;
 import org.codeberg.DeployedReject.Main;
 import org.codeberg.DeployedReject.utils.Communicator;
 import org.codeberg.DeployedReject.utils.ErrorHelper;
+import org.codeberg.DeployedReject.utils.Platform;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -16,6 +19,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.function.Consumer;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class JdkManager {
 
@@ -50,26 +55,27 @@ public class JdkManager {
   }
 
   public static File getJavaExecutable(int majorVersion) {
-    return new File(getJdkHome(majorVersion), "bin/java");
+    String javaName = Platform.isWindows() ? "java.exe" : "java";
+    return new File(getJdkHome(majorVersion), "bin" + File.separator + javaName);
   }
 
   public static boolean isJdkInstalled(int majorVersion) {
     File javaBin = getJavaExecutable(majorVersion);
-    return javaBin.exists() && javaBin.canExecute();
+    return javaBin.exists() && (Platform.isWindows() || javaBin.canExecute());
   }
 
   public static String getJavaCommand(String mcVersion, boolean usePortable) {
     int req = getRequiredJdkVersion(mcVersion);
     File portableBin = getJavaExecutable(req);
     if (usePortable) {
-      if (portableBin.exists() && portableBin.canExecute()) {
+      if (portableBin.exists() && (Platform.isWindows() || portableBin.canExecute())) {
         return portableBin.getAbsolutePath();
       }
     }
-    if (ServerHandler.isCommandAvailable("java")) {
+    if (Platform.isCommandAvailable("java")) {
       return "java";
     }
-    if (portableBin.exists() && portableBin.canExecute()) {
+    if (portableBin.exists() && (Platform.isWindows() || portableBin.canExecute())) {
       return portableBin.getAbsolutePath();
     }
     return "java";
@@ -77,6 +83,37 @@ public class JdkManager {
 
   public static String getJdkBinDir(int majorVersion) {
     return new File(getJdkHome(majorVersion), "bin").getAbsolutePath();
+  }
+
+  private static void extractZipStripComponents(File zipFile, File targetDir) throws IOException {
+    try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
+      ZipEntry entry;
+      while ((entry = zis.getNextEntry()) != null) {
+        String name = entry.getName().replace('\\', '/');
+        int firstSlash = name.indexOf('/');
+        if (firstSlash == -1 || firstSlash == name.length() - 1) {
+          continue;
+        }
+        String strippedName = name.substring(firstSlash + 1);
+        File outFile = new File(targetDir, strippedName.replace('/', File.separatorChar));
+        if (entry.isDirectory()) {
+          outFile.mkdirs();
+        } else {
+          File parent = outFile.getParentFile();
+          if (parent != null) {
+            parent.mkdirs();
+          }
+          try (FileOutputStream fos = new FileOutputStream(outFile)) {
+            byte[] buf = new byte[16384];
+            int len;
+            while ((len = zis.read(buf)) > 0) {
+              fos.write(buf, 0, len);
+            }
+          }
+        }
+        zis.closeEntry();
+      }
+    }
   }
 
   public static synchronized boolean downloadAndExtractJdk(int majorVersion,
@@ -91,16 +128,18 @@ public class JdkManager {
 
     String arch = System.getProperty("os.arch", "x86_64").toLowerCase();
     String adoptiumArch = (arch.contains("aarch64") || arch.contains("arm64")) ? "aarch64" : "x64";
+    String adoptiumOs = Platform.isWindows() ? "windows" : (Platform.isMac() ? "mac" : "linux");
+    String ext = Platform.isWindows() ? ".zip" : ".tar.gz";
     String url = "https://api.adoptium.net/v3/binary/latest/" + majorVersion
-        + "/ga/linux/" + adoptiumArch + "/jdk/hotspot/normal/eclipse";
+        + "/ga/" + adoptiumOs + "/" + adoptiumArch + "/jdk/hotspot/normal/eclipse";
 
     File jdksDir = new File("jdks");
     if (!jdksDir.exists()) {
       jdksDir.mkdirs();
     }
 
-    File tarTmp = new File(jdksDir, "jdk-" + majorVersion + ".tar.gz.tmp");
-    File tarFinal = new File(jdksDir, "jdk-" + majorVersion + ".tar.gz");
+    File archiveTmp = new File(jdksDir, "jdk-" + majorVersion + ext + ".tmp");
+    File archiveFinal = new File(jdksDir, "jdk-" + majorVersion + ext);
     File targetDir = getJdkHome(majorVersion);
 
     if (statusCallback != null) {
@@ -118,7 +157,7 @@ public class JdkManager {
     try {
       HttpRequest req = HttpRequest.newBuilder()
           .uri(URI.create(url))
-          .header("User-Agent", "DeployedReject/MurCes/1.2.0")
+          .header("User-Agent", "DeployedReject/MurCes/1.6.0")
           .GET()
           .build();
 
@@ -134,7 +173,7 @@ public class JdkManager {
       long totalRead = 0;
       long lastReport = 0;
 
-      try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(tarTmp)) {
+      try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(archiveTmp)) {
         int n;
         while ((n = in.read(buffer)) != -1) {
           if (Thread.currentThread().isInterrupted()) {
@@ -163,7 +202,7 @@ public class JdkManager {
         out.flush();
       }
 
-      Files.move(tarTmp.toPath(), tarFinal.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      Files.move(archiveTmp.toPath(), archiveFinal.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
       if (statusCallback != null) {
         statusCallback.accept("Extracting Portable JDK " + majorVersion + "...");
@@ -173,28 +212,31 @@ public class JdkManager {
         targetDir.mkdirs();
       }
 
-      Process p = new ProcessBuilder("tar", "-xzf", tarFinal.getAbsolutePath(),
-          "-C", targetDir.getAbsolutePath(), "--strip-components=1").start();
-      int exit = p.waitFor();
+      if (Platform.isWindows() || ext.equals(".zip")) {
+        extractZipStripComponents(archiveFinal, targetDir);
+      } else {
+        Process p = new ProcessBuilder("tar", "-xzf", archiveFinal.getAbsolutePath(),
+            "-C", targetDir.getAbsolutePath(), "--strip-components=1").start();
+        int exit = p.waitFor();
+        if (exit != 0) {
+          ErrorHelper.errorJson("Failed to extract JDK " + majorVersion + " archive (tar exit code " + exit + ")");
+          return false;
+        }
+      }
 
       try {
-        tarFinal.delete();
+        archiveFinal.delete();
       } catch (Exception ignored) {
       }
 
-      if (exit != 0) {
-        ErrorHelper.errorJson("Failed to extract JDK " + majorVersion + " archive (tar exit code " + exit + ")");
-        return false;
-      }
-
       File javaBin = getJavaExecutable(majorVersion);
-      if (javaBin.exists()) {
+      if (javaBin.exists() && !Platform.isWindows()) {
         javaBin.setExecutable(true, false);
       }
 
       File binDir = new File(targetDir, "bin");
       File[] allBins = binDir.listFiles();
-      if (allBins != null) {
+      if (allBins != null && !Platform.isWindows()) {
         for (File b : allBins) {
           b.setExecutable(true, false);
         }
@@ -215,9 +257,9 @@ public class JdkManager {
       return isJdkInstalled(majorVersion);
 
     } catch (Exception e) {
-      if (tarTmp.exists()) {
+      if (archiveTmp.exists()) {
         try {
-          tarTmp.delete();
+          archiveTmp.delete();
         } catch (Exception ignored) {
         }
       }

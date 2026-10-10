@@ -2,6 +2,8 @@ package org.codeberg.DeployedReject.tui.views;
 
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialog;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import com.googlecode.lanterna.input.KeyType;
 import org.codeberg.DeployedReject.tui.backend.OrchestratorBridge;
 import org.codeberg.DeployedReject.tui.config.ConfigManager;
@@ -18,6 +20,18 @@ public class ModBrowseView implements WorkspaceView {
 
   private final MainWindow mainWindow;
   private final Panel root;
+
+  // Tabs: 0 = Single Mods, 1 = Modpacks
+  private int currentTab = 0;
+  private final Button tabSingleModsBtn;
+  private final Button tabModpacksBtn;
+  private final Panel tabHeaderPanel;
+  private final Panel tabContentPanel;
+
+  // ==========================================
+  // TAB 0: Single Mods UI State & Components
+  // ==========================================
+  private final Panel singleModsPanel;
   private final ComboBox<String> platformBox;
   private final ComboBox<String> loaderBox;
   private final ComboBox<String> versionComboBox;
@@ -42,27 +56,67 @@ public class ModBrowseView implements WorkspaceView {
 
   private final List<OrchestratorBridge.ModResult> currentResults = new ArrayList<>();
   private final List<OrchestratorBridge.ModVersionInfo> currentModVersions = new ArrayList<>();
-  private final Map<Character, Runnable> hotkeys = new HashMap<>();
   private final Map<String, String> fullDescCache = new HashMap<>();
   private final Set<String> pendingFetches = Collections.synchronizedSet(new HashSet<>());
-
   private OrchestratorBridge.ModResult selectedMod = null;
   private boolean isDownloading = false;
   private int descPageIndex = 0;
+
+  // ==========================================
+  // TAB 1: Modpacks UI State & Components
+  // ==========================================
+  private final Panel modpacksPanel;
+  private final ComboBox<String> packPlatformBox;
+  private final ComboBox<String> packLoaderBox;
+  private final ComboBox<String> packVersionComboBox;
+  private final TextBox packSearchBox;
+  private final MurcesListBox packResultsList;
+  private final ComboBox<String> packVersionCombo;
+  private final Label packVersionDetailLabel;
+  private final Label packTitleAuthorLabel;
+  private final Label packDescContentLabel;
+  private final Label packDepsSummaryLabel;
+  private final MurcesListBox packDepsList;
+  private final CheckBox packIncludeClientCheck;
+  private final Label packStatusLabel;
+  private final MinecraftPickaxeAnimation packPickaxeAnim;
+  private final Button packSearchBtn;
+  private final Button packInstallBtn;
+  private final Button packCancelBtn;
+
+  private final List<OrchestratorBridge.ModpackResult> currentPackResults = new ArrayList<>();
+  private final List<OrchestratorBridge.ModpackVersionInfo> currentPackVersions = new ArrayList<>();
+  private final List<OrchestratorBridge.ModpackDependencyInfo> currentPackDeps = new ArrayList<>();
+  private OrchestratorBridge.ModpackResult selectedPack = null;
+  private boolean isPackInstalling = false;
+
+  private final Map<Character, Runnable> hotkeys = new HashMap<>();
+  private ScheduledExecutorService activeTicker = null;
+  private ScheduledExecutorService packTicker = null;
   private int currentTermWidth = 80;
   private int currentTermHeight = 24;
-  private int descCardWidth = 46;
-  private int descLinesPerPage = 8;
-  private ScheduledExecutorService activeTicker = null;
-
-  private Panel midCols;
-  private Panel leftCol;
-  private Panel rightCol;
-  private Panel downloadPanel;
 
   public ModBrowseView(MainWindow mainWindow) {
     this.mainWindow = mainWindow;
     this.root = new Panel(new LinearLayout(Direction.VERTICAL));
+
+    // Tab Header Switcher
+    tabHeaderPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    tabSingleModsBtn = new Button(GlyphHelper.apply("[1] Single Mods"), () -> setTab(0));
+    tabModpacksBtn = new Button(GlyphHelper.apply("[2] Modpacks"), () -> setTab(1));
+    tabHeaderPanel.addComponent(tabSingleModsBtn);
+    tabHeaderPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+    tabHeaderPanel.addComponent(tabModpacksBtn);
+    root.addComponent(tabHeaderPanel);
+    root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+
+    tabContentPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+    root.addComponent(tabContentPanel);
+
+    // ==========================================
+    // Build Tab 0: Single Mods Panel
+    // ==========================================
+    singleModsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
 
     platformBox = new ComboBox<>("Modrinth", "CurseForge");
     loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
@@ -71,27 +125,6 @@ public class ModBrowseView implements WorkspaceView {
     searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
     downloadBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [D]ownload"), this::onDownload);
     resultsList = new MurcesListBox(new TerminalSize(38, 10));
-
-    platformBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-      if (changedByUserInteraction) {
-        mainWindow.getGui().getGUIThread().invokeLater(loaderBox::takeFocus);
-      }
-    });
-
-    loaderBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-      if (changedByUserInteraction) {
-        mainWindow.getGui().getGUIThread().invokeLater(versionComboBox::takeFocus);
-      }
-    });
-
-    versionComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-      if (selectedIndex >= 0 && selectedIndex < versionComboBox.getItemCount()) {
-        String sel = versionComboBox.getItem(selectedIndex);
-        if (!"Custom...".equals(sel) && changedByUserInteraction) {
-          mainWindow.getGui().getGUIThread().invokeLater(searchBox::takeFocus);
-        }
-      }
-    });
 
     Panel filterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [P]lat:")));
@@ -102,199 +135,809 @@ public class ModBrowseView implements WorkspaceView {
     filterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
     filterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " [V]er:")));
     filterPanel.addComponent(versionComboBox);
-    root.addComponent(filterPanel);
+    singleModsPanel.addComponent(filterPanel);
 
     Panel searchPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
     searchPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Query: ")));
+    searchPanel.addComponent(searchBox);
+    searchPanel.addComponent(searchBtn);
+    singleModsPanel.addComponent(searchPanel);
 
     searchBox.setInputFilter((interactable, keyStroke) -> {
-      if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
-        if (resultsList.getItemCount() > 0) {
-          resultsList.takeFocus();
-        }
-        return false;
-      }
       if (keyStroke.getKeyType() == KeyType.Enter) {
         onSearch();
+        resultsList.takeFocus();
+        return false;
+      }
+      if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
+        resultsList.takeFocus();
         return false;
       }
       return true;
     });
 
-    searchPanel.addComponent(searchBox);
-    searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-    searchPanel.addComponent(searchBtn);
-    searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-    searchPanel.addComponent(downloadBtn);
-    searchPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-    cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Download"), this::cancelDownload);
-    searchPanel.addComponent(cancelBtn);
-    root.addComponent(searchPanel);
+    Panel midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    Panel leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
+    leftCol.addComponent(resultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Mod Results"))));
 
-    statusLabel = new Label(
-        GlyphHelper.apply(GlyphHelper.ICON_INFO + " Type query, press [S] to search, [D] to download, [X] to cancel."));
-    statusLabel.setForegroundColor(Themes.getLogWarnColor());
-    root.addComponent(statusLabel);
-
-    midCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
-
-    leftCol = new Panel(new LinearLayout(Direction.VERTICAL));
-    leftCol.addComponent(
-        resultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Results [L]ist (↑/↓)"))));
-    midCols.addComponent(leftCol);
-
-    midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-
-    rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
+    Panel rightCol = new Panel(new LinearLayout(Direction.VERTICAL));
     detailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
 
-    titleAuthorLabel = new Label(
-        GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: -\n" + GlyphHelper.ICON_USER + " Author: -"));
-    titleAuthorLabel.setForegroundColor(Themes.getAccentColor());
+    titleAuthorLabel = new Label("Select a mod from the list to view details.");
+    titleAuthorLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
     detailsCard.addComponent(titleAuthorLabel);
 
-    Panel versionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
-    versionRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Mod Version [K]: ")));
-    modVersionCombo = new ComboBox<>("[Latest Compatible]");
-    versionRow.addComponent(modVersionCombo);
-    detailsCard.addComponent(versionRow);
-
-    versionDetailLabel = new Label("");
-    versionDetailLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
-    detailsCard.addComponent(versionDetailLabel);
-
-    modVersionCombo.setInputFilter((interactable, keyStroke) -> {
-      if (keyStroke.getKeyType() == KeyType.Enter ||
-          (keyStroke.getKeyType() == KeyType.Character && keyStroke.getCharacter() != null && keyStroke.getCharacter() == ' ')) {
-        WideDropDownHelper.showWideDropDown(mainWindow.getGui(), modVersionCombo, 10, idx -> {
-          updateSelectedVersionDisplay();
-          downloadBtn.takeFocus();
-        });
-        return false;
-      }
-      return true;
-    });
-
-    modVersionCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-      updateSelectedVersionDisplay();
-    });
-
-    Panel modeRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
-    modeRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " View [M]ode: ")));
-    descModeCombo = new ComboBox<>(GlyphHelper.apply("▾ Summary (Heading)"),
-        GlyphHelper.apply("▾ Read More (Full Description)"));
+    Panel descTogglePanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    descTogglePanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Desc [M]ode:")));
+    descModeCombo = new ComboBox<>("Summary", "Full Details");
     descModeCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-      descPageIndex = 0;
-      if (selectedIndex == 1 && selectedMod != null) {
-        fetchFullDescriptionIfNeeded(selectedMod);
+      if (changedByUserInteraction) {
+        descPageIndex = 0;
+        if (selectedIndex == 1 && selectedMod != null) {
+          fetchFullDescriptionIfNeeded(selectedMod);
+        }
+        updateDetailsDisplay();
       }
-      relayoutForCurrentMode();
-      updateDetailsDisplay();
-      mainWindow.invalidate();
     });
+    descTogglePanel.addComponent(descModeCombo);
+    detailsCard.addComponent(descTogglePanel);
 
-    descModeCombo.setInputFilter((interactable, keyStroke) -> false);
-    modeRow.addComponent(descModeCombo);
-    detailsCard.addComponent(modeRow);
-
-    descContentLabel = new Label(
-        GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the list to view its description."));
-    descContentLabel.setForegroundColor(Themes.getActivePalette().fg);
-    detailsCard.addComponent(
-        descContentLabel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Description"))));
+    descContentLabel = new Label("No mod selected.");
+    detailsCard.addComponent(descContentLabel);
 
     paginationPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-    prevPageBtn = new Button(GlyphHelper.apply("◀ Prev ([)"), this::onPrevPage);
-    pageIndicatorLabel = new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
-    pageIndicatorLabel.setForegroundColor(Themes.getLogMutedColor());
-    nextPageBtn = new Button(GlyphHelper.apply("Next (]) ▶"), this::onNextPage);
-
+    prevPageBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " Prev [[]"), this::onPrevPage);
+    nextPageBtn = new Button(GlyphHelper.apply("Next []] " + GlyphHelper.ICON_PLAY), this::onNextPage);
+    pageIndicatorLabel = new Label("Page 1/1");
     paginationPanel.addComponent(prevPageBtn);
-    paginationPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
     paginationPanel.addComponent(pageIndicatorLabel);
-    paginationPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
     paginationPanel.addComponent(nextPageBtn);
     detailsCard.addComponent(paginationPanel);
 
-    detailsCard.setPreferredSize(new TerminalSize(38, 12));
-    rightCol.addComponent(detailsCard
-        .withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Mod Details & Versions"))));
-    midCols.addComponent(rightCol);
+    Panel versionSelectPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    versionSelectPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [K] Version:")));
+    modVersionCombo = new ComboBox<>("[Latest Compatible]");
+    modVersionCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      if (changedByUserInteraction) {
+        updateSelectedVersionDisplay();
+      }
+    });
+    versionSelectPanel.addComponent(modVersionCombo);
+    detailsCard.addComponent(versionSelectPanel);
 
-    root.addComponent(midCols);
+    versionDetailLabel = new Label("");
+    versionDetailLabel.setForegroundColor(Themes.getActivePalette().accent);
+    detailsCard.addComponent(versionDetailLabel);
+
+    rightCol.addComponent(detailsCard.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Mod Details"))));
+
+    midCols.addComponent(leftCol);
+    midCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+    midCols.addComponent(rightCol);
+    singleModsPanel.addComponent(midCols);
+
+    statusLabel = new Label("Ready to browse mods.");
+    statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+    singleModsPanel.addComponent(statusLabel);
 
     pickaxeAnim = new MinecraftPickaxeAnimation();
-    pickaxeAnim.setProgress(0.0);
-    pickaxeAnim.setCustomMessage("Ready to download mods");
-    downloadPanel = new Panel(new LinearLayout(Direction.VERTICAL));
-    downloadPanel.addComponent(
-        pickaxeAnim.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_TOOL + " Download Status"))));
-    root.addComponent(downloadPanel);
+    singleModsPanel.addComponent(pickaxeAnim);
 
-    resultsList.setSelectionListener(idx -> {
-      if (idx >= 0 && idx < currentResults.size()) {
-        OrchestratorBridge.ModResult mod = currentResults.get(idx);
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          onModSelected(mod);
-        });
-      } else if (idx < 0) {
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          selectedMod = null;
-          updateDetailsDisplay();
-          mainWindow.invalidate();
-        });
-      }
-    });
-
+    Panel actionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    actionRow.addComponent(downloadBtn);
+    cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Download"), this::cancelDownload);
+    actionRow.addComponent(cancelBtn);
     backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
-    root.addComponent(backBtn);
+    actionRow.addComponent(backBtn);
+    singleModsPanel.addComponent(actionRow);
 
-    hotkeys.put('L', () -> {
-      if (resultsList.getItemCount() > 0) {
-        resultsList.takeFocus();
-      } else {
-        searchBox.takeFocus();
+    // ==========================================
+    // Build Tab 1: Modpacks Panel
+    // ==========================================
+    modpacksPanel = new Panel(new LinearLayout(Direction.VERTICAL));
+
+    packPlatformBox = new ComboBox<>("Modrinth", "CurseForge");
+    packLoaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
+    packVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
+    packSearchBox = new TextBox(new TerminalSize(16, 1), "cobblemon");
+    packSearchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch Packs"), this::onPackSearch);
+    packInstallBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " [I]nstall Modpack"), this::onPackInstall);
+    packResultsList = new MurcesListBox(new TerminalSize(38, 10));
+
+    Panel packFilterPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    packFilterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [P]lat:")));
+    packFilterPanel.addComponent(packPlatformBox);
+    packFilterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+    packFilterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " L[o]ad:")));
+    packFilterPanel.addComponent(packLoaderBox);
+    packFilterPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+    packFilterPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " [V]er:")));
+    packFilterPanel.addComponent(packVersionComboBox);
+    modpacksPanel.addComponent(packFilterPanel);
+
+    Panel packSearchPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    packSearchPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [Q] Query: ")));
+    packSearchPanel.addComponent(packSearchBox);
+    packSearchPanel.addComponent(packSearchBtn);
+    modpacksPanel.addComponent(packSearchPanel);
+
+    packSearchBox.setInputFilter((interactable, keyStroke) -> {
+      if (keyStroke.getKeyType() == KeyType.Enter) {
+        onPackSearch();
+        packResultsList.takeFocus();
+        return false;
+      }
+      if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.ArrowDown) {
+        packResultsList.takeFocus();
+        return false;
+      }
+      return true;
+    });
+
+    Panel packMidCols = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    Panel packLeftCol = new Panel(new LinearLayout(Direction.VERTICAL));
+    packLeftCol.addComponent(packResultsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " Modpacks"))));
+
+    Panel packRightCol = new Panel(new LinearLayout(Direction.VERTICAL));
+    Panel packDetailsCard = new Panel(new LinearLayout(Direction.VERTICAL));
+
+    packTitleAuthorLabel = new Label("Select a modpack from the list.");
+    packTitleAuthorLabel.setForegroundColor(MinecraftTheme.GOLD_YELLOW);
+    packDetailsCard.addComponent(packTitleAuthorLabel);
+
+    packDescContentLabel = new Label("No modpack selected.");
+    packDetailsCard.addComponent(packDescContentLabel);
+
+    Panel packVerRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    packVerRow.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " Pack Ver: ")));
+    packVersionCombo = new ComboBox<>("[Latest Compatible]");
+    packVersionCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
+      if (changedByUserInteraction) {
+        onPackVersionSelected();
       }
     });
-    hotkeys.put('S', KeyboardNavigationHelper.action(searchBtn, this::onSearch));
-    hotkeys.put('D', KeyboardNavigationHelper.action(downloadBtn, this::onDownload));
-    hotkeys.put('Q', searchBox::takeFocus);
-    hotkeys.put('/', searchBox::takeFocus);
-    hotkeys.put('K', () -> {
-      if (modVersionCombo.getItemCount() > 0) {
-        modVersionCombo.takeFocus();
-        WideDropDownHelper.showWideDropDown(mainWindow.getGui(), modVersionCombo, 10, idx -> {
-          updateSelectedVersionDisplay();
-          downloadBtn.takeFocus();
-        });
-      }
+    packVerRow.addComponent(packVersionCombo);
+    packDetailsCard.addComponent(packVerRow);
+
+    packVersionDetailLabel = new Label("");
+    packVersionDetailLabel.setForegroundColor(Themes.getActivePalette().accent);
+    packDetailsCard.addComponent(packVersionDetailLabel);
+
+    packDepsSummaryLabel = new Label("Dependencies: N/A");
+    packDepsSummaryLabel.setForegroundColor(MinecraftTheme.DIAMOND_CYAN);
+    packDetailsCard.addComponent(packDepsSummaryLabel);
+
+    packDepsList = new MurcesListBox(new TerminalSize(42, 4));
+    packDetailsCard.addComponent(packDepsList.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_MOD + " Included Mods"))));
+
+    packIncludeClientCheck = new CheckBox("Include client-only mods (cosmetics/shaders)");
+    packIncludeClientCheck.setChecked(false);
+    packDetailsCard.addComponent(packIncludeClientCheck);
+
+    packRightCol.addComponent(packDetailsCard.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Pack Manifest & Dependencies"))));
+
+    packMidCols.addComponent(packLeftCol);
+    packMidCols.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+    packMidCols.addComponent(packRightCol);
+    modpacksPanel.addComponent(packMidCols);
+
+    packStatusLabel = new Label("Ready to search modpacks.");
+    packStatusLabel.setForegroundColor(Themes.getLogSuccessColor());
+    modpacksPanel.addComponent(packStatusLabel);
+
+    packPickaxeAnim = new MinecraftPickaxeAnimation();
+    modpacksPanel.addComponent(packPickaxeAnim);
+
+    Panel packActions = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    packActions.addComponent(packInstallBtn);
+    packCancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Install"), this::cancelPackInstall);
+    packActions.addComponent(packCancelBtn);
+    packActions.addComponent(new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu));
+    modpacksPanel.addComponent(packActions);
+
+    // Initial Tab
+    setTab(0);
+
+    // Hotkeys
+    hotkeys.put('1', () -> setTab(0));
+    hotkeys.put('2', () -> setTab(1));
+    hotkeys.put('T', () -> setTab((currentTab + 1) % 2));
+    hotkeys.put('P', this::cyclePlatform);
+    hotkeys.put('O', this::cycleLoader);
+    hotkeys.put('V', this::cycleVersion);
+    hotkeys.put('C', this::promptCustomVersion);
+    hotkeys.put('Q', this::focusSearchBox);
+    hotkeys.put('S', () -> {
+      if (currentTab == 0) onSearch();
+      else onPackSearch();
     });
-    hotkeys.put('M', () -> {
-      int next = (descModeCombo.getSelectedIndex() + 1) % descModeCombo.getItemCount();
-      descModeCombo.setSelectedIndex(next);
-    });
+    hotkeys.put('D', () -> { if (currentTab == 0) onDownload(); });
+    hotkeys.put('I', () -> { if (currentTab == 1) onPackInstall(); });
+    hotkeys.put('K', this::cycleModOrPackVersion);
+    hotkeys.put('M', this::cycleDescMode);
     hotkeys.put('[', this::onPrevPage);
     hotkeys.put(']', this::onNextPage);
-    hotkeys.put('P', () -> {
-      if (platformBox.getItemCount() > 0) {
-        int next = (platformBox.getSelectedIndex() + 1) % platformBox.getItemCount();
+    hotkeys.put('X', () -> {
+      if (currentTab == 0) cancelDownload();
+      else cancelPackInstall();
+    });
+    hotkeys.put('B', mainWindow::showMainMenu);
+  }
+
+  private void cyclePlatform() {
+    if (currentTab == 0) {
+      int count = platformBox.getItemCount();
+      if (count > 0) {
+        int next = (platformBox.getSelectedIndex() + 1) % count;
         platformBox.setSelectedIndex(next);
+        statusLabel.setText("Platform changed to: " + platformBox.getItem(next) + ". Press [S] to search.");
+        statusLabel.setForegroundColor(Themes.getLogWarnColor());
+        mainWindow.invalidate();
       }
-    });
-    hotkeys.put('O', () -> {
-      if (loaderBox.getItemCount() > 0) {
-        int next = (loaderBox.getSelectedIndex() + 1) % loaderBox.getItemCount();
+    } else {
+      int count = packPlatformBox.getItemCount();
+      if (count > 0) {
+        int next = (packPlatformBox.getSelectedIndex() + 1) % count;
+        packPlatformBox.setSelectedIndex(next);
+        packStatusLabel.setText("Platform changed to: " + packPlatformBox.getItem(next) + ". Press [S] to search.");
+        packStatusLabel.setForegroundColor(Themes.getLogWarnColor());
+        mainWindow.invalidate();
+      }
+    }
+  }
+
+  private void cycleLoader() {
+    if (currentTab == 0) {
+      int count = loaderBox.getItemCount();
+      if (count > 0) {
+        int next = (loaderBox.getSelectedIndex() + 1) % count;
         loaderBox.setSelectedIndex(next);
+        statusLabel.setText("Loader changed to: " + loaderBox.getItem(next) + ". Press [S] to search.");
+        statusLabel.setForegroundColor(Themes.getLogWarnColor());
+        mainWindow.invalidate();
       }
+    } else {
+      int count = packLoaderBox.getItemCount();
+      if (count > 0) {
+        int next = (packLoaderBox.getSelectedIndex() + 1) % count;
+        packLoaderBox.setSelectedIndex(next);
+        packStatusLabel.setText("Loader changed to: " + packLoaderBox.getItem(next) + ". Press [S] to search.");
+        packStatusLabel.setForegroundColor(Themes.getLogWarnColor());
+        mainWindow.invalidate();
+      }
+    }
+  }
+
+  private void cycleVersion() {
+    if (currentTab == 0) {
+      MinecraftVersionHelper.cycleVersion(versionComboBox);
+    } else {
+      MinecraftVersionHelper.cycleVersion(packVersionComboBox);
+    }
+  }
+
+  private void promptCustomVersion() {
+    if (currentTab == 0) {
+      MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), versionComboBox, versionComboBox.getSelectedIndex());
+    } else {
+      MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), packVersionComboBox, packVersionComboBox.getSelectedIndex());
+    }
+  }
+
+  private void focusSearchBox() {
+    if (currentTab == 0) {
+      searchBox.takeFocus();
+    } else {
+      packSearchBox.takeFocus();
+    }
+  }
+
+  private void cycleModOrPackVersion() {
+    if (currentTab == 0) {
+      int count = modVersionCombo.getItemCount();
+      if (count > 0) {
+        int next = (modVersionCombo.getSelectedIndex() + 1) % count;
+        modVersionCombo.setSelectedIndex(next);
+        updateSelectedVersionDisplay();
+        mainWindow.invalidate();
+      }
+    } else {
+      int count = packVersionCombo.getItemCount();
+      if (count > 0) {
+        int next = (packVersionCombo.getSelectedIndex() + 1) % count;
+        packVersionCombo.setSelectedIndex(next);
+        onPackVersionSelected();
+        mainWindow.invalidate();
+      }
+    }
+  }
+
+  private void cycleDescMode() {
+    if (currentTab == 0) {
+      int count = descModeCombo.getItemCount();
+      if (count > 0) {
+        int next = (descModeCombo.getSelectedIndex() + 1) % count;
+        descModeCombo.setSelectedIndex(next);
+        descPageIndex = 0;
+        if (next == 1 && selectedMod != null) {
+          fetchFullDescriptionIfNeeded(selectedMod);
+        }
+        updateDetailsDisplay();
+        mainWindow.invalidate();
+      }
+    }
+  }
+
+  public void setTab(int tabIndex) {
+    this.currentTab = tabIndex;
+    tabContentPanel.removeAllComponents();
+    if (tabIndex == 0) {
+      tabSingleModsBtn.setEnabled(false);
+      tabModpacksBtn.setEnabled(true);
+      tabContentPanel.addComponent(singleModsPanel);
+    } else {
+      tabSingleModsBtn.setEnabled(true);
+      tabModpacksBtn.setEnabled(false);
+      tabContentPanel.addComponent(modpacksPanel);
+    }
+    mainWindow.invalidate();
+  }
+
+  // ==========================================
+  // Single Mods Logic
+  // ==========================================
+  private void onSearch() {
+    String query = searchBox.getText().trim();
+    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
+    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
+    String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
+
+    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Searching " + platform + " for '" + query + "'..."));
+    statusLabel.setForegroundColor(Themes.getLogWarnColor());
+    ActivityLogger.info("Searching " + platform + " for '" + query + "' (MC " + version + ", " + loader + ")");
+
+    new Thread(() -> {
+      try {
+        List<OrchestratorBridge.ModResult> mods = OrchestratorBridge.getInstance().searchMods(platform, query, version, loader).get();
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          currentResults.clear();
+          currentResults.addAll(mods);
+          resultsList.clearItems();
+          selectedMod = null;
+
+          if (mods.isEmpty()) {
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No mods found matching: \"" + query + "\""));
+            statusLabel.setForegroundColor(Themes.getLogMutedColor());
+          } else {
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Found " + mods.size() + " mods."));
+            statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+            for (OrchestratorBridge.ModResult m : mods) {
+              resultsList.addItem(GlyphHelper.apply(GlyphHelper.ICON_MOD + " " + m.name + (m.author.isEmpty() ? "" : " • " + m.author)), () -> {
+                onModSelected(m);
+              });
+            }
+            resultsList.setSelectedIndex(0);
+            onModSelected(mods.get(0));
+          }
+          mainWindow.invalidate();
+        });
+      } catch (Exception e) {
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " Search failed: " + e.getMessage()));
+          statusLabel.setForegroundColor(Themes.getLogErrorColor());
+          ActivityLogger.err("Mod search failed: " + e.getMessage());
+        });
+      }
+    }).start();
+  }
+
+  private void onModSelected(OrchestratorBridge.ModResult mod) {
+    if (mod == null) {
+      selectedMod = null;
+      updateDetailsDisplay();
+      return;
+    }
+    this.selectedMod = mod;
+    this.descPageIndex = 0;
+    updateDetailsDisplay();
+
+    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
+    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
+    String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
+
+    modVersionCombo.clearItems();
+    modVersionCombo.addItem("[Latest Compatible]");
+    modVersionCombo.setSelectedIndex(0);
+    currentModVersions.clear();
+
+    new Thread(() -> {
+      try {
+        List<OrchestratorBridge.ModVersionInfo> versions = OrchestratorBridge.getInstance()
+            .getModVersions(platform, mod.id, version, loader).get();
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          if (selectedMod != null && mod.id.equals(selectedMod.id)) {
+            currentModVersions.clear();
+            currentModVersions.addAll(versions);
+            for (OrchestratorBridge.ModVersionInfo v : versions) {
+              modVersionCombo.addItem(v.toString());
+            }
+            updateSelectedVersionDisplay();
+            mainWindow.invalidate();
+          }
+        });
+      } catch (Exception ignored) {}
+    }).start();
+  }
+
+  private void onDownload() {
+    if (isDownloading) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " Another download is already running."));
+      return;
+    }
+    if (selectedMod == null && resultsList.getSelectedIndex() >= 0 && resultsList.getSelectedIndex() < currentResults.size()) {
+      selectedMod = currentResults.get(resultsList.getSelectedIndex());
+    }
+    if (selectedMod == null) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " Select a mod from the list first!"));
+      return;
+    }
+
+    String loader = loaderBox.getSelectedItem();
+    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
+
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = OrchestratorBridge.getInstalledServerMetadata();
+    if (meta == null) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] No server installed! Install a server engine first [I]."));
+      statusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err("Cannot install mod: No Minecraft server is installed. Please install a server engine first [I].");
+      return;
+    }
+    var compat = OrchestratorBridge.checkCompatibility(loader, version);
+    if (!compat.isCompatible()) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] " + compat.getMessage()));
+      statusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err(compat.getMessage());
+      MessageDialog.showMessageDialog(mainWindow.getGui(), "Incompatible Mod", compat.getMessage(), MessageDialogButton.OK);
+      return;
+    }
+
+    final OrchestratorBridge.ModResult mod = selectedMod;
+    int verIndex = modVersionCombo.getSelectedIndex();
+    OrchestratorBridge.ModVersionInfo chosenVer = null;
+    if (verIndex > 0 && (verIndex - 1) < currentModVersions.size()) {
+      chosenVer = currentModVersions.get(verIndex - 1);
+    } else if (!currentModVersions.isEmpty()) {
+      chosenVer = currentModVersions.get(0);
+    }
+
+    if (chosenVer == null || chosenVer.downloadUrl.isEmpty()) {
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " No valid download URL found."));
+      return;
+    }
+
+    String filename = chosenVer.filename;
+    if (filename == null || filename.isEmpty()) filename = mod.name.toLowerCase().replaceAll("[^a-z0-9_-]", "") + ".jar";
+    if (!filename.endsWith(".jar")) filename += ".jar";
+
+    isDownloading = true;
+    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Downloading mod: " + mod.name + "..."));
+    statusLabel.setForegroundColor(Themes.getLogWarnColor());
+    ActivityLogger.info("Downloading mod: " + mod.name + " -> mods/" + filename);
+
+    final String finalFn = filename;
+    OrchestratorBridge.getInstance().downloadModDirect(
+        chosenVer.downloadUrl,
+        finalFn,
+        loader,
+        version,
+        info -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          pickaxeAnim.setProgress(info.percent);
+          statusLabel.setText(GlyphHelper.apply(String.format("%s Downloading %s (%.1f%%) @ %s",
+              GlyphHelper.ICON_DOWNLOAD, finalFn, info.percent, info.formattedSpeed())));
+          mainWindow.invalidate();
+        }))
+        .thenAccept(ok -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          isDownloading = false;
+          statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Mod installed to mods/" + finalFn));
+          statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+          ActivityLogger.ok("Mod " + mod.name + " installed to mods/" + finalFn);
+          MessageDialog.showMessageDialog(mainWindow.getGui(), "Mod Installed", "Mod " + mod.name + " successfully installed to mods/" + finalFn, MessageDialogButton.OK);
+        }))
+        .exceptionally(ex -> {
+          mainWindow.getGui().getGUIThread().invokeLater(() -> {
+            isDownloading = false;
+            statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Download failed: " + ex.getMessage()));
+            statusLabel.setForegroundColor(Themes.getLogErrorColor());
+            ActivityLogger.err("Mod download failed: " + ex.getMessage());
+          });
+          return null;
+        });
+  }
+
+  private void cancelDownload() {
+    if (isDownloading) {
+      isDownloading = false;
+      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " Download cancelled."));
+      ActivityLogger.warn("Mod download cancelled.");
+    }
+  }
+
+  private void updateSelectedVersionDisplay() {
+    if (versionDetailLabel == null) return;
+    int sel = modVersionCombo.getSelectedIndex();
+    if (sel > 0 && (sel - 1) < currentModVersions.size()) {
+      OrchestratorBridge.ModVersionInfo v = currentModVersions.get(sel - 1);
+      versionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " " + v.filename + " (" + formatSize(v.sizeBytes) + ")"));
+    } else {
+      versionDetailLabel.setText("");
+    }
+  }
+
+  private void updateDetailsDisplay() {
+    if (selectedMod == null) {
+      titleAuthorLabel.setText("Select a mod from the list to view details.");
+      descContentLabel.setText("No mod selected.");
+      return;
+    }
+    titleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_MOD + " " + selectedMod.name + " by " + selectedMod.author));
+    descContentLabel.setText(selectedMod.description);
+    mainWindow.invalidate();
+  }
+
+  private void fetchFullDescriptionIfNeeded(OrchestratorBridge.ModResult mod) {
+    if (mod == null || fullDescCache.containsKey(mod.id)) return;
+    String plat = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
+    OrchestratorBridge.getInstance().getModFullDescription(plat, mod.id).thenAccept(desc -> {
+      fullDescCache.put(mod.id, desc);
+      mainWindow.getGui().getGUIThread().invokeLater(this::updateDetailsDisplay);
     });
-    hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(versionComboBox));
-    hotkeys.put('X', KeyboardNavigationHelper.action(cancelBtn, this::cancelDownload));
-    hotkeys.put('B', KeyboardNavigationHelper.action(backBtn, mainWindow::showMainMenu));
+  }
+
+  private void onPrevPage() {
+    if (descPageIndex > 0) {
+      descPageIndex--;
+      updateDetailsDisplay();
+    }
+  }
+
+  private void onNextPage() {
+    descPageIndex++;
+    updateDetailsDisplay();
+  }
+
+  // ==========================================
+  // Modpacks Logic (Tab 1)
+  // ==========================================
+  private void onPackSearch() {
+    String query = packSearchBox.getText().trim();
+    String plat = packPlatformBox.getSelectedItem() != null ? packPlatformBox.getSelectedItem().toLowerCase() : "modrinth";
+    String ver = MinecraftVersionHelper.getSelectedVersion(packVersionComboBox);
+    String ldr = packLoaderBox.getSelectedItem();
+
+    packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Searching modpacks for '" + query + "'..."));
+    packStatusLabel.setForegroundColor(Themes.getLogWarnColor());
+    ActivityLogger.info("Searching modpacks: '" + query + "' (" + ver + " / " + ldr + ")");
+
+    new Thread(() -> {
+      try {
+        List<OrchestratorBridge.ModpackResult> packs = OrchestratorBridge.getInstance()
+            .searchModpacks(plat, query, ver, ldr).get();
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          currentPackResults.clear();
+          currentPackResults.addAll(packs);
+          packResultsList.clearItems();
+          selectedPack = null;
+
+          if (packs.isEmpty()) {
+            packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " No modpacks found matching: \"" + query + "\""));
+            packStatusLabel.setForegroundColor(Themes.getLogMutedColor());
+          } else {
+            packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Found " + packs.size() + " modpacks."));
+            packStatusLabel.setForegroundColor(Themes.getLogSuccessColor());
+            for (OrchestratorBridge.ModpackResult p : packs) {
+              packResultsList.addItem(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " " + p.name + " • " + p.author), () -> {
+                onPackSelected(p);
+              });
+            }
+            packResultsList.setSelectedIndex(0);
+            onPackSelected(packs.get(0));
+          }
+          mainWindow.invalidate();
+        });
+      } catch (Exception e) {
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " Modpack search failed: " + e.getMessage()));
+          packStatusLabel.setForegroundColor(Themes.getLogErrorColor());
+          ActivityLogger.err("Modpack search error: " + e.getMessage());
+        });
+      }
+    }).start();
+  }
+
+  private void onPackSelected(OrchestratorBridge.ModpackResult pack) {
+    if (pack == null) {
+      selectedPack = null;
+      packTitleAuthorLabel.setText("No modpack selected.");
+      packDescContentLabel.setText("");
+      return;
+    }
+    this.selectedPack = pack;
+    packTitleAuthorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " " + pack.name + " by " + pack.author + " [" + pack.downloads + " dls]"));
+    packDescContentLabel.setText(pack.description);
+
+    String plat = packPlatformBox.getSelectedItem() != null ? packPlatformBox.getSelectedItem().toLowerCase() : "modrinth";
+    String ver = MinecraftVersionHelper.getSelectedVersion(packVersionComboBox);
+    String ldr = packLoaderBox.getSelectedItem();
+
+    packVersionCombo.clearItems();
+    packVersionCombo.addItem("[Latest Compatible]");
+    packVersionCombo.setSelectedIndex(0);
+    currentPackVersions.clear();
+
+    new Thread(() -> {
+      try {
+        List<OrchestratorBridge.ModpackVersionInfo> versions = OrchestratorBridge.getInstance()
+            .getModpackVersions(plat, pack.id, ver, ldr).get();
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          if (selectedPack != null && pack.id.equals(selectedPack.id)) {
+            currentPackVersions.clear();
+            currentPackVersions.addAll(versions);
+            for (OrchestratorBridge.ModpackVersionInfo v : versions) {
+              packVersionCombo.addItem(v.toString());
+            }
+            onPackVersionSelected();
+          }
+        });
+      } catch (Exception ignored) {}
+    }).start();
+  }
+
+  private void onPackVersionSelected() {
+    int sel = packVersionCombo.getSelectedIndex();
+    if (sel >= 0 && sel < currentPackVersions.size()) {
+      OrchestratorBridge.ModpackVersionInfo v = currentPackVersions.get(sel);
+      packVersionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Version: " + v.versionName + " (" + formatSize(v.sizeBytes) + ")"));
+      fetchPackDependencies(v.versionId);
+    } else {
+      packVersionDetailLabel.setText("");
+      packDepsSummaryLabel.setText("Dependencies: N/A");
+      packDepsList.clearItems();
+    }
+    mainWindow.invalidate();
+  }
+
+  private void fetchPackDependencies(String versionId) {
+    if (versionId == null || versionId.isEmpty()) return;
+    String plat = packPlatformBox.getSelectedItem() != null ? packPlatformBox.getSelectedItem().toLowerCase() : "modrinth";
+    packDepsSummaryLabel.setText("Resolving dependencies...");
+    packDepsList.clearItems();
+
+    new Thread(() -> {
+      try {
+        List<OrchestratorBridge.ModpackDependencyInfo> deps = OrchestratorBridge.getInstance()
+            .getModpackDependencies(plat, versionId).get();
+        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          currentPackDeps.clear();
+          currentPackDeps.addAll(deps);
+          int srv = 0, cli = 0;
+          for (OrchestratorBridge.ModpackDependencyInfo d : deps) {
+            if (d.isClientOnly()) cli++;
+            else srv++;
+            packDepsList.addItem(d.name + " (" + d.formattedEnvironment() + ")", () -> {});
+          }
+          packDepsSummaryLabel.setText(String.format("Dependencies: %d total (%d server-safe, %d client-only)", deps.size(), srv, cli));
+          mainWindow.invalidate();
+        });
+      } catch (Exception ignored) {}
+    }).start();
+  }
+
+  private void onPackInstall() {
+    if (isPackInstalling) {
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " A modpack installation is already in progress."));
+      return;
+    }
+    if (selectedPack == null) {
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " Select a modpack first!"));
+      return;
+    }
+
+    String plat = packPlatformBox.getSelectedItem();
+    String ldr = packLoaderBox.getSelectedItem();
+    String ver = MinecraftVersionHelper.getSelectedVersion(packVersionComboBox);
+
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = OrchestratorBridge.getInstalledServerMetadata();
+    if (meta == null) {
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] No server installed! Install a server engine first [I]."));
+      packStatusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err("Cannot install modpack: No Minecraft server is installed. Please install a server engine first [I].");
+      MessageDialog.showMessageDialog(mainWindow.getGui(), "Server Required", "No Minecraft server is installed.\nPlease install a server engine first from [I] Install Server Engine.", MessageDialogButton.OK);
+      return;
+    }
+    var compat = OrchestratorBridge.checkCompatibility(ldr, ver);
+    if (!compat.isCompatible()) {
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] " + compat.getMessage()));
+      packStatusLabel.setForegroundColor(Themes.getLogErrorColor());
+      ActivityLogger.err(compat.getMessage());
+      MessageDialog.showMessageDialog(mainWindow.getGui(), "Incompatible Modpack", compat.getMessage(), MessageDialogButton.OK);
+      return;
+    }
+
+    String versionId = "";
+    String mrpackUrl = "";
+    int selIdx = packVersionCombo.getSelectedIndex();
+    if (selIdx >= 0 && selIdx < currentPackVersions.size()) {
+      OrchestratorBridge.ModpackVersionInfo v = currentPackVersions.get(selIdx);
+      versionId = v.versionId;
+      mrpackUrl = v.mrpackUrl;
+    } else {
+      versionId = selectedPack.slug;
+    }
+
+    boolean includeClient = packIncludeClientCheck.isChecked();
+    isPackInstalling = true;
+    packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Installing modpack: " + selectedPack.name + "..."));
+    packStatusLabel.setForegroundColor(Themes.getLogWarnColor());
+    ActivityLogger.info("Starting installation of modpack: " + selectedPack.name + " (" + ver + " / " + ldr + ")");
+
+    OrchestratorBridge.getInstance().installModpack(
+        plat,
+        selectedPack.name,
+        versionId,
+        mrpackUrl,
+        ver,
+        ldr,
+        includeClient,
+        stepMsg -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " " + stepMsg));
+          ActivityLogger.info(stepMsg);
+        }),
+        overallPct -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          packPickaxeAnim.setProgress(overallPct);
+          mainWindow.invalidate();
+        }),
+        progressInfo -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          if (progressInfo.speedMBps > 0) {
+            packStatusLabel.setText(GlyphHelper.apply(String.format("%s Downloading file (%.1f%%) @ %s (ETA: %s)",
+                GlyphHelper.ICON_DOWNLOAD, progressInfo.percent, progressInfo.formattedSpeed(), progressInfo.formattedEta())));
+          }
+        }))
+        .thenAccept(summary -> mainWindow.getGui().getGUIThread().invokeLater(() -> {
+          isPackInstalling = false;
+          packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " " + summary.formattedSummary()));
+          packStatusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
+          ActivityLogger.ok(summary.formattedSummary());
+          MessageDialog.showMessageDialog(mainWindow.getGui(), "Modpack Installed", summary.formattedSummary(), MessageDialogButton.OK);
+        }))
+        .exceptionally(ex -> {
+          mainWindow.getGui().getGUIThread().invokeLater(() -> {
+            isPackInstalling = false;
+            packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " Installation failed: " + ex.getMessage()));
+            packStatusLabel.setForegroundColor(Themes.getLogErrorColor());
+            ActivityLogger.err("Modpack install failed: " + ex.getMessage());
+          });
+          return null;
+        });
+  }
+
+  private void cancelPackInstall() {
+    if (isPackInstalling) {
+      isPackInstalling = false;
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " Modpack install cancelled."));
+      ActivityLogger.warn("Modpack installation cancelled by user.");
+    }
+  }
+
+  private String formatSize(long bytes) {
+    if (bytes < 1024) return bytes + " B";
+    int exp = (int) (Math.log(bytes) / Math.log(1024));
+    char unit = "KMGTPE".charAt(exp - 1);
+    return String.format("%.1f %cB", bytes / Math.pow(1024, exp), unit);
   }
 
   @Override
   public String getTitle() {
-    return GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " Download & Browse Mods");
+    return GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " Browse Mods & Modpacks");
   }
 
   @Override
@@ -309,12 +952,11 @@ public class ModBrowseView implements WorkspaceView {
 
   @Override
   public Interactable getDefaultFocus() {
-    return searchBtn;
+    return currentTab == 0 ? resultsList : packResultsList;
   }
 
   @Override
   public void onActivated() {
-    relayoutForCurrentMode();
     checkInstalledServerState();
   }
 
@@ -323,21 +965,25 @@ public class ModBrowseView implements WorkspaceView {
     if (meta == null) {
       statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] No server installed! Please install a server engine first [I]."));
       statusLabel.setForegroundColor(Themes.getLogWarnColor());
+      packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] No server installed! Please install a server engine first [I]."));
+      packStatusLabel.setForegroundColor(Themes.getLogWarnColor());
       ActivityLogger.warn("No Minecraft server is installed. You must install a server engine first from [I] Install Server Engine.");
-      downloadBtn.setEnabled(false);
     } else {
-      downloadBtn.setEnabled(true);
       String sType = meta.getServerType();
       String sVer = meta.getGameVersion();
       if ("fabric".equalsIgnoreCase(sType) || "quilt".equalsIgnoreCase(sType)) {
         loaderBox.setSelectedItem("fabric");
+        packLoaderBox.setSelectedItem("fabric");
       } else if ("forge".equalsIgnoreCase(sType)) {
         loaderBox.setSelectedItem("forge");
+        packLoaderBox.setSelectedItem("forge");
       } else if ("neoforge".equalsIgnoreCase(sType)) {
         loaderBox.setSelectedItem("neoforge");
+        packLoaderBox.setSelectedItem("neoforge");
       }
       if (sVer != null && !sVer.isEmpty() && !"unknown".equalsIgnoreCase(sVer)) {
         MinecraftVersionHelper.setSelectedVersion(versionComboBox, sVer);
+        MinecraftVersionHelper.setSelectedVersion(packVersionComboBox, sVer);
       }
       if ("vanilla".equalsIgnoreCase(sType)) {
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Vanilla server detected (" + sVer + "). Vanilla does not support mods."));
@@ -346,624 +992,25 @@ public class ModBrowseView implements WorkspaceView {
         statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] " + meta.getFormattedTitle() + " detected (Plugins only, mods unsupported)."));
         statusLabel.setForegroundColor(Themes.getLogWarnColor());
       } else {
-        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [SERVER] " + meta.getFormattedTitle() + " detected. Ready for mod installation."));
+        statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [SERVER] " + meta.getFormattedTitle() + " detected. Ready for mods."));
         statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+        packStatusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [SERVER] " + meta.getFormattedTitle() + " detected. Ready for modpacks."));
+        packStatusLabel.setForegroundColor(Themes.getLogSuccessColor());
       }
     }
   }
 
   @Override
-  public void onDeactivated() {
-    stopTicker();
-  }
-
-  private synchronized void stopTicker() {
-    if (activeTicker != null) {
-      try {
-        activeTicker.shutdownNow();
-      } catch (Exception ignored) {
-      }
-      activeTicker = null;
-    }
-  }
+  public void onDeactivated() {}
 
   @Override
   public void onResized(TerminalSize newSize) {
-    if (newSize == null)
-      return;
+    if (newSize == null) return;
     this.currentTermWidth = newSize.getColumns();
     this.currentTermHeight = newSize.getRows();
-    relayoutForCurrentMode();
-    updateDetailsDisplay();
-  }
-
-  private void relayoutForCurrentMode() {
-    int width = Math.max(60, currentTermWidth);
-    int rows = Math.max(20, currentTermHeight);
-
-    int middleHeight = Math.max(10, rows - 11);
-
-    this.descLinesPerPage = Math.max(6, middleHeight - 7);
-
-    int usableWidth = Math.max(60, width - 2);
-
-    if (usableWidth >= 70) {
-
-      int halfWidth = (usableWidth - 3) / 2;
-      int leftWidth = halfWidth;
-      int rightWidth = usableWidth - leftWidth - 3;
-
-      this.descCardWidth = rightWidth;
-
-      resultsList.setPreferredSize(new TerminalSize(leftWidth, middleHeight));
-      detailsCard.setPreferredSize(new TerminalSize(rightWidth, middleHeight));
-      descContentLabel.setPreferredSize(new TerminalSize(rightWidth - 4, descLinesPerPage));
-      modVersionCombo.setPreferredSize(new TerminalSize(Math.max(22, rightWidth - 22), 1));
-      pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 4), 3));
-      if (downloadPanel != null) {
-        downloadPanel.setPreferredSize(new TerminalSize(Math.max(24, usableWidth - 2), 5));
-      }
-      searchBox.setPreferredSize(new TerminalSize(Math.max(16, (usableWidth * 25) / 100), 1));
-    } else {
-      int fullWidth = Math.max(34, usableWidth - 4);
-      this.descCardWidth = fullWidth;
-      int halfH = Math.max(5, middleHeight / 2);
-      this.descLinesPerPage = Math.max(4, halfH - 4);
-
-      resultsList.setPreferredSize(new TerminalSize(fullWidth, halfH));
-      detailsCard.setPreferredSize(new TerminalSize(fullWidth, halfH + 3));
-      descContentLabel.setPreferredSize(new TerminalSize(fullWidth - 4, descLinesPerPage));
-      modVersionCombo.setPreferredSize(new TerminalSize(Math.max(22, fullWidth - 22), 1));
-      pickaxeAnim.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 4), 3));
-      if (downloadPanel != null) {
-        downloadPanel.setPreferredSize(new TerminalSize(Math.max(20, fullWidth - 2), 5));
-      }
-    }
-  }
-
-  private void onPrevPage() {
-    if (descPageIndex > 0) {
-      descPageIndex--;
-      updateDetailsDisplay();
-      mainWindow.invalidate();
-    }
-  }
-
-  private void onNextPage() {
-    descPageIndex++;
-    updateDetailsDisplay();
-    mainWindow.invalidate();
-  }
-
-  private void fetchFullDescriptionIfNeeded(OrchestratorBridge.ModResult mod) {
-    if (mod == null || mod.id == null || mod.id.trim().isEmpty())
-      return;
-    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
-    if ("curseforge".equals(platform)) {
-      platform = "curseForge";
-    }
-    String cacheKey = (platform + ":" + mod.id).toLowerCase();
-    if (fullDescCache.containsKey(cacheKey)) {
-      return;
-    }
-    if (pendingFetches.contains(cacheKey)) {
-      return;
-    }
-
-    pendingFetches.add(cacheKey);
-    final String targetPlatform = platform;
-    final String modId = mod.id;
-
-    OrchestratorBridge.getInstance().getModFullDescription(targetPlatform, modId)
-        .thenAccept(fullDesc -> {
-          pendingFetches.remove(cacheKey);
-          mainWindow.getGui().getGUIThread().invokeLater(() -> {
-            if (fullDesc != null && !fullDesc.trim().isEmpty()) {
-              fullDescCache.put(cacheKey, fullDesc.trim());
-            } else if (mod.description != null && !mod.description.trim().isEmpty()) {
-              fullDescCache.put(cacheKey, mod.description.trim()
-                  + "\n\n(No additional extended description provided by " + targetPlatform + ")");
-            } else {
-              fullDescCache.put(cacheKey, "No extended description provided by " + targetPlatform + ".");
-            }
-            if (selectedMod != null && selectedMod.id.equals(modId)) {
-              updateDetailsDisplay();
-              mainWindow.invalidate();
-            }
-          });
-        }).exceptionally(ex -> {
-          pendingFetches.remove(cacheKey);
-          mainWindow.getGui().getGUIThread().invokeLater(() -> {
-            if (mod.description != null && !mod.description.trim().isEmpty()) {
-              fullDescCache.put(cacheKey,
-                  mod.description.trim() + "\n\n(Extended description failed to load: " + ex.getMessage() + ")");
-            } else {
-              fullDescCache.put(cacheKey, "Failed to load full description: " + ex.getMessage());
-            }
-            if (selectedMod != null && selectedMod.id.equals(modId)) {
-              updateDetailsDisplay();
-              mainWindow.invalidate();
-            }
-          });
-          return null;
-        });
-  }
-
-  private void updateDetailsDisplay() {
-    if (selectedMod == null) {
-      String q = searchBox != null ? searchBox.getText().trim() : "";
-      if (!q.isEmpty() && currentResults.isEmpty()) {
-        titleAuthorLabel.setText(
-            GlyphHelper.apply(GlyphHelper.ICON_FILE + " Title: No mod found\n" + GlyphHelper.ICON_USER + " Author: -"));
-        descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " No mods found matching query: \"" + q
-            + "\"\n" + GlyphHelper.ICON_INFO + " Try checking the spelling or changing filters."));
-      } else {
-        titleAuthorLabel.setText(GlyphHelper
-            .apply(GlyphHelper.ICON_FILE + " Title: No mod selected\n" + GlyphHelper.ICON_USER + " Author: -"));
-        descContentLabel.setText(
-            GlyphHelper.apply(GlyphHelper.ICON_INFO + " Select a mod from the results list to view its description."));
-      }
-      pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Page 1/1"));
-      descContentLabel.invalidate();
-      detailsCard.invalidate();
-      mainWindow.invalidate();
-      return;
-    }
-
-    String author = (selectedMod.author != null && !selectedMod.author.trim().isEmpty())
-        ? selectedMod.author
-        : "Unknown";
-    titleAuthorLabel.setText(GlyphHelper.apply(
-        GlyphHelper.ICON_FILE + " Title: " + selectedMod.name + "\n" + GlyphHelper.ICON_USER + " Author: " + author));
-
-    boolean isFullDescMode = (descModeCombo != null && descModeCombo.getSelectedIndex() == 1);
-    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
-    if ("curseforge".equals(platform)) {
-      platform = "curseForge";
-    }
-    String cacheKey = (platform + ":" + selectedMod.id).toLowerCase();
-
-    List<String> lines;
-    if (isFullDescMode) {
-      if (pendingFetches.contains(cacheKey)) {
-        descContentLabel
-            .setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Fetching full description from " + platform + "..."));
-        descContentLabel.setForegroundColor(Themes.getAccentColor());
-        pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
-        descContentLabel.invalidate();
-        detailsCard.invalidate();
-        mainWindow.invalidate();
-        return;
-      }
-      String fullDesc = fullDescCache.get(cacheKey);
-      if (fullDesc == null || fullDesc.trim().isEmpty()) {
-        fetchFullDescriptionIfNeeded(selectedMod);
-        descContentLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " Requesting full description..."));
-        descContentLabel.setForegroundColor(Themes.getAccentColor());
-        pageIndicatorLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Loading..."));
-        descContentLabel.invalidate();
-        detailsCard.invalidate();
-        mainWindow.invalidate();
-        return;
-      }
-      int wrapWidth = Math.max(28, descCardWidth - 6);
-      lines = formatAndWrapDescription(fullDesc, wrapWidth);
-    } else {
-      String rawDesc = (selectedMod.description != null && !selectedMod.description.trim().isEmpty())
-          ? selectedMod.description
-          : "No description provided.";
-      int wrapWidth = Math.max(28, descCardWidth - 6);
-      lines = formatAndWrapDescription(rawDesc, wrapWidth);
-    }
-
-    if (lines.isEmpty()) {
-      lines.add("No description text available.");
-    }
-
-    int pageSize = Math.max(5, descLinesPerPage);
-    int totalPages = Math.max(1, (int) Math.ceil((double) lines.size() / pageSize));
-    if (descPageIndex >= totalPages) {
-      descPageIndex = totalPages - 1;
-    }
-    if (descPageIndex < 0) {
-      descPageIndex = 0;
-    }
-
-    int startIdx = descPageIndex * pageSize;
-    int endIdx = Math.min(lines.size(), startIdx + pageSize);
-
-    StringBuilder sb = new StringBuilder();
-    for (int i = startIdx; i < endIdx; i++) {
-      if (i > startIdx) {
-        sb.append('\n');
-      }
-      String line = lines.get(i);
-      sb.append(line.isEmpty() ? " " : line);
-    }
-
-    for (int i = endIdx - startIdx; i < pageSize; i++) {
-      sb.append('\n');
-      sb.append(' ');
-    }
-
-    descContentLabel.setText(sb.toString());
-    descContentLabel.setForegroundColor(Themes.getActivePalette().fg);
-    pageIndicatorLabel.setText(GlyphHelper.apply(
-        String.format(GlyphHelper.ICON_FILE + " Page %d/%d (%d lines)", descPageIndex + 1, totalPages, lines.size())));
-    descContentLabel.invalidate();
-    detailsCard.invalidate();
-    mainWindow.invalidate();
-  }
-
-  private void updateSelectedVersionDisplay() {
-    if (versionDetailLabel == null) return;
-    int sel = modVersionCombo.getSelectedIndex();
-    if (sel > 0 && (sel - 1) < currentModVersions.size()) {
-      OrchestratorBridge.ModVersionInfo v = currentModVersions.get(sel - 1);
-      String fullTitle = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : (v.versionNumber != null ? v.versionNumber : "");
-      String fileInfo = (v.filename != null ? v.filename : "") + (v.sizeBytes > 0 ? " (" + formatSize(v.sizeBytes) + ")" : "");
-      versionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Full: " + fullTitle + "\n" + GlyphHelper.ICON_FILE + " File: " + fileInfo));
-    } else if (sel == 0 && !currentModVersions.isEmpty()) {
-      OrchestratorBridge.ModVersionInfo v = currentModVersions.get(0);
-      String fullTitle = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : (v.versionNumber != null ? v.versionNumber : "");
-      versionDetailLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " Full [Latest]: " + fullTitle));
-    } else {
-      versionDetailLabel.setText("");
-    }
-  }
-
-  private String formatSize(long bytes) {
-    if (bytes < 1024) return bytes + " B";
-    int exp = (int) (Math.log(bytes) / Math.log(1024));
-    char unit = "KMGTPE".charAt(exp - 1);
-    return String.format("%.1f %cB", bytes / Math.pow(1024, exp), unit);
-  }
-
-  private List<String> formatAndWrapDescription(String text, int width) {
-    List<String> result = new ArrayList<>();
-    if (text == null || text.trim().isEmpty()) {
-      return result;
-    }
-    String[] paragraphs = text.split("\r?\n");
-    for (String para : paragraphs) {
-      String trimmed = para.trim();
-      if (trimmed.isEmpty()) {
-        if (!result.isEmpty() && !result.get(result.size() - 1).isEmpty()) {
-          result.add("");
-        }
-        continue;
-      }
-      result.addAll(wrapText(trimmed, width));
-    }
-
-    while (!result.isEmpty() && result.get(0).trim().isEmpty()) {
-      result.remove(0);
-    }
-
-    while (!result.isEmpty() && result.get(result.size() - 1).trim().isEmpty()) {
-      result.remove(result.size() - 1);
-    }
-    return result;
-  }
-
-  private static List<String> wrapText(String text, int width) {
-    List<String> result = new ArrayList<>();
-    if (text == null || text.trim().isEmpty()) {
-      return result;
-    }
-    int safeWidth = Math.max(10, width);
-    String remaining = text.trim();
-    while (!remaining.isEmpty()) {
-      if (remaining.length() <= safeWidth) {
-        result.add(remaining);
-        break;
-      }
-      int split = remaining.lastIndexOf(' ', safeWidth);
-      if (split <= 0) {
-        split = Math.min(safeWidth, remaining.length());
-      }
-      result.add(remaining.substring(0, split).trim());
-      remaining = remaining.substring(split).trim();
-    }
-    return result;
-  }
-
-  private void onModSelected(OrchestratorBridge.ModResult mod) {
-    if (mod == null) {
-      this.selectedMod = null;
-      updateDetailsDisplay();
-      mainWindow.invalidate();
-      return;
-    }
-    this.selectedMod = mod;
-    this.descPageIndex = 0;
-    if (descModeCombo != null && descModeCombo.getSelectedIndex() == 1) {
-      fetchFullDescriptionIfNeeded(mod);
-    }
-    updateDetailsDisplay();
-    mainWindow.invalidate();
-
-    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
-    if ("curseforge".equals(platform)) {
-      platform = "curseForge";
-    }
-    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
-    String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
-
-    modVersionCombo.clearItems();
-    modVersionCombo.addItem("[Latest Compatible]");
-    modVersionCombo.setSelectedIndex(0);
-    currentModVersions.clear();
-    updateSelectedVersionDisplay();
-
-    final String finalPlat = platform;
-    final String currentModId = mod.id;
-    new Thread(() -> {
-      try {
-        List<OrchestratorBridge.ModVersionInfo> versions = OrchestratorBridge.getInstance()
-            .getModVersions(finalPlat, currentModId, version, loader).get();
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          try {
-            if (selectedMod != null && currentModId.equals(selectedMod.id)) {
-              currentModVersions.clear();
-              currentModVersions.addAll(versions);
-              for (OrchestratorBridge.ModVersionInfo v : versions) {
-                if (v != null) {
-                  String label = (v.versionName != null && !v.versionName.isEmpty()) ? v.versionName : v.toString();
-                  modVersionCombo.addItem(label != null ? label : "Unknown Version");
-                }
-              }
-              updateSelectedVersionDisplay();
-              mainWindow.invalidate();
-            }
-          } catch (Exception ignored) {
-          }
-        });
-      } catch (Exception ignored) {
-      }
-    }).start();
-  }
-
-  private void onSearch() {
-    String query = searchBox.getText().trim();
-    String platform = platformBox.getSelectedItem() != null ? platformBox.getSelectedItem().toLowerCase() : "modrinth";
-    if ("curseforge".equals(platform)) {
-      platform = "curseForge";
-    }
-    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
-    String loader = loaderBox.getSelectedItem() != null ? loaderBox.getSelectedItem() : "fabric";
-
-    statusLabel.setText(
-        GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Searching " + platform + " for '" + query + "'..."));
-    statusLabel.setForegroundColor(Themes.getLogWarnColor());
-    ActivityLogger.info("Searching " + platform + " for '" + query + "' (MC " + version + ", " + loader + ")");
-
-    final String targetPlatform = platform;
-    new Thread(() -> {
-      try {
-        List<OrchestratorBridge.ModResult> mods = OrchestratorBridge.getInstance()
-            .searchMods(targetPlatform, query, version, loader).get();
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          try {
-            currentResults.clear();
-            currentResults.addAll(mods);
-            resultsList.clearItems();
-            selectedMod = null;
-
-            if (mods.isEmpty()) {
-              modVersionCombo.clearItems();
-              modVersionCombo.addItem("[No Mod Selected]");
-              modVersionCombo.setSelectedIndex(0);
-              currentModVersions.clear();
-              updateSelectedVersionDisplay();
-              updateDetailsDisplay();
-
-              statusLabel.setText(
-                  GlyphHelper.apply(GlyphHelper.ICON_FILE + " No mods found matching query: \"" + query + "\""));
-              statusLabel.setForegroundColor(Themes.getLogMutedColor());
-              ActivityLogger.info("No mods found matching query: " + query);
-              searchBox.takeFocus();
-            } else {
-              statusLabel.setText(GlyphHelper.apply(
-                  GlyphHelper.ICON_CHECK + " [OK] Found " + mods.size() + " mods. [L]ist / [K] Version / [D]ownload."));
-              statusLabel.setForegroundColor(Themes.getLogSuccessColor());
-              ActivityLogger.ok("Found " + mods.size() + " mods for query: " + query);
-
-              for (OrchestratorBridge.ModResult m : mods) {
-                resultsList.addItem(GlyphHelper
-                    .apply(GlyphHelper.ICON_MOD + " " + m.name + (m.author.isEmpty() ? "" : " • " + m.author)), () -> {
-                      onModSelected(m);
-                      onDownload();
-                    });
-              }
-              resultsList.setSelectedIndex(0);
-              if (!mods.isEmpty()) {
-                onModSelected(mods.get(0));
-              }
-              resultsList.takeFocus();
-            }
-          } catch (Exception err) {
-            ActivityLogger.err("Search UI error: " + err.getMessage());
-          }
-        });
-      } catch (Exception e) {
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Search failed: " + e.getMessage()));
-          statusLabel.setForegroundColor(Themes.getLogErrorColor());
-          ActivityLogger.err("Mod search failed: " + e.getMessage());
-        });
-      }
-    }).start();
-  }
-
-  private void onDownload() {
-    if (isDownloading) {
-      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Another download is already running."));
-      return;
-    }
-
-    if (selectedMod == null && resultsList.getSelectedIndex() >= 0
-        && resultsList.getSelectedIndex() < currentResults.size()) {
-      selectedMod = currentResults.get(resultsList.getSelectedIndex());
-    }
-    if (selectedMod == null) {
-      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_WARN + " [WARN] Select a mod from the list first!"));
-      statusLabel.setForegroundColor(Themes.getLogWarnColor());
-      ActivityLogger.warn("Please select a mod from the results list before downloading.");
-      return;
-    }
-
-    final OrchestratorBridge.ModResult mod = selectedMod;
-    String platform = platformBox.getSelectedItem().toLowerCase();
-    if ("curseforge".equals(platform)) {
-      platform = "curseForge";
-    }
-    String version = MinecraftVersionHelper.getSelectedVersion(versionComboBox);
-    String loader = loaderBox.getSelectedItem();
-
-    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = OrchestratorBridge.getInstalledServerMetadata();
-    if (meta == null) {
-      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] No server installed! Install a server engine first [I]."));
-      statusLabel.setForegroundColor(Themes.getLogErrorColor());
-      ActivityLogger.err("Cannot install mod: No Minecraft server is installed. Please install a server engine first from [I] Install Server Engine.");
-      return;
-    }
-    var compat = OrchestratorBridge.checkCompatibility(loader, version);
-    if (!compat.isCompatible()) {
-      statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Incompatible: " + compat.getMessage()));
-      statusLabel.setForegroundColor(Themes.getLogErrorColor());
-      ActivityLogger.err(compat.getMessage());
-      return;
-    }
-
-    int verIndex = modVersionCombo.getSelectedIndex();
-    OrchestratorBridge.ModVersionInfo chosenVer = null;
-    if (verIndex > 0 && (verIndex - 1) < currentModVersions.size()) {
-      chosenVer = currentModVersions.get(verIndex - 1);
-    }
-
-    boolean showAnimation = ConfigManager.getInstance().getConfig().isPickaxeAnimation();
-    pickaxeAnim.setProgress(0.0);
-    pickaxeAnim.setCustomMessage("Downloading " + mod.name + "...");
-
-    stopTicker();
-    if (showAnimation) {
-      activeTicker = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "PickaxeAnimTicker");
-        t.setDaemon(true);
-        return t;
-      });
-      activeTicker.scheduleAtFixedRate(() -> {
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          pickaxeAnim.tick();
-          mainWindow.invalidate();
-        });
-      }, 50, 110, TimeUnit.MILLISECONDS);
-    }
-
-    isDownloading = true;
-    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_BUSY + " [BUSY] Downloading " + mod.name + "..."));
-    statusLabel.setForegroundColor(Themes.getLogWarnColor());
-    ActivityLogger
-        .info("Downloading mod: " + mod.name + (chosenVer != null ? " (" + chosenVer.versionNumber + ")" : ""));
-
-    final String targetPlatform = platform;
-    final OrchestratorBridge.ModVersionInfo specificVer = chosenVer;
-
-    new Thread(() -> {
-      try {
-        String verStr = specificVer != null
-            ? (specificVer.versionNumber != null && !specificVer.versionNumber.trim().isEmpty() ? specificVer.versionNumber.trim() : specificVer.versionName)
-            : version;
-        if (verStr != null && verStr.toLowerCase().endsWith(".jar")) {
-          verStr = verStr.substring(0, verStr.length() - 4);
-        }
-        String cleanVer = (verStr != null ? verStr : "unknown").replaceAll("[^a-zA-Z0-9_.+-]", "");
-        String cleanSlug = mod.id.toLowerCase().replaceAll("[^a-z0-9_-]", "");
-        String targetFilename = cleanSlug + (cleanVer.isEmpty() ? "" : "-" + cleanVer) + ".jar";
-
-        if (specificVer != null && specificVer.downloadUrl != null && !specificVer.downloadUrl.isEmpty()) {
-          OrchestratorBridge.getInstance().downloadModDirect(specificVer.downloadUrl, targetFilename, info -> {
-            updateProgressUI(mod.name, info);
-          }).get();
-        } else {
-          OrchestratorBridge.getInstance().downloadMod(targetPlatform, mod.id, version, loader, null, info -> {
-            updateProgressUI(mod.name, info);
-          }).get();
-        }
-
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          isDownloading = false;
-          stopTicker();
-          statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] " + mod.name + " installed!"));
-          statusLabel.setForegroundColor(Themes.getLogSuccessColor());
-          pickaxeAnim.setProgress(100.0);
-          pickaxeAnim.setCustomMessage(
-              GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] " + mod.name + " downloaded & installed!"));
-          mainWindow.invalidate();
-          try {
-            mainWindow.getGui().updateScreen();
-          } catch (Exception ignored) {
-          }
-          ActivityLogger.ok("Mod " + mod.name + " downloaded and installed to mods/ folder!");
-        });
-      } catch (Exception e) {
-        mainWindow.getGui().getGUIThread().invokeLater(() -> {
-          isDownloading = false;
-          stopTicker();
-          statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Download failed: " + e.getMessage()));
-          statusLabel.setForegroundColor(Themes.getLogErrorColor());
-          pickaxeAnim.setCustomMessage(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] " + e.getMessage()));
-          mainWindow.invalidate();
-          try {
-            mainWindow.getGui().updateScreen();
-          } catch (Exception ignored) {
-          }
-          ActivityLogger.err("Mod download failed: " + e.getMessage());
-        });
-      }
-    }).start();
-  }
-
-  public void cancelDownload() {
-    if (!isDownloading) {
-      ActivityLogger.info("No mod download currently in progress.");
-      return;
-    }
-    ActivityLogger.warn("Cancelling active mod download...");
-    org.codeberg.DeployedReject.tui.backend.JobTracker.getInstance().getActiveJobs().forEach(job -> {
-      if ("Mod".equalsIgnoreCase(job.getType())) {
-        job.cancel();
-      }
-    });
-    isDownloading = false;
-    stopTicker();
-    statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [CANCELLED] Download cancelled."));
-    statusLabel.setForegroundColor(Themes.getLogWarnColor());
-    pickaxeAnim.setCustomMessage(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [CANCELLED] Download aborted."));
-    mainWindow.invalidate();
-  }
-
-  private volatile long lastProgressUiUpdate = 0;
-
-  private void updateProgressUI(String modName, OrchestratorBridge.DownloadProgressInfo info) {
-    long now = System.currentTimeMillis();
-    if (info.percent < 100.0 && (now - lastProgressUiUpdate < 100)) {
-      return;
-    }
-    lastProgressUiUpdate = now;
-
-    mainWindow.getGui().getGUIThread().invokeLater(() -> {
-      String status = String.format("%s [BUSY] Downloading %.2f%% (ETA: %s @ %s)...",
-          GlyphHelper.ICON_BUSY, info.percent, info.formattedEta(), info.formattedSpeed());
-      statusLabel.setText(GlyphHelper.apply(status));
-      statusLabel.setForegroundColor(Themes.getLogWarnColor());
-
-      pickaxeAnim.setProgress(info.percent);
-      pickaxeAnim.setCustomMessage(GlyphHelper.apply(String.format("%s Downloading %s: %.2f%% (ETA: %s @ %s)",
-          GlyphHelper.ICON_TOOL, modName, info.percent, info.formattedEta(), info.formattedSpeed())));
-
-      mainWindow.invalidate();
-    });
+    int listWidth = Math.max(26, Math.min(38, (currentTermWidth * 42) / 100));
+    int listHeight = Math.max(6, Math.min(14, currentTermHeight - 16));
+    resultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
+    packResultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
   }
 }

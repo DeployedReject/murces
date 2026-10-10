@@ -2,14 +2,14 @@
 
 # MurCes
 
-**A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux.**
+**A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux & Windows.**
 
 [![Release](https://img.shields.io/github/v/release/DeployedReject/murces?style=for-the-badge&logo=github&color=5865F2)](https://github.com/DeployedReject/murces/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-7952B3?style=for-the-badge)](LICENSE)
-[![Binary](https://img.shields.io/badge/GraalVM-Native%20AOT%20ELF-E86F00?style=for-the-badge&logo=oracle)](https://www.graalvm.org/)
+[![Binary](https://img.shields.io/badge/GraalVM-Native%20AOT%20Executable-E86F00?style=for-the-badge&logo=oracle)](https://www.graalvm.org/)
 [![Java](https://img.shields.io/badge/Java-21+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/DeployedReject/murces)
-[![tmux](https://img.shields.io/badge/tmux-Process%20Daemon-1BB954?style=for-the-badge)](https://github.com/tmux/tmux)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20WSL2-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/DeployedReject/murces)
+[![tmux / psmux](https://img.shields.io/badge/Multiplexer-tmux%20%2F%20psmux-1BB954?style=for-the-badge)](https://github.com/psmux/psmux)
 
 <p align="center">
   <a href="#why-murces">Why MurCes</a> •
@@ -97,31 +97,32 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 4. In-TUI Mod Search & Downloader
+### 4. In-TUI Mod & Modpack Browser (Dual-Tabbed)
 
-> Search, inspect, and install mods from Modrinth and CurseForge without leaving your terminal.
+> Search, inspect, and install mods and full modpacks from Modrinth and CurseForge without leaving your terminal.
 
 <p align="center">
   <img src="assets/mod_browser.png" alt="Mod Browser & Downloader" width="880" style="border-radius: 6px;" />
 </p>
 
-- **Universal Mod Index**: Switch between Modrinth and CurseForge API providers on the fly.
+- **Dual Tab Switcher**: Effortlessly switch between `[1] Single Mods` and `[2] Modpacks` inside a unified interface.
+- **Universal Index**: Search Modrinth and CurseForge API providers on the fly.
 - **Smart Filtering**: Automatically filters releases by your active server loader (Fabric, Forge, NeoForge, Quilt) and game version.
 - **Canonical Naming**: Downloads are automatically named `<slug>-<version>.jar`, making tracking and version management effortless.
-- **Interactive Inspector**: Read full mod summaries, descriptions, dependencies, and author metadata.
+- **Modpack Dependency Inspector**: Inspects modpack manifests, queries dependencies, excludes client-only mods by default, and unpacks config overrides (`overrides/`).
 - **Atomic Telemetry**: Real-time progress bar downloads into `.tmp` staging before atomic deployment to `mods/`.
 
 ---
 
-### 5. Modpack Browser & Installer
+### 5. Dedicated Plugin Workspace (Paper, Spigot, Bukkit)
 
-> Search, inspect dependencies, download, and extract complete modpacks directly to your server.
+> Search, inspect, download, and manage Minecraft plugins stored cleanly in `plugins/`.
 
-- **Separate Dedicated Workspace**: Browse Modrinth and CurseForge modpacks without cluttering single mod management.
-- **Dependency Resolution**: Automatically inspects the modpack manifest dependencies, batch queries version metadata, and categorizes mods by environment (`server`, `client`, `both`).
-- **Client-Side Exclusion**: Defaults to omitting `client_only` mods to keep server instances lightweight and crash-free.
-- **Overrides & Config Unpacking**: Extracts modpack configuration overrides (`overrides/` / `client-overrides/`) directly to server root.
-- **Interactive Inspector**: View mod count, loader build, version changelogs, and individual mod dependencies before installing.
+- **Platform Support**: Browse plugins on both Modrinth (`project_type:plugin`) and CurseForge (`Bukkit Plugins`).
+- **Server Engine Compatibility**: Verifies server type from jar metadata (allows Paper/Spigot, rejects Vanilla or Fabric/Forge with diagnostics logging).
+- **Dual Tabs**:
+  - `[1] Browse & Download`: Live search, pagination, detailed descriptions, version selector, and animated pickaxe progress bar.
+  - `[2] Installed Plugins Manager`: Lists all `.jar` files in `plugins/`, parses plugin YAML metadata (`plugin.yml` / `paper-plugin.yml`), and supports 1-key deletion (`[D]`).
 
 ---
 
@@ -260,8 +261,9 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ## Quickstart
 
-### 1. Interactive Automated Installer
+### 1. Interactive Automated Installers
 
+#### Linux / macOS / WSL (Bash)
 Run the interactive installer to set up system dependencies (`tmux`, `curl`, `tar`, optional `rclone`, `playit`) with per-package consent prompts and fetch the latest `murces` standalone executable:
 
 ```bash
@@ -272,21 +274,35 @@ curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.s
 ./murces
 ```
 
+#### Windows (PowerShell)
+Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe`:
+
+```powershell
+# Run the automated PowerShell installer
+irm https://raw.githubusercontent.com/DeployedReject/murces/main/install.ps1 | iex
+
+# Launch the interactive dashboard
+.\murces.exe
+```
+
 Alternatively, to download the precompiled binary directly without the installer:
 
 ```bash
-# For x86_64 / amd64:
+# For Linux x86_64 / amd64:
 curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64
+chmod +x murces && ./murces
 
-# For arm64 / aarch64 (Raspberry Pi, ARM VPS, Apple Silicon VM):
+# For Linux arm64 / aarch64 (Raspberry Pi, ARM VPS, Apple Silicon VM):
 curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-arm64
+chmod +x murces && ./murces
 
-chmod +x murces
-./murces
+# For Windows x86_64 (PowerShell / cmd):
+curl.exe -sSL -o murces.exe https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe
+.\murces.exe
 ```
 
 > [!NOTE]
-> The precompiled native release is completely self-contained in a single executable file. No zip archive extraction or complex configuration is required.
+> The precompiled native release is completely self-contained in a single executable file. No zip archive extraction or complex runtime configuration is required.
 
 ---
 
@@ -295,18 +311,23 @@ chmod +x murces
 MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 
 ```bash
-./murces [command] [options]
+./murces [command] [options]        # Linux / macOS
+.\murces.exe [command] [options]    # Windows
 ```
 
 | Command                                     | Description                                                             | Flags / Arguments                             |
 | ------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
 | `./murces`                                  | Launches the interactive Lanterna TUI dashboard                         | None                                          |
-| `./murces start`                            | Starts Minecraft in a detached `tmux` session                           | `-p`, `--public` _(starts Playit.gg tunnel)_  |
+| `./murces start`                            | Starts Minecraft in a detached `tmux`/`psmux` session                   | `-p`, `--public` _(starts Playit.gg tunnel)_  |
 | `./murces stop`                             | Sends graceful `stop` command and terminates the session                | None                                          |
 | `./murces status`                           | Checks if the Minecraft server daemon is active                         | None                                          |
-| `./murces server-name [name]`               | Gets or sets the server name & synchronized `tmux` session name         | `[name]` _(optional)_                         |
+| `./murces server-name [name]`               | Gets or sets the server name & synchronized background session name     | `[name]` _(optional)_                         |
 | `./murces search-modpacks <query> [ver] [loader]` | Searches Modrinth/CurseForge modpacks by game version and loader  | `[query] [version] [loader]`                  |
 | `./murces install-modpack <slug> [ver] [loader]`  | Resolves dependencies, downloads jars, & extracts modpack overrides | `[slug-or-id] [ver] [loader] [--include-client]` |
+| `./murces search-plugins <query> [ver] [engine]`  | Searches Modrinth/CurseForge Paper & Bukkit plugins                   | `[query] [version] [server-type]`             |
+| `./murces install-plugin <slug> [ver] [engine]`   | Downloads & installs plugin jar into `plugins/`                         | `[slug-or-id] [version] [server-type]`        |
+| `./murces list-plugins`                     | Lists all installed `.jar` plugins in `plugins/`                        | None                                          |
+| `./murces delete-plugin <filename>`         | Deletes a plugin from `plugins/`                                        | `<filename>`                                  |
 | `./murces backup`                           | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                          |
 | `./murces update-mods [version] [loader]`   | Upgrades all installed server mods to latest compatible versions        | `[gameVersion] [loader]` _(optional)_         |
 | `./murces install-jdk [version]`            | Downloads and provisions portable OpenJDK for target MC/Java version    | `[mcVersion]` or `8|17|21`                    |
@@ -330,12 +351,13 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[C]`                   | Open **Configure Properties** (`server.properties`)            |
 | `[B]`                   | Open **World Backups**                                         |
 | `[P]`                   | Open **Player UUID Migration**                                 |
-| `[D]`                   | Open **Download & Browse Mods**                                |
-| `[K]`                   | Open **Modpacks (Browse & Install)**                           |
+| `[D]`                   | Open **Download & Browse Mods (Mods & Modpacks Tabs)**         |
 | `[M]`                   | Open **Manage Installed Mods**                                 |
+| `[G]`                   | Open **Plugins (Browse & Manage)**                             |
+| `[1]` / `[2]`           | Switch tabs in Mods (`[1] Single Mods` / `[2] Modpacks`) and Plugins (`[1] Browse` / `[2] Installed`) |
 | `[U]`                   | **Update All Mods** (inside Manage Installed Mods view)        |
 | `[Z]`                   | Open **Customization & Themes**                                |
-| `[N]`                   | Edit **Server Name / tmux Session** (in Server Control & Setup) |
+| `[N]`                   | Edit **Server Name / Session** (in Server Control & Setup)      |
 | `[E]`                   | Exit MurCes                                                    |
 
 ---
@@ -344,9 +366,10 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 
 | Component                       | Requirement                                     | Details                                                           |
 | ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
-| **Operating System**            | Linux 64-bit (x86_64)                           | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, and WSL2    |
-| **Terminal Multiplexer**        | `tmux`                                          | Required for detached background session supervision              |
-| **HTTP Downloader**             | `curl` or `wget`                                | Required for dependency and package fetching                      |
+| **Operating System**            | Linux (x86_64, arm64) or Windows 10/11 (x64)    | Tested on Ubuntu, Debian, Arch Linux, Alpine, Fedora, WSL2, & Win |
+| **Terminal Multiplexer**        | `tmux` (Linux/macOS) or `psmux` (Windows)       | Required for detached background session supervision              |
+| **HTTP Downloader**             | `curl` or `wget` (built-in on Windows 10+)      | Required for dependency and package fetching                      |
+| **Archive Bundler**             | `tar` (built-in on Windows 10 build 17063+)     | Required for world backups and player migration snapshots         |
 | **Terminal Font**               | [Nerd Font](https://www.nerdfonts.com/) (v3.0+) | Required for icons, navigation glyphs, and status indicators      |
 | **Cloud Sync** _(Optional)_     | `rclone`                                        | Required only if using Google Drive/S3 offsite world backups      |
 | **Public Tunnels** _(Optional)_ | `playit`                                        | Required only if running public servers without port forwarding   |

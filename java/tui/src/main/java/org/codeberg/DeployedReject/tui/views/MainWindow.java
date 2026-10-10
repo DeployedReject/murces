@@ -44,6 +44,7 @@ public class MainWindow extends BasicWindow {
     private final ModBrowseView modBrowseView;
     private final ModManageView modManageView;
     private final ModpackBrowseView modpackBrowseView;
+    private final PluginBrowseView pluginBrowseView;
     private final CustomizationView customizationView;
     private final JobManagerView jobManagerView;
     private final TunnelConfigView tunnelConfigView;
@@ -137,6 +138,7 @@ public class MainWindow extends BasicWindow {
         this.modBrowseView = new ModBrowseView(this);
         this.modManageView = new ModManageView(this);
         this.modpackBrowseView = new ModpackBrowseView(this);
+        this.pluginBrowseView = new PluginBrowseView(this);
         this.customizationView = new CustomizationView(this);
         this.jobManagerView = new JobManagerView(this);
         this.tunnelConfigView = new TunnelConfigView(this);
@@ -219,9 +221,10 @@ public class MainWindow extends BasicWindow {
     public void showConfigServer() { showView(configServerView); }
     public void showBackup() { showView(backupView); }
     public void showMigratePlayer() { showView(migratePlayerView); }
-    public void showModBrowse() { showView(modBrowseView); }
+    public void showModBrowse() { modBrowseView.setTab(0); showView(modBrowseView); }
     public void showModManage() { showView(modManageView); }
-    public void showModpackBrowse() { showView(modpackBrowseView); }
+    public void showModpackBrowse() { modBrowseView.setTab(1); showView(modBrowseView); }
+    public void showPluginBrowse() { showView(pluginBrowseView); }
     public void showCustomization() { showView(customizationView); }
     public void showJobManager() { showView(jobManagerView); }
     public void showTunnelConfig() { showView(tunnelConfigView); }
@@ -235,6 +238,7 @@ public class MainWindow extends BasicWindow {
     public ModBrowseView getModBrowseView() { return modBrowseView; }
     public ModManageView getModManageView() { return modManageView; }
     public ModpackBrowseView getModpackBrowseView() { return modpackBrowseView; }
+    public PluginBrowseView getPluginBrowseView() { return pluginBrowseView; }
     public CustomizationView getCustomizationView() { return customizationView; }
     public JobManagerView getJobManagerView() { return jobManagerView; }
     public TunnelConfigView getTunnelConfigView() { return tunnelConfigView; }

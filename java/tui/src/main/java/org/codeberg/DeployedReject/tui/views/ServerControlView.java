@@ -69,7 +69,8 @@ public class ServerControlView implements WorkspaceView {
         });
 
         Panel serverNamePanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-        serverNamePanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server [N]ame (tmux session): ")));
+        String mux = org.codeberg.DeployedReject.utils.Platform.getMultiplexer();
+        serverNamePanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server [N]ame (" + mux + " session): ")));
         serverNameInput = new TextBox(new TerminalSize(16, 1), org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().getServerName());
         serverNameInput.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Enter) {
@@ -386,7 +387,8 @@ public class ServerControlView implements WorkspaceView {
         String oldName = cfg.getServerName();
         cfg.setServerName(newName);
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
-        ActivityLogger.ok("Server name & tmux session updated: '" + oldName + "' -> '" + cfg.getServerName() + "'");
+        String mux = org.codeberg.DeployedReject.utils.Platform.getMultiplexer();
+        ActivityLogger.ok("Server name & " + mux + " session updated: '" + oldName + "' -> '" + cfg.getServerName() + "'");
         updateStatus();
     }
 }

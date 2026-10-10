@@ -184,7 +184,8 @@ public class TunnelConfigView implements WorkspaceView {
         }
 
         if (running) {
-            daemonIndicatorLabel.setText(GlyphHelper.apply("● [ONLINE (tmux: playit)] Forwarding Active"));
+            String mux = org.codeberg.DeployedReject.utils.Platform.getMultiplexer();
+            daemonIndicatorLabel.setText(GlyphHelper.apply("● [ONLINE (" + mux + ": playit)] Forwarding Active"));
             daemonIndicatorLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);
         } else {
             daemonIndicatorLabel.setText(GlyphHelper.apply("○ [OFFLINE] Stopped"));

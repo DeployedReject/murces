@@ -51,7 +51,7 @@ Triggers live memory flushing (`save-all` & `save-off`), creates a timestamped `
 - `retentionLimit`: Number of newest backups to retain (e.g., `3`, optional, default `3`).
 - `cloudSync`: Boolean toggle to sync via rclone (`true` / `false`, default `false`).
 - `cloudRemote`: Rclone remote name (e.g., `"minecraftdrive"`, default `"minecraftdrive"`).
-- `sessionName`: Target tmux session name (e.g., `"mcsv"`, optional, default `"mcsv"`).
+- `sessionName`: Target multiplexer session name (e.g., `"mcsv"`, optional, default `"mcsv"`).
 - `serverDir`: Target server root directory (e.g., `"."` or `"servers/survival"`, optional, default `"."`).
 
 **Example:**
@@ -61,13 +61,13 @@ Triggers live memory flushing (`save-all` & `save-off`), creates a timestamped `
 
 ## Type: `server`
 
-The server module manages the download, installation, and background process execution (`tmux`) of Minecraft servers. It automatically bypasses the EULA.
+The server module manages the download, installation, and background process execution (`tmux` on Linux/macOS, `psmux` on Windows) of Minecraft servers. It automatically bypasses the EULA.
 
 **Required Parameters:**
 `type`, `gameVersion`, `loaderVersion`, `serverType`, `ram`, `job`
 
 **Optional Parameters:**
-- `sessionName`: Name of the background tmux session (default: `"mcsv"`).
+- `sessionName`: Name of the background session (default: `"mcsv"`).
 - `serverDir`: Working directory for the server instance (default: `"."`).
 - `command`: In-game console command for `job: 7`.
 - `oldName` / `newName`: Old and new account usernames for player UUID migration (`job: 8`).
