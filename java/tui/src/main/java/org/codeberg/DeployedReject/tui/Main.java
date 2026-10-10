@@ -473,7 +473,7 @@ public class Main {
                 }
             });
 
-            if (terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
+            if (!Platform.isWindows() && terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
                 try {
                     ((com.googlecode.lanterna.terminal.ExtendedTerminal) terminal).setMouseCaptureMode(com.googlecode.lanterna.terminal.MouseCaptureMode.CLICK_RELEASE);
                 } catch (Exception ignored) {}

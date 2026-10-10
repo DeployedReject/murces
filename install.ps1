@@ -81,8 +81,22 @@ function Download-FileWithProgress([string]$url, [string]$dest, [string]$label) 
 Show-Banner
 
 # 1. System & Architecture Detection
-$rawArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLower()
-$is64Bit = [Environment]::Is64BitOperatingSystem
+$rawArch = $env:PROCESSOR_ARCHITECTURE
+if (-not $rawArch) {
+    try {
+        $rawArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+    } catch {
+        $rawArch = if ([Environment]::Is64BitOperatingSystem) { "AMD64" } else { "x86" }
+    }
+}
+$rawArch = $rawArch.ToLower()
+if ($rawArch -eq "amd64" -or $rawArch -eq "x64") {
+    $rawArch = "amd64"
+} elseif ($rawArch -eq "arm64") {
+    $rawArch = "arm64"
+} else {
+    $rawArch = "x86"
+}
 $archLabel = "Windows $rawArch"
 Write-Color "✦ Architecture detected: $archLabel" "Magenta"
 
