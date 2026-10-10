@@ -21,9 +21,11 @@ public class ConfigManager {
 
     private TuiConfig config;
     private final File configFile;
+    private boolean firstBoot = false;
 
     private ConfigManager() {
         this.configFile = new File(CONFIG_FILENAME);
+        this.firstBoot = !configFile.exists();
         load();
     }
 
@@ -39,6 +41,18 @@ public class ConfigManager {
             config = new TuiConfig();
         }
         return config;
+    }
+
+    public synchronized boolean isFirstBoot() {
+        return firstBoot;
+    }
+
+    public synchronized void clearFirstBoot() {
+        this.firstBoot = false;
+    }
+
+    public File getConfigFile() {
+        return configFile;
     }
 
     public synchronized void setConfig(TuiConfig newConfig) {

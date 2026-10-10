@@ -226,7 +226,7 @@ public class ModUpdateManager {
 
   public static void cleanOldModVersions(String slug, String keepFilename) {
     try {
-      File modsDir = new File("mods");
+      File modsDir = OrchestratorBridge.getModsDir();
       if (!modsDir.exists() || !modsDir.isDirectory()) return;
       File[] files = modsDir.listFiles((dir, name) -> name.endsWith(".jar"));
       if (files == null) return;
@@ -297,8 +297,9 @@ public class ModUpdateManager {
               statusCallback.accept("Upgrading " + safeSlug + " from " + mod.version + " to " + remoteVer + "...");
             }
 
-            File tmpFile = new File("mods", targetFilename + ".tmp");
-            File finalFile = new File("mods", targetFilename);
+            File modsDir = OrchestratorBridge.getModsDir();
+            File tmpFile = new File(modsDir, targetFilename + ".tmp");
+            File finalFile = new File(modsDir, targetFilename);
 
             HttpRequest dlReq = HttpRequest.newBuilder()
                 .uri(URI.create(downloadUrl))
@@ -335,7 +336,7 @@ public class ModUpdateManager {
             String normVer = mod.version.replaceAll("[^a-zA-Z0-9_.+-]", "");
             String normFilename = safeSlug + "-" + normVer + ".jar";
             if (!mod.file.getName().equalsIgnoreCase(normFilename)) {
-              File normFile = new File("mods", normFilename);
+              File normFile = new File(OrchestratorBridge.getModsDir(), normFilename);
               if (!normFile.exists()) {
                 try {
                   Files.move(mod.file.toPath(), normFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -404,8 +405,9 @@ public class ModUpdateManager {
                   String targetFilename = safeSlug + "-" + cleanVer + ".jar";
 
                   if (cmp > 0) {
-                    File tmpFile = new File("mods", targetFilename + ".tmp");
-                    File finalFile = new File("mods", targetFilename);
+                    File modsDir = OrchestratorBridge.getModsDir();
+                    File tmpFile = new File(modsDir, targetFilename + ".tmp");
+                    File finalFile = new File(modsDir, targetFilename);
                     HttpRequest cfDl = HttpRequest.newBuilder()
                         .uri(URI.create(dUrl))
                         .header("x-api-key", curseAPI)
@@ -455,7 +457,7 @@ public class ModUpdateManager {
                                            Consumer<String> logCallback,
                                            Consumer<Double> progressCallback) {
     UpdateSummary summary = new UpdateSummary();
-    File modsDir = new File("mods");
+    File modsDir = OrchestratorBridge.getModsDir();
     if (!modsDir.exists() || !modsDir.isDirectory()) {
       if (logCallback != null) logCallback.accept("No mods directory found.");
       return summary;

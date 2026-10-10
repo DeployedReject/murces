@@ -249,7 +249,19 @@ try {
         Write-Color "  ✔ Added $InstallDir to user PATH environment variable." "Green"
     }
 } catch {
-    Write-Color "  ⚠ Could not automatically update user PATH: $_" "Yellow"
+    # Non-fatal
+}
+
+# Ensure Windows Virtual Terminal Processing is enabled in Registry
+try {
+    $consoleReg = "HKCU:\Console"
+    $vtLevel = (Get-ItemProperty -Path $consoleReg -Name "VirtualTerminalLevel" -ErrorAction SilentlyContinue).VirtualTerminalLevel
+    if ($vtLevel -ne 1) {
+        Set-ItemProperty -Path $consoleReg -Name "VirtualTerminalLevel" -Value 1 -Type DWord -Force | Out-Null
+        Write-Color "  ✔ Enabled Windows Virtual Terminal (ANSI/VT100) processing." "Green"
+    }
+} catch {
+    # Non-fatal
 }
 Write-Host ""
 

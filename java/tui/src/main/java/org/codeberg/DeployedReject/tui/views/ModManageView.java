@@ -157,8 +157,7 @@ public class ModManageView implements WorkspaceView {
         }
 
         confirmingDelete = false;
-        File f = new File("mods", selectedModFile);
-        if (f.exists() && f.delete()) {
+        if (OrchestratorBridge.deleteMod(selectedModFile)) {
             ActivityLogger.ok("Mod '" + selectedModFile + "' deleted successfully.");
             statusLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Deleted: " + selectedModFile));
             statusLabel.setForegroundColor(MinecraftTheme.CREEPER_GREEN);

@@ -153,7 +153,13 @@ public class MainWindow extends BasicWindow {
 
         setupInputHandling();
 
-        showView(mainMenuView);
+        if (ConfigManager.getInstance().isFirstBoot() || !OrchestratorBridge.isServerInstalled()) {
+            ActivityLogger.info("Welcome to MurCes! Please configure install directory and server engine.");
+            showView(installServerView);
+            ConfigManager.getInstance().clearFirstBoot();
+        } else {
+            showView(mainMenuView);
+        }
     }
 
     public void updateLayoutDimensions(TerminalSize termSize) {

@@ -82,11 +82,24 @@ public class TerminalResizeHelper {
             } catch (Exception ignored) {}
         }
 
-        try {
-            sun.misc.Signal.handle(new sun.misc.Signal("WINCH"), sig -> {
-                scheduleResize(screen, gui, terminal, 50);
-            });
-        } catch (Throwable ignored) {}
+        if (!org.codeberg.DeployedReject.utils.Platform.isWindows()) {
+            try {
+                Class<?> signalClass = Class.forName("sun.misc.Signal");
+                Class<?> handlerClass = Class.forName("sun.misc.SignalHandler");
+                Object winchSignal = signalClass.getConstructor(String.class).newInstance("WINCH");
+                Object handlerProxy = java.lang.reflect.Proxy.newProxyInstance(
+                    handlerClass.getClassLoader(),
+                    new Class<?>[]{handlerClass},
+                    (proxy, method, mArgs) -> {
+                        if ("handle".equals(method.getName())) {
+                            scheduleResize(screen, gui, terminal, 50);
+                        }
+                        return null;
+                    }
+                );
+                signalClass.getMethod("handle", signalClass, handlerClass).invoke(null, winchSignal, handlerProxy);
+            } catch (Throwable ignored) {}
+        }
 
         Thread watcher = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {

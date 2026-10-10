@@ -18,6 +18,7 @@ public class InstallServerView implements WorkspaceView {
     private final ComboBox<String> gameVersionComboBox;
     private final TextBox loaderVersionBox;
     private final TextBox serverNameBox;
+    private final TextBox installDirBox;
     private final ComboBox<String> ramComboBox;
     private final CheckBox portableJdkCheck;
     private final ProgressBar progressBar;
@@ -37,6 +38,7 @@ public class InstallServerView implements WorkspaceView {
         gameVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(16, 1));
         loaderVersionBox = new TextBox(new TerminalSize(16, 1), "0.16.5");
         serverNameBox = new TextBox(new TerminalSize(16, 1), org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().getServerName());
+        installDirBox = new TextBox(new TerminalSize(16, 1), org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().getServerDir());
         ramComboBox = new ComboBox<>("2G", "4G", "6G", "8G", "12G", "16G", "1G");
         ramComboBox.setPreferredSize(new TerminalSize(16, 1));
         ramComboBox.setSelectedIndex(1);
@@ -76,11 +78,23 @@ public class InstallServerView implements WorkspaceView {
 
         serverNameBox.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                ramComboBox.takeFocus();
+                installDirBox.takeFocus();
                 return false;
             }
             if (keyStroke.getKeyType() == KeyType.ArrowUp) {
                 loaderVersionBox.takeFocus();
+                return false;
+            }
+            return true;
+        });
+
+        installDirBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
+                ramComboBox.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                serverNameBox.takeFocus();
                 return false;
             }
             return true;
@@ -113,6 +127,8 @@ public class InstallServerView implements WorkspaceView {
         formPanel.addComponent(loaderVersionBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_SERVER + " Server [N]ame / Session:")));
         formPanel.addComponent(serverNameBox);
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Install [D]ir / Assets:")));
+        formPanel.addComponent(installDirBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_OPTIONS + " [R]AM Allocation:")));
         formPanel.addComponent(ramComboBox);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_CONFIG + " Portable [J]DK:")));
@@ -147,6 +163,7 @@ public class InstallServerView implements WorkspaceView {
         hotkeys.put('C', () -> MinecraftVersionHelper.promptCustomVersion(mainWindow.getGui(), gameVersionComboBox, gameVersionComboBox.getSelectedIndex()));
         hotkeys.put('O', loaderVersionBox::takeFocus);
         hotkeys.put('N', serverNameBox::takeFocus);
+        hotkeys.put('D', installDirBox::takeFocus);
         hotkeys.put('R', this::cycleRam);
         hotkeys.put('J', () -> {
             boolean val = !portableJdkCheck.isChecked();
@@ -188,6 +205,8 @@ public class InstallServerView implements WorkspaceView {
         engineComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         gameVersionComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         loaderVersionBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        serverNameBox.setPreferredSize(new TerminalSize(inputWidth, 1));
+        installDirBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         ramComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         progressBar.setPreferredSize(new TerminalSize(Math.max(20, wsWidth - 6), 1));
     }
@@ -245,6 +264,10 @@ public class InstallServerView implements WorkspaceView {
         String sName = serverNameBox.getText().trim();
         if (!sName.isEmpty()) {
             org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setServerName(sName);
+        }
+        String sDir = installDirBox.getText().trim();
+        if (!sDir.isEmpty()) {
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setServerDir(sDir);
         }
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setGameVersion(gameVer);
         org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setLoader(engine.toLowerCase());

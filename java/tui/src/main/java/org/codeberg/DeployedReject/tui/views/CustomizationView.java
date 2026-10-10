@@ -46,12 +46,12 @@ public class CustomizationView implements WorkspaceView {
         header = new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Theme & Interface Customization"));
         header.setForegroundColor(Themes.getAccentColor());
         root.addComponent(header);
-        root.addComponent(new Label("Select from LazyVim themes and terminal transparency levels:"));
+        root.addComponent(new Label("Select from LazyVim themes, assets storage location, and transparency levels:"));
         root.addComponent(new EmptySpace(new TerminalSize(1, 1)));
-        root.addComponent(new Label("Assets directory:"));
+
         assetDirBox = new TextBox(new TerminalSize(30, 1));
         assetDirBox.setText(ConfigManager.getInstance().getConfig().getServerDir());
-        root.addComponent(assetDirBox);
+
         themeCombo = new ComboBox<>();
         List<String> themeNames = Themes.getAvailableThemeNames();
         for (String t : themeNames) {
@@ -84,8 +84,20 @@ public class CustomizationView implements WorkspaceView {
 
         nerdFontCombo.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
             if (changedByUserInteraction) {
-                mainWindow.getGui().getGUIThread().invokeLater(trueColorCheck::takeFocus);
+                mainWindow.getGui().getGUIThread().invokeLater(assetDirBox::takeFocus);
             }
+        });
+
+        assetDirBox.setInputFilter((interactable, keyStroke) -> {
+            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
+                trueColorCheck.takeFocus();
+                return false;
+            }
+            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                nerdFontCombo.takeFocus();
+                return false;
+            }
+            return true;
         });
 
         trueColorCheck.setInputFilter((interactable, keyStroke) -> {
@@ -131,7 +143,9 @@ public class CustomizationView implements WorkspaceView {
         formPanel.addComponent(transparencyCombo);
         formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_THEME + " [G]lyphs: ")));
         formPanel.addComponent(nerdFontCombo);
-        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance Settings (Enter advances)"))));
+        formPanel.addComponent(new Label(GlyphHelper.apply(GlyphHelper.ICON_FILE + " Assets [D]ir: ")));
+        formPanel.addComponent(assetDirBox);
+        root.addComponent(formPanel.withBorder(Borders.singleLine(GlyphHelper.apply(GlyphHelper.ICON_THEME + " Appearance & Assets Settings (Enter advances)"))));
 
         Panel togglePanel = new Panel(new LinearLayout(Direction.VERTICAL));
         togglePanel.addComponent(trueColorCheck);
@@ -159,6 +173,7 @@ public class CustomizationView implements WorkspaceView {
         hotkeys.put('T', themeCombo::takeFocus);
         hotkeys.put('P', transparencyCombo::takeFocus);
         hotkeys.put('G', nerdFontCombo::takeFocus);
+        hotkeys.put('D', assetDirBox::takeFocus);
         hotkeys.put('C', () -> trueColorCheck.setChecked(!trueColorCheck.isChecked()));
         hotkeys.put('M', () -> minSizeCheck.setChecked(!minSizeCheck.isChecked()));
         hotkeys.put('K', () -> animationCheck.setChecked(!animationCheck.isChecked()));
@@ -280,10 +295,12 @@ public class CustomizationView implements WorkspaceView {
         themeCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
         transparencyCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
         nerdFontCombo.setPreferredSize(new TerminalSize(comboWidth, 1));
+        assetDirBox.setPreferredSize(new TerminalSize(comboWidth, 1));
     }
 
     @Override
     public void onActivated() {
         loadCurrentConfig();
+        assetDirBox.setText(ConfigManager.getInstance().getConfig().getServerDir());
     }
 }

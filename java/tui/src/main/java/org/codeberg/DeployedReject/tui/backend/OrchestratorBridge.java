@@ -420,11 +420,34 @@ public class OrchestratorBridge {
   private String curseAPI;
   private String email = "user@murces.local";
 
+  public static File getModsDir() {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    String sDir = cfg.getServerDir();
+    File dir = (sDir != null && !sDir.trim().isEmpty() && !sDir.trim().equals(".")) 
+        ? new File(sDir.trim(), "mods") 
+        : new File("mods");
+    if (!dir.exists()) {
+      dir.mkdirs();
+    }
+    return dir;
+  }
+
+  public static File getPluginsDir() {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    String sDir = cfg.getServerDir();
+    File dir = (sDir != null && !sDir.trim().isEmpty() && !sDir.trim().equals(".")) 
+        ? new File(sDir.trim(), "plugins") 
+        : new File("plugins");
+    if (!dir.exists()) {
+      dir.mkdirs();
+    }
+    return dir;
+  }
+
   private OrchestratorBridge() {
     try {
-      if (!Files.isDirectory(Paths.get("mods"))) {
-        Files.createDirectories(Paths.get("mods"));
-      }
+      getModsDir();
+      getPluginsDir();
     } catch (Exception ignored) {
     }
 
@@ -931,8 +954,9 @@ public class OrchestratorBridge {
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     String jobId = "mod-direct-" + filename;
-    File targetTmp = new File("mods", filename + ".tmp");
-    File targetFinal = new File("mods", filename);
+    File modsDir = getModsDir();
+    File targetTmp = new File(modsDir, filename + ".tmp");
+    File targetFinal = new File(modsDir, filename);
 
     final Thread[] workerThread = new Thread[1];
     final JobTracker.TrackedJob trackedJob = JobTracker.getInstance().registerJob(
@@ -970,10 +994,6 @@ public class OrchestratorBridge {
         }
         long filesize = resp.headers().firstValueAsLong("content-length").orElse(-1L);
         long startTime = System.currentTimeMillis();
-
-        File modsDir = new File("mods");
-        if (!modsDir.exists())
-          modsDir.mkdirs();
 
         try (InputStream in = resp.body(); FileOutputStream out = new FileOutputStream(targetTmp)) {
           byte[] buf = new byte[8192];
@@ -1423,10 +1443,7 @@ public class OrchestratorBridge {
           }
         }
 
-        File modsDir = new File("mods");
-        if (!modsDir.exists()) {
-          modsDir.mkdirs();
-        }
+        File modsDir = getModsDir();
 
         int totalDeps = allDeps.size();
         List<ModpackDependencyInfo> toInstall = new ArrayList<>();
@@ -1974,7 +1991,7 @@ public class OrchestratorBridge {
 
   public static List<String> listInstalledMods() {
     List<String> list = new ArrayList<>();
-    File modsDir = new File("mods");
+    File modsDir = getModsDir();
     if (!modsDir.exists() || !modsDir.isDirectory()) {
       return list;
     }
@@ -1989,7 +2006,7 @@ public class OrchestratorBridge {
   }
 
   public static boolean deleteMod(String filename) {
-    File file = new File("mods", filename);
+    File file = new File(getModsDir(), filename);
     if (file.exists()) {
       return file.delete();
     }
@@ -2204,10 +2221,7 @@ public class OrchestratorBridge {
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     String jobId = "plugin-direct-" + filename;
-    File pluginsDir = new File("plugins");
-    if (!pluginsDir.exists()) {
-      pluginsDir.mkdirs();
-    }
+    File pluginsDir = getPluginsDir();
     File targetTmp = new File(pluginsDir, filename + ".tmp");
     File targetFinal = new File(pluginsDir, filename);
 
@@ -2345,7 +2359,7 @@ public class OrchestratorBridge {
 
   public static List<PluginFileInfo> listInstalledPlugins() {
     List<PluginFileInfo> list = new ArrayList<>();
-    File pluginsDir = new File("plugins");
+    File pluginsDir = getPluginsDir();
     if (!pluginsDir.exists() || !pluginsDir.isDirectory()) {
       return list;
     }
@@ -2363,7 +2377,7 @@ public class OrchestratorBridge {
   }
 
   public static boolean deletePlugin(String filename) {
-    File file = new File("plugins", filename);
+    File file = new File(getPluginsDir(), filename);
     if (file.exists()) {
       return file.delete();
     }
