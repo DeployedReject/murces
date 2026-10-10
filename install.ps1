@@ -46,7 +46,7 @@ function Ask-Consent([string]$prompt, [bool]$defaultYes = $true) {
     if ($Unattended) { return $true }
     $suffix = if ($defaultYes) { "[Y/n]" } else { "[y/N]" }
     Write-Color "  ? " "Yellow" -NoNewline
-    Write-Color "$prompt $suffix: " "White" -NoNewline
+    Write-Color "$prompt ${suffix}: " "White" -NoNewline
     $response = Read-Host
     if ([string]::IsNullOrWhiteSpace($response)) {
         return $defaultYes

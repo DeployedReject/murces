@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -76,9 +77,15 @@ jobs:
           - os: ubuntu-latest
             arch: amd64
             asset_name: murces-linux-amd64
+            target_binary: murces
           - os: ubuntu-24.04-arm
             arch: arm64
             asset_name: murces-linux-arm64
+            target_binary: murces
+          - os: windows-latest
+            arch: amd64
+            asset_name: murces-windows-amd64.exe
+            target_binary: murces.exe
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -86,6 +93,10 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 1
+
+      - name: Set up MSVC Developer Tools (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       # Pinned to your specified graalvm/setup-graalvm commit SHA
       - name: Set up GraalVM JDK 21
@@ -112,15 +123,29 @@ jobs:
           cd java/tui
           mvn clean package -Pnative -DskipTests
 
-      - name: Verify Binary with Headless Self-Test
+      - name: Verify Binary with Headless Self-Test (Unix)
+        if: runner.os != 'Windows'
         run: |
-          chmod +x java/tui/target/murces
-          ./java/tui/target/murces --test-tui
+          chmod +x java/tui/target/${{ matrix.target_binary }}
+          ./java/tui/target/${{ matrix.target_binary }} --test-tui
 
-      - name: Prepare Standalone Executable
+      - name: Verify Binary with Headless Self-Test (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
-          cp java/tui/target/murces ./${{ matrix.asset_name }}
+          ./java/tui/target/${{ matrix.target_binary }} --test-tui
+
+      - name: Prepare Standalone Executable (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
           chmod +x ./${{ matrix.asset_name }}
+
+      - name: Prepare Standalone Executable (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
 
       - name: Upload Native Binary Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -144,22 +169,28 @@ jobs:
           name: release-notes
           path: .
 
-      - name: Download amd64 Binary
+      - name: Download Linux amd64 Binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: murces-linux-amd64
           path: .
 
-      - name: Download arm64 Binary
+      - name: Download Linux arm64 Binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: murces-linux-arm64
           path: .
 
+      - name: Download Windows amd64 Binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: murces-windows-amd64.exe
+          path: .
+
       - name: Prepare Release Assets
         run: |
           chmod +x murces-linux-amd64 murces-linux-arm64
-          ls -la murces-linux-*
+          ls -la murces-*
 
       - name: Create GitHub Release
         env:
@@ -168,5 +199,6 @@ jobs:
           gh release create "${{ needs.prepare.outputs.tag_name }}" \
             murces-linux-amd64 \
             murces-linux-arm64 \
+            murces-windows-amd64.exe \
             --title "MurCes ${{ needs.prepare.outputs.tag_name }}" \
             --notes-file release_notes.md
