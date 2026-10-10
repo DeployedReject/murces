@@ -301,8 +301,28 @@ curl.exe -sSL -o murces.exe https://github.com/DeployedReject/murces/releases/la
 .\murces.exe
 ```
 
+#### Portable Packages (Zero-Installation Archives)
+Each release also provides pre-packaged portable `.tar.gz` and `.zip` archives containing the standalone executable and documentation ready to unpack and run anywhere:
+
+- **Linux x86_64 Portable**: [`murces-linux-amd64-portable.tar.gz`](https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64-portable.tar.gz)
+- **Linux arm64 Portable**: [`murces-linux-arm64-portable.tar.gz`](https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-arm64-portable.tar.gz)
+- **Windows x86_64 Portable**: [`murces-windows-amd64.exe-portable.zip`](https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe-portable.zip)
+
+#### Uninstallation
+
+MurCes provides clean, consent-driven uninstall scripts that remove binaries, configuration data, and PATH entries:
+
+- **Linux / macOS**:
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall.sh | bash
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall.ps1 | iex
+  ```
+
 > [!NOTE]
-> The precompiled native release is completely self-contained in a single executable file. No zip archive extraction or complex runtime configuration is required.
+> Standalone native executables can also simply be deleted directly from your bin directory at any time without leaving registry or daemon residue.
 
 ---
 

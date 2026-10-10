@@ -135,23 +135,35 @@ jobs:
         run: |
           ./java/tui/target/${{ matrix.target_binary }} --test-tui
 
-      - name: Prepare Standalone Executable (Unix)
+      - name: Prepare Standalone Executable and Portable Package (Unix)
         if: runner.os != 'Windows'
         run: |
           cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
           chmod +x ./${{ matrix.asset_name }}
+          # Create portable tar.gz bundle containing executable, install script, and README
+          mkdir -p portable-dist
+          cp ./${{ matrix.asset_name }} portable-dist/${{ matrix.target_binary }}
+          cp README.md LICENSE portable-dist/
+          tar -czf ./${{ matrix.asset_name }}-portable.tar.gz -C portable-dist .
+          rm -rf portable-dist
 
-      - name: Prepare Standalone Executable (Windows)
+      - name: Prepare Standalone Executable and Portable Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
+          # Create portable zip bundle
+          mkdir -p portable-dist
+          cp ./${{ matrix.asset_name }} portable-dist/${{ matrix.target_binary }}
+          cp README.md LICENSE portable-dist/
+          powershell -Command "Compress-Archive -Path 'portable-dist\*' -DestinationPath './${{ matrix.asset_name }}-portable.zip' -Force"
+          rm -rf portable-dist
 
       - name: Upload Native Binary Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.asset_name }}
-          path: ./${{ matrix.asset_name }}
+          path: ./${{ matrix.asset_name }}*
           if-no-files-found: error
 
   release:
@@ -197,8 +209,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ needs.prepare.outputs.tag_name }}" \
-            murces-linux-amd64 \
-            murces-linux-arm64 \
-            murces-windows-amd64.exe \
+            murces-* \
             --title "MurCes ${{ needs.prepare.outputs.tag_name }}" \
             --notes-file release_notes.md
