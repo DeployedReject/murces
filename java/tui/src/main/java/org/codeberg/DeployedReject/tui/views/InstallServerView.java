@@ -49,63 +49,7 @@ public class InstallServerView implements WorkspaceView {
         cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Installation"), this::cancelInstallation);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
 
-        engineComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-            if (changedByUserInteraction) {
-                mainWindow.getGui().getGUIThread().invokeLater(gameVersionComboBox::takeFocus);
-            }
-        });
-
-        gameVersionComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-            if (selectedIndex >= 0 && selectedIndex < gameVersionComboBox.getItemCount()) {
-                String selected = gameVersionComboBox.getItem(selectedIndex);
-                if (!"Custom...".equals(selected) && changedByUserInteraction) {
-                    mainWindow.getGui().getGUIThread().invokeLater(loaderVersionBox::takeFocus);
-                }
-            }
-        });
-
-        loaderVersionBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                serverNameBox.takeFocus();
-                return false;
-            }
-            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
-                gameVersionComboBox.takeFocus();
-                return false;
-            }
-            return true;
-        });
-
-        serverNameBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                installDirBox.takeFocus();
-                return false;
-            }
-            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
-                loaderVersionBox.takeFocus();
-                return false;
-            }
-            return true;
-        });
-
-        installDirBox.setInputFilter((interactable, keyStroke) -> {
-            if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.ArrowDown) {
-                ramComboBox.takeFocus();
-                return false;
-            }
-            if (keyStroke.getKeyType() == KeyType.ArrowUp) {
-                serverNameBox.takeFocus();
-                return false;
-            }
-            return true;
-        });
-
-        ramComboBox.addListener((selectedIndex, previousSelection, changedByUserInteraction) -> {
-            if (changedByUserInteraction) {
-                mainWindow.getGui().getGUIThread().invokeLater(portableJdkCheck::takeFocus);
-            }
-        });
-
+        // Allow user to change selection naturally without stealing focus
         portableJdkCheck.setInputFilter((interactable, keyStroke) -> {
             if (keyStroke.getKeyType() == KeyType.Enter) {
                 boolean val = !portableJdkCheck.isChecked();

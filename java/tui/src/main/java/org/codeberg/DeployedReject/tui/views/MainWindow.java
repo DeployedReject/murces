@@ -153,12 +153,10 @@ public class MainWindow extends BasicWindow {
 
         setupInputHandling();
 
+        showView(mainMenuView);
         if (ConfigManager.getInstance().isFirstBoot() || !OrchestratorBridge.isServerInstalled()) {
-            ActivityLogger.info("Welcome to MurCes! Please configure install directory and server engine.");
-            showView(installServerView);
+            ActivityLogger.info("Welcome to MurCes! No server installed yet. Press [I] to install server engine.");
             ConfigManager.getInstance().clearFirstBoot();
-        } else {
-            showView(mainMenuView);
         }
     }
 
@@ -385,15 +383,7 @@ public class MainWindow extends BasicWindow {
 
                 if (type == KeyType.ArrowDown || type == KeyType.ArrowUp ||
                     type == KeyType.ArrowLeft || type == KeyType.ArrowRight) {
-                    boolean isScrollableOrText = (focused instanceof ActionListBox) ||
-                                                 (focused instanceof Table) ||
-                                                 (focused instanceof TextBox) ||
-                                                 (focused instanceof ColoredLogView) ||
-                                                 (focused instanceof ComboBox);
-                    if (!isScrollableOrText) {
-                        deliver.set(false);
-                        return;
-                    }
+                    // Let Lanterna handle arrow keys for component navigation, lists, tables, and text boxes
                 }
 
                 if (!isEditableText) {

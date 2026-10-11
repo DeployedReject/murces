@@ -37,7 +37,7 @@ public class ResponsiveStreamTerminal extends StreamAnsiTerminal implements Resp
         if (queried != null) {
             return queried;
         }
-        return super.findTerminalSize();
+        return new TerminalSize(80, 25);
     }
 
     @Override
