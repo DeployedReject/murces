@@ -82,10 +82,24 @@ detect_os() {
 
 OS=$(detect_os)
 
+if [ "$OS" = "windows" ]; then
+    echo -e "${RED}${BOLD}[ERROR] Native Windows is not supported.${RESET}"
+    echo -e "${YELLOW}MurCes requires a native Linux / POSIX terminal environment (tmux / PTY).${RESET}"
+    echo ""
+    echo -e "${CYAN}To run MurCes on Windows, please use Windows Subsystem for Linux (WSL):${RESET}"
+    echo -e "  1. Open PowerShell and run: ${BOLD}wsl --install${RESET}"
+    echo -e "  2. Launch your WSL terminal (e.g. Ubuntu)"
+    echo -e "  3. Re-run this installer:"
+    echo -e "     ${BOLD}curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash${RESET}"
+    echo -e "  4. Launch MurCes with: ${BOLD}murces${RESET}"
+    echo ""
+    exit 1
+fi
+
 # Prompt for sudo privileges upfront before doing anything (Unix only)
 SUDO=""
 SUDO_KEEP_ALIVE_PID=""
-if [ "$OS" != "windows" ] && [ "$(id -u)" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
         echo -e "${YELLOW}${BOLD}Authentication Required${RESET}"
@@ -518,14 +532,10 @@ echo ""
 echo -e "${BOLD}[4/4] MurCes Standalone Executable${RESET}"
 
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
-if [ "$OS" = "windows" ]; then
-    DEFAULT_INSTALL_DIR="$HOME/bin"
-fi
-
 INSTALL_DIR="${MURCES_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
-BINARY_NAME="$([ "$OS" = "windows" ] && echo "murces.exe" || echo "murces")"
+BINARY_NAME="murces"
 MURCES_BIN="${INSTALL_DIR}/${BINARY_NAME}"
 
 download_murces() {
@@ -535,12 +545,7 @@ download_murces() {
         return 1
     fi
 
-    local target_url
-    if [ "$OS" = "windows" ]; then
-        target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-${ARCH}.exe"
-    else
-        target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
-    fi
+    local target_url="https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-${ARCH}"
     local desc="MurCes native binary (${ARCH_LABEL})"
 
     if download_with_progress "$target_url" "$MURCES_BIN" "$desc"; then
@@ -554,13 +559,13 @@ download_murces() {
 
 echo -e "  Install location: ${CYAN}${INSTALL_DIR}${RESET}"
 
-if [ -f "$MURCES_BIN" ] && ([ -x "$MURCES_BIN" ] || [ "$OS" = "windows" ]); then
+if [ -f "$MURCES_BIN" ] && [ -x "$MURCES_BIN" ]; then
     echo -e "${GREEN}  ✔${RESET} $BINARY_NAME is already present in ${INSTALL_DIR}."
     if ask_consent "Re-download and overwrite with the latest release from GitHub?" "n"; then
         download_murces
     fi
-elif [ -f "java/tui/target/murces" ] || [ -f "java/tui/target/murces.exe" ]; then
-    LOCAL_SRC="$([ -f "java/tui/target/murces.exe" ] && echo "java/tui/target/murces.exe" || echo "java/tui/target/murces")"
+elif [ -f "java/tui/target/murces" ]; then
+    LOCAL_SRC="java/tui/target/murces"
     if ask_consent "Deploy locally built native binary '$LOCAL_SRC' to $MURCES_BIN?" "y"; then
         cp "$LOCAL_SRC" "$MURCES_BIN"
         chmod +x "$MURCES_BIN" 2>/dev/null || true
@@ -577,19 +582,14 @@ PATH_UPDATED=0
 case ":$PATH:" in
     *":$INSTALL_DIR:"*) ;;
     *)
-        if [ "$OS" = "windows" ]; then
-            export PATH="$INSTALL_DIR:$PATH"
-            PATH_UPDATED=1
-        else
-            export PATH="$INSTALL_DIR:$PATH"
-            # Attempt to add to shell RC files if not present
-            for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-                if [ -f "$rc_file" ] && ! grep -q "$INSTALL_DIR" "$rc_file" 2>/dev/null; then
-                    echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$rc_file"
-                    PATH_UPDATED=1
-                fi
-            done
-        fi
+        export PATH="$INSTALL_DIR:$PATH"
+        # Attempt to add to shell RC files if not present
+        for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+            if [ -f "$rc_file" ] && ! grep -q "$INSTALL_DIR" "$rc_file" 2>/dev/null; then
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$rc_file"
+                PATH_UPDATED=1
+            fi
+        done
         ;;
 esac
 
@@ -605,14 +605,12 @@ check_tool() {
     local desc="$2"
     local req="$3"
 
-    if command -v "$cmd" >/dev/null 2>&1 || command -v "${cmd}.exe" >/dev/null 2>&1; then
+    if command -v "$cmd" >/dev/null 2>&1; then
         printf "  %-12s %-38s ${GREEN}✔ Ready${RESET}\n" "$cmd" "($desc)"
-    elif [ -x "$MURCES_BIN" ] && ([ "$cmd" = "murces" ] || [ "$cmd" = "murces.exe" ]); then
+    elif [ -x "$MURCES_BIN" ] && [ "$cmd" = "murces" ]; then
         printf "  %-12s %-38s ${GREEN}✔ Ready (${INSTALL_DIR})${RESET}\n" "$cmd" "($desc)"
-    elif ([ "$cmd" = "playit" ] || [ "$cmd" = "playit.exe" ]) && ([ -x "./playit" ] || [ -f "./playit.exe" ]); then
+    elif [ "$cmd" = "playit" ] && [ -x "./playit" ]; then
         printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./${cmd}" "($desc)"
-    elif [ "$cmd" = "psmux" ] && [ -f "./psmux.exe" ]; then
-        printf "  %-12s %-38s ${GREEN}✔ Ready (local)${RESET}\n" "./psmux.exe" "($desc)"
     else
         if [ "$req" = "req" ]; then
             printf "  %-12s %-38s ${RED}✖ Missing (Required)${RESET}\n" "$cmd" "($desc)"
@@ -622,8 +620,8 @@ check_tool() {
     fi
 }
 
-check_tool "$([ "$OS" = "windows" ] && echo "murces.exe" || echo "murces")" "MurCes Native Manager" "req"
-check_tool "$MUX_NAME" "$([ "$OS" = "windows" ] && echo "Windows Process Multiplexer" || echo "Detached Process Supervision")" "req"
+check_tool "murces" "MurCes Native Manager" "req"
+check_tool "tmux" "Detached Process Supervision" "req"
 check_tool "curl" "HTTP Package Downloader" "req"
 check_tool "tar" "World Archive Bundler" "req"
 check_tool "rclone" "Cloud Sync & Google Drive" "opt"

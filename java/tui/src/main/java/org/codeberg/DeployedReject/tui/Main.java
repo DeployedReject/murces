@@ -23,6 +23,20 @@ import java.nio.charset.StandardCharsets;
 public class Main {
 
     public static void main(String[] args) {
+        if (Platform.isWindows()) {
+            System.err.println("================================================================================");
+            System.err.println(" [ERROR] Native Windows console is not supported.");
+            System.err.println(" MurCes requires a native Linux / POSIX terminal environment (tmux / PTY).");
+            System.err.println("");
+            System.err.println(" To run MurCes on Windows, please use Windows Subsystem for Linux (WSL):");
+            System.err.println("   1. Open PowerShell and run: wsl --install");
+            System.err.println("   2. Launch your WSL terminal (e.g. Ubuntu)");
+            System.err.println("   3. Run the installer: curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash");
+            System.err.println("   4. Run: murces");
+            System.err.println("================================================================================");
+            System.exit(1);
+        }
+
         if (args.length > 0) {
             handleCli(args);
             return;
@@ -431,21 +445,11 @@ public class Main {
     }
 
     private static void launchTui() {
-        if (Platform.isWindows()) {
-            try {
-                new ProcessBuilder("cmd.exe", "/c", "chcp 65001 >nul").inheritIO().start().waitFor();
-            } catch (Exception ignored) {}
-        }
-
         ResponsiveTerminal terminal;
-        if (Platform.isWindows()) {
+        try {
+            terminal = new ResponsiveUnixTerminal();
+        } catch (Exception ttyEx) {
             terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);
-        } else {
-            try {
-                terminal = new ResponsiveUnixTerminal();
-            } catch (Exception ttyEx) {
-                terminal = new ResponsiveStreamTerminal(System.in, System.out, StandardCharsets.UTF_8);
-            }
         }
 
         final ResponsiveTerminal termRef = terminal;
@@ -481,7 +485,7 @@ public class Main {
                 }
             });
 
-            if (!Platform.isWindows() && terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
+            if (terminal instanceof com.googlecode.lanterna.terminal.ExtendedTerminal) {
                 try {
                     ((com.googlecode.lanterna.terminal.ExtendedTerminal) terminal).setMouseCaptureMode(com.googlecode.lanterna.terminal.MouseCaptureMode.CLICK_RELEASE);
                 } catch (Exception ignored) {}
@@ -496,11 +500,7 @@ public class Main {
             String mux = Platform.getMultiplexer();
             if (!OrchestratorBridge.isCommandAvailable(mux)) {
                 ActivityLogger.warn("[WARN] '" + mux + "' is not found in PATH! Background server execution requires " + mux + ".");
-                if (Platform.isWindows()) {
-                    ActivityLogger.warn("[WARN] Install psmux via: winget install psmux (or scoop install psmux)");
-                } else {
-                    ActivityLogger.warn("[WARN] Install tmux via: sudo apt install tmux (or pacman -S tmux / brew install tmux)");
-                }
+                ActivityLogger.warn("[WARN] Install tmux via: sudo apt install tmux (or pacman -S tmux / brew install tmux)");
             }
             if (!OrchestratorBridge.isCommandAvailable("java")) {
                 ActivityLogger.warn("[WARN] 'java' is not found in PATH! Minecraft server execution requires Java 17/21+.");
@@ -512,12 +512,6 @@ public class Main {
             cleanupTerminal(screen, termRef);
             System.err.println("\n[Murces Fatal Error] Exception encountered during TUI execution:");
             t.printStackTrace(System.err);
-            if (Platform.isWindows()) {
-                System.err.println("\nPress Enter to exit...");
-                try {
-                    System.in.read();
-                } catch (Exception ignored) {}
-            }
         } finally {
             if (gui != null && gui.getGUIThread() instanceof com.googlecode.lanterna.gui2.AsynchronousTextGUIThread) {
                 try {
@@ -541,11 +535,9 @@ public class Main {
                 terminal.close();
             } catch (Exception ignored) {}
         }
-        if (!Platform.isWindows()) {
-            try {
-                new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
-            } catch (Exception ignored) {}
-        }
+        try {
+            new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
+        } catch (Exception ignored) {}
         System.out.print("\033[?1000l\033[?1002l\033[?1006l\033[?25h\033[?1049l\033[0m");
         System.out.flush();
     }

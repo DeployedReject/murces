@@ -107,11 +107,8 @@ public class ServerHandler {
   public static ProcessResult startServer(boolean publicTunnel, String ram, String javaBinOverride, String jdkHomeOverride, String sessionName, String workingDir) {
     String mux = Platform.getMultiplexer();
     if (!Platform.isCommandAvailable(mux)) {
-      String installHint = Platform.isWindows()
-          ? "winget install psmux (or 'scoop install psmux')"
-          : "sudo apt install tmux (or 'pacman -S tmux')";
       return new ProcessResult(1,
-          "[ERROR] '" + mux + "' is not installed or not in PATH.\nMurces requires " + mux + " to manage background Minecraft sessions.\nPlease install it (e.g. '" + installHint + "').");
+          "[ERROR] 'tmux' is not installed or not in PATH.\nMurces requires tmux to manage background Minecraft sessions.\nPlease install it (e.g. 'sudo apt install tmux' or 'pacman -S tmux').");
     }
 
     String sess = (sessionName != null && !sessionName.trim().isEmpty()) ? sessionName.trim() : "mcsv";
@@ -714,10 +711,7 @@ public class ServerHandler {
   private void spawnServer() {
     String mux = Platform.getMultiplexer();
     if (!checkCommand(mux)) {
-      String installHint = Platform.isWindows()
-          ? "winget install psmux (or 'scoop install psmux')"
-          : "sudo apt install tmux (e.g. 'pacman -S tmux')";
-      ErrorHelper.errorJson(mux + " is not installed or not in PATH. Please install " + mux + " (e.g. " + installHint + ").");
+      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
     String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);
@@ -871,10 +865,7 @@ public class ServerHandler {
   private void spawnServer(boolean x) {
     String mux = Platform.getMultiplexer();
     if (!checkCommand(mux)) {
-      String installHint = Platform.isWindows()
-          ? "winget install psmux (or 'scoop install psmux')"
-          : "sudo apt install tmux (e.g. 'pacman -S tmux')";
-      ErrorHelper.errorJson(mux + " is not installed or not in PATH. Please install " + mux + " (e.g. " + installHint + ").");
+      ErrorHelper.errorJson("tmux is not installed or not in PATH. Please install tmux (e.g. sudo apt install tmux).");
       return;
     }
     String javaExec = JdkManager.getJavaCommand(gVersion, portableJdk);

@@ -2,14 +2,14 @@
 
 # MurCes
 
-**A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux & Windows.**
+**A high-performance, zero-overhead TUI & CLI manager for dedicated Minecraft servers on Linux & WSL2.**
 
 [![Release](https://img.shields.io/github/v/release/DeployedReject/murces?style=for-the-badge&logo=github&color=5865F2)](https://github.com/DeployedReject/murces/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-7952B3?style=for-the-badge)](LICENSE)
 [![Binary](https://img.shields.io/badge/GraalVM-Native%20AOT%20Executable-E86F00?style=for-the-badge&logo=oracle)](https://www.graalvm.org/)
 [![Java](https://img.shields.io/badge/Java-21+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20WSL2-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/DeployedReject/murces)
-[![tmux / psmux](https://img.shields.io/badge/Multiplexer-tmux%20%2F%20psmux-1BB954?style=for-the-badge)](https://github.com/psmux/psmux)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/DeployedReject/murces)
+[![tmux](https://img.shields.io/badge/Multiplexer-tmux-1BB954?style=for-the-badge)](https://github.com/tmux/tmux)
 
 <p align="center">
   <a href="#why-murces">Why MurCes</a> •
@@ -260,10 +260,10 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 ---
 
 ## Quickstart
-
+ 
 ### 1. Interactive Automated Installers
-
-#### Linux / macOS / WSL (Bash)
+ 
+#### Linux / WSL2 (Ubuntu / Debian / Arch / Fedora / Alpine)
 Run the interactive installer to set up system dependencies (`tmux`, `curl`, `tar`, optional `rclone`, `playit`) with per-package consent prompts and fetch the latest `murces` standalone executable:
 
 ```bash
@@ -274,61 +274,51 @@ curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.s
 murces
 ```
 
-#### Windows (PowerShell)
-Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe` to `%LOCALAPPDATA%\MurCes`.
+#### Windows Users (Windows Subsystem for Linux - WSL2)
+Native Windows console does not support the low-level POSIX pseudo-terminal / tmux environment required by MurCes. Windows users can run MurCes seamlessly inside WSL2:
 
-> [!NOTE]
-> If script execution is disabled on your system (the default Windows security policy), first run:
-> ```powershell
-> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
-```powershell
-# Run the automated PowerShell installer
-irm https://raw.githubusercontent.com/DeployedReject/murces/main/install.ps1 | iex
-
-# Launch the interactive dashboard from any folder
-murces
-```
+1. **Install WSL2** (if you haven't already, run in PowerShell as Administrator):
+   ```powershell
+   wsl --install
+   ```
+2. **Open your WSL2 terminal** (e.g. Ubuntu).
+3. **Run the MurCes installer**:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/install.sh | bash
+   ```
+4. **Launch the TUI**:
+   ```bash
+   murces
+   ```
 
 Alternatively, to download the precompiled binary directly without the installer:
 
 ```bash
-# For Linux x86_64 / amd64:
+# For Linux x86_64 / amd64 (and WSL2):
 curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64
 chmod +x murces && ./murces
 
 # For Linux arm64 / aarch64 (Raspberry Pi, ARM VPS, Apple Silicon VM):
 curl -sSL -o murces https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-arm64
 chmod +x murces && ./murces
-
-# For Windows x86_64 (PowerShell / cmd):
-curl.exe -sSL -o murces.exe https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe
-.\murces.exe
 ```
 
 #### Portable Packages (Zero-Installation Archives)
-Each release also provides pre-packaged portable `.tar.gz` and `.zip` archives containing the standalone executable and documentation ready to unpack and run anywhere:
+Each release also provides pre-packaged portable `.tar.gz` archives containing the standalone executable and documentation ready to unpack and run anywhere:
 
-- **Linux x86_64 Portable**: [`murces-linux-amd64-portable.tar.gz`](https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64-portable.tar.gz)
+- **Linux x86_64 / WSL2 Portable**: [`murces-linux-amd64-portable.tar.gz`](https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-amd64-portable.tar.gz)
 - **Linux arm64 Portable**: [`murces-linux-arm64-portable.tar.gz`](https://github.com/DeployedReject/murces/releases/latest/download/murces-linux-arm64-portable.tar.gz)
-- **Windows x86_64 Portable**: [`murces-windows-amd64.exe-portable.zip`](https://github.com/DeployedReject/murces/releases/latest/download/murces-windows-amd64.exe-portable.zip)
 
 #### Uninstallation
 
-MurCes provides clean, consent-driven uninstall scripts that remove binaries, configuration data, and PATH entries:
+MurCes provides a clean, consent-driven uninstall script that removes binaries, configuration data, and PATH entries:
 
-- **Linux / macOS**:
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall.sh | bash
-  ```
-- **Windows (PowerShell)**:
-  ```powershell
-  irm https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall.ps1 | iex
-  ```
+```bash
+curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall.sh | bash
+```
 
 > [!NOTE]
-> Standalone native executables can also simply be deleted directly from your bin directory at any time without leaving registry or daemon residue.
+> Standalone native executables can also simply be deleted directly from your `~/.local/bin` directory at any time without leaving registry or daemon residue.
 
 ---
 
@@ -337,8 +327,7 @@ MurCes provides clean, consent-driven uninstall scripts that remove binaries, co
 MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 
 ```bash
-./murces [command] [options]        # Linux / macOS
-.\murces.exe [command] [options]    # Windows
+./murces [command] [options]        # Linux / WSL2
 ```
 
 | Command                                     | Description                                                             | Flags / Arguments                             |

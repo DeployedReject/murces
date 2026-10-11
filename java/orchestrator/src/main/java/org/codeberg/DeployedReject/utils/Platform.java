@@ -22,7 +22,7 @@ public class Platform {
   }
 
   public static String getMultiplexer() {
-    return IS_WINDOWS ? "psmux" : "tmux";
+    return "tmux";
   }
 
   public static boolean isCommandAvailable(String cmd) {

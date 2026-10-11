@@ -25,37 +25,30 @@ public class TerminalResizeHelper {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public static TerminalSize queryPhysicalTerminalSize() {
-        if (!org.codeberg.DeployedReject.utils.Platform.isWindows()) {
-            try {
-                File tty = new File("/dev/tty");
-                ProcessBuilder pb = new ProcessBuilder("stty", "size");
-                if (tty.exists() && tty.canRead()) {
-                    pb.redirectInput(tty);
-                }
-                pb.redirectErrorStream(true);
-                Process p = pb.start();
-                String line;
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                    line = r.readLine();
-                }
-                p.waitFor(100, TimeUnit.MILLISECONDS);
-                if (line != null) {
-                    String[] parts = line.trim().split("\\s+");
-                    if (parts.length >= 2) {
-                        int rows = Integer.parseInt(parts[0]);
-                        int cols = Integer.parseInt(parts[1]);
-                        if (cols >= 20 && rows >= 5) {
-                            return new TerminalSize(cols, rows);
-                        }
+        try {
+            File tty = new File("/dev/tty");
+            ProcessBuilder pb = new ProcessBuilder("stty", "size");
+            if (tty.exists() && tty.canRead()) {
+                pb.redirectInput(tty);
+            }
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String line;
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                line = r.readLine();
+            }
+            p.waitFor(100, TimeUnit.MILLISECONDS);
+            if (line != null) {
+                String[] parts = line.trim().split("\\s+");
+                if (parts.length >= 2) {
+                    int rows = Integer.parseInt(parts[0]);
+                    int cols = Integer.parseInt(parts[1]);
+                    if (cols >= 20 && rows >= 5) {
+                        return new TerminalSize(cols, rows);
                     }
                 }
-            } catch (Exception ignored) {}
-        } else {
-            TerminalSize winSize = queryWindowsTerminalSize();
-            if (winSize != null) {
-                return winSize;
             }
-        }
+        } catch (Exception ignored) {}
 
         try {
             String colsStr = System.getenv("COLUMNS");
@@ -70,49 +63,6 @@ public class TerminalResizeHelper {
         } catch (Exception ignored) {}
 
         return null;
-    }
-
-    private static volatile long lastWindowsQueryTime = 0;
-    private static volatile TerminalSize cachedWindowsSize = null;
-
-    private static TerminalSize queryWindowsTerminalSize() {
-        long now = System.currentTimeMillis();
-        if (cachedWindowsSize != null && (now - lastWindowsQueryTime) < 1500) {
-            return cachedWindowsSize;
-        }
-        lastWindowsQueryTime = now;
-        try {
-            ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", "mode con");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String output;
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = r.readLine()) != null) {
-                    sb.append(line).append("\n");
-                }
-                output = sb.toString();
-            }
-            p.waitFor(150, TimeUnit.MILLISECONDS);
-
-            int cols = -1;
-            int rows = -1;
-            java.util.regex.Matcher mCols = java.util.regex.Pattern.compile("Columns:\\s*(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(output);
-            if (mCols.find()) {
-                cols = Integer.parseInt(mCols.group(1));
-            }
-            java.util.regex.Matcher mLines = java.util.regex.Pattern.compile("Lines:\\s*(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(output);
-            if (mLines.find()) {
-                rows = Integer.parseInt(mLines.group(1));
-            }
-
-            if (cols >= 20 && rows >= 5) {
-                cachedWindowsSize = new TerminalSize(cols, rows);
-                return cachedWindowsSize;
-            }
-        } catch (Exception ignored) {}
-        return cachedWindowsSize;
     }
 
     public static synchronized void setup(Screen screen, MultiWindowTextGUI gui, ResponsiveTerminal terminal) {
@@ -130,30 +80,27 @@ public class TerminalResizeHelper {
             } catch (Exception ignored) {}
         }
 
-        if (!org.codeberg.DeployedReject.utils.Platform.isWindows()) {
-            try {
-                Class<?> signalClass = Class.forName("sun.misc.Signal");
-                Class<?> handlerClass = Class.forName("sun.misc.SignalHandler");
-                Object winchSignal = signalClass.getConstructor(String.class).newInstance("WINCH");
-                Object handlerProxy = java.lang.reflect.Proxy.newProxyInstance(
-                    handlerClass.getClassLoader(),
-                    new Class<?>[]{handlerClass},
-                    (proxy, method, mArgs) -> {
-                        if ("handle".equals(method.getName())) {
-                            scheduleResize(screen, gui, terminal, 50);
-                        }
-                        return null;
+        try {
+            Class<?> signalClass = Class.forName("sun.misc.Signal");
+            Class<?> handlerClass = Class.forName("sun.misc.SignalHandler");
+            Object winchSignal = signalClass.getConstructor(String.class).newInstance("WINCH");
+            Object handlerProxy = java.lang.reflect.Proxy.newProxyInstance(
+                handlerClass.getClassLoader(),
+                new Class<?>[]{handlerClass},
+                (proxy, method, mArgs) -> {
+                    if ("handle".equals(method.getName())) {
+                        scheduleResize(screen, gui, terminal, 50);
                     }
-                );
-                signalClass.getMethod("handle", signalClass, handlerClass).invoke(null, winchSignal, handlerProxy);
-            } catch (Throwable ignored) {}
-        }
+                    return null;
+                }
+            );
+            signalClass.getMethod("handle", signalClass, handlerClass).invoke(null, winchSignal, handlerProxy);
+        } catch (Throwable ignored) {}
 
         Thread watcher = new Thread(() -> {
-            long pollInterval = org.codeberg.DeployedReject.utils.Platform.isWindows() ? 1000 : 500;
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    Thread.sleep(pollInterval);
+                    Thread.sleep(500);
                     TerminalSize current = queryPhysicalTerminalSize();
                     if (current != null) {
                         TerminalSize prev = lastKnownSize.get();

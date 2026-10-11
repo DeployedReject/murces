@@ -82,10 +82,6 @@ jobs:
             arch: arm64
             asset_name: murces-linux-arm64
             target_binary: murces
-          - os: windows-latest
-            arch: amd64
-            asset_name: murces-windows-amd64.exe
-            target_binary: murces.exe
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -93,10 +89,6 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 1
-
-      - name: Set up MSVC Developer Tools (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       # Pinned to your specified graalvm/setup-graalvm commit SHA
       - name: Set up GraalVM JDK 21
@@ -124,19 +116,11 @@ jobs:
           mvn clean package -Pnative -DskipTests
 
       - name: Verify Binary with Headless Self-Test (Unix)
-        if: runner.os != 'Windows'
         run: |
           chmod +x java/tui/target/${{ matrix.target_binary }}
           ./java/tui/target/${{ matrix.target_binary }} --test-tui
 
-      - name: Verify Binary with Headless Self-Test (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          ./java/tui/target/${{ matrix.target_binary }} --test-tui
-
       - name: Prepare Standalone Executable and Portable Package (Unix)
-        if: runner.os != 'Windows'
         run: |
           cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
           chmod +x ./${{ matrix.asset_name }}
@@ -145,18 +129,6 @@ jobs:
           cp ./${{ matrix.asset_name }} portable-dist/${{ matrix.target_binary }}
           cp README.md LICENSE portable-dist/
           tar -czf ./${{ matrix.asset_name }}-portable.tar.gz -C portable-dist .
-          rm -rf portable-dist
-
-      - name: Prepare Standalone Executable and Portable Package (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cp java/tui/target/${{ matrix.target_binary }} ./${{ matrix.asset_name }}
-          # Create portable zip bundle
-          mkdir -p portable-dist
-          cp ./${{ matrix.asset_name }} portable-dist/${{ matrix.target_binary }}
-          cp README.md LICENSE portable-dist/
-          powershell -Command "Compress-Archive -Path 'portable-dist\*' -DestinationPath './${{ matrix.asset_name }}-portable.zip' -Force"
           rm -rf portable-dist
 
       - name: Upload Native Binary Artifact
@@ -191,12 +163,6 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: murces-linux-arm64
-          path: .
-
-      - name: Download Windows amd64 Binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: murces-windows-amd64.exe
           path: .
 
       - name: Prepare Release Assets
