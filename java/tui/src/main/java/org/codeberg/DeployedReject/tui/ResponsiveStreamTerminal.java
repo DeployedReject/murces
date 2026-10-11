@@ -11,6 +11,9 @@ public class ResponsiveStreamTerminal extends StreamAnsiTerminal implements Resp
 
     public ResponsiveStreamTerminal(InputStream inputStream, OutputStream outputStream, Charset charset) {
         super(inputStream, outputStream, charset);
+        try {
+            getInputDecoder().setTimeoutUnits(0);
+        } catch (Exception ignored) {}
     }
 
     private char highSurrogate = 0;
@@ -45,16 +48,10 @@ public class ResponsiveStreamTerminal extends StreamAnsiTerminal implements Resp
         try {
             com.googlecode.lanterna.input.KeyStroke ks = super.readInput();
             if (ks != null && ks.getKeyType() == com.googlecode.lanterna.input.KeyType.EOF) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ignored) {}
                 return null;
             }
             return ks;
         } catch (java.io.EOFException e) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ignored) {}
             return null;
         }
     }

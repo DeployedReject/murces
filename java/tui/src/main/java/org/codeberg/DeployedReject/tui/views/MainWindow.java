@@ -312,7 +312,7 @@ public class MainWindow extends BasicWindow {
             @Override
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliver) {
 
-                if (keyStroke.isCtrlDown() && (keyStroke.getCharacter() == 'c' || keyStroke.getCharacter() == 'C')) {
+                if (keyStroke.isCtrlDown() && (keyStroke.getCharacter() == 'c' || keyStroke.getCharacter() == 'C' || keyStroke.getCharacter() == 'q' || keyStroke.getCharacter() == 'Q')) {
                     deliver.set(false);
                     poller.shutdownNow();
                     System.exit(0);
@@ -408,6 +408,12 @@ public class MainWindow extends BasicWindow {
                         } else if (c == 'L') {
                             deliver.set(false);
                             consoleLogView.takeFocus();
+                            return;
+                        }
+
+                        if (c == 'Q' && currentView != mainMenuView) {
+                            deliver.set(false);
+                            exit();
                             return;
                         }
 
