@@ -276,18 +276,34 @@ if (-not ([System.Management.Automation.PSTypeName]'MurcesConsole').Type) {
     Add-Type -TypeDefinition $Kernel32Def -ErrorAction SilentlyContinue
 }
 $hStdin = [MurcesConsole]::GetStdHandle(-10)
-$origMode = [uint32]0
-if ([MurcesConsole]::GetConsoleMode($hStdin, [ref]$origMode)) {
-    # Clear line input (0x2) and echo (0x4), enable virtual terminal input (0x200)
-    $rawMode = ($origMode -band -bnot 0x0006) -bor 0x0200
-    [MurcesConsole]::SetConsoleMode($hStdin, $rawMode) | Out-Null
+$hStdout = [MurcesConsole]::GetStdHandle(-11)
+
+$origInMode = [uint32]0
+$origOutMode = [uint32]0
+
+if ([MurcesConsole]::GetConsoleMode($hStdin, [ref]$origInMode)) {
+    # Match Neovim / libuv Windows console raw mode:
+    # Disable Processed (0x0001), Line (0x0002), Echo (0x0004)
+    # Enable Virtual Terminal Input (0x0200) and Window Input (0x0008)
+    $rawInMode = ($origInMode -band -bnot 0x0007) -bor 0x0208
+    [MurcesConsole]::SetConsoleMode($hStdin, $rawInMode) | Out-Null
 }
+
+if ([MurcesConsole]::GetConsoleMode($hStdout, [ref]$origOutMode)) {
+    # Enable Virtual Terminal Processing (0x0004) and Disable Newline Auto Return (0x0008)
+    $rawOutMode = $origOutMode -bor 0x0004 -bor 0x0008
+    [MurcesConsole]::SetConsoleMode($hStdout, $rawOutMode) | Out-Null
+}
+
 $exe = Join-Path $PSScriptRoot "murces.exe"
 try {
     & $exe $args
 } finally {
-    if ($origMode -ne 0) {
-        [MurcesConsole]::SetConsoleMode($hStdin, $origMode) | Out-Null
+    if ($origInMode -ne 0) {
+        [MurcesConsole]::SetConsoleMode($hStdin, $origInMode) | Out-Null
+    }
+    if ($origOutMode -ne 0) {
+        [MurcesConsole]::SetConsoleMode($hStdout, $origOutMode) | Out-Null
     }
 }
 '@

@@ -439,4 +439,9 @@ public class MainWindow extends BasicWindow {
             }
         });
     }
+
+    @Override
+    public TerminalPosition getCursorPosition() {
+        return null;
+    }
 }

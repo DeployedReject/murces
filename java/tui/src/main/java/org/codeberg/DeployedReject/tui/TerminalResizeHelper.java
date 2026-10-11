@@ -201,8 +201,6 @@ public class TerminalResizeHelper {
 
                     screen.doResizeIfNecessary();
 
-                    screen.clear();
-
                     for (Window w : gui.getWindows()) {
                         if (w instanceof org.codeberg.DeployedReject.tui.views.MainWindow) {
                             ((org.codeberg.DeployedReject.tui.views.MainWindow) w).updateLayoutDimensions(effectiveSize);

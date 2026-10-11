@@ -455,6 +455,10 @@ public class Main {
             screen = new TerminalScreen(terminal);
             screen.startScreen();
 
+            // Emit standard VT sequences: alternate screen buffer (\033[?1049h) and hide cursor (\033[?25l)
+            System.out.print("\033[?1049h\033[?25l");
+            System.out.flush();
+
             final Screen screenRef = screen;
 
             TuiConfig config = ConfigManager.getInstance().getConfig();
@@ -542,7 +546,7 @@ public class Main {
                 new ProcessBuilder("stty", "sane").inheritIO().start().waitFor();
             } catch (Exception ignored) {}
         }
-        System.out.print("\033[?1000l\033[?1002l\033[?1006l\033[?25h\033[0m");
+        System.out.print("\033[?1000l\033[?1002l\033[?1006l\033[?25h\033[?1049l\033[0m");
         System.out.flush();
     }
 }
