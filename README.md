@@ -378,7 +378,8 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[U]`                   | **Update All Mods** (inside Manage Installed Mods view)        |
 | `[Z]`                   | Open **Customization & Themes**                                |
 | `[N]`                   | Edit **Server Name / Session** (in Server Control & Setup)      |
-| `[E]`                   | Exit MurCes                                                    |
+| `[Q]` / `[E]`           | Exit MurCes (from any view)                                    |
+| `[Ctrl+C]` / `[Ctrl+Q]` | Immediate emergency shutdown and terminal restore              |
 
 ---
 
