@@ -77,7 +77,7 @@ public class TerminalResizeHelper {
 
     private static TerminalSize queryWindowsTerminalSize() {
         long now = System.currentTimeMillis();
-        if (cachedWindowsSize != null && (now - lastWindowsQueryTime) < 1000) {
+        if (cachedWindowsSize != null && (now - lastWindowsQueryTime) < 1500) {
             return cachedWindowsSize;
         }
         lastWindowsQueryTime = now;
@@ -150,14 +150,15 @@ public class TerminalResizeHelper {
         }
 
         Thread watcher = new Thread(() -> {
+            long pollInterval = org.codeberg.DeployedReject.utils.Platform.isWindows() ? 1000 : 500;
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    Thread.sleep(250);
+                    Thread.sleep(pollInterval);
                     TerminalSize current = queryPhysicalTerminalSize();
                     if (current != null) {
                         TerminalSize prev = lastKnownSize.get();
                         if (prev == null || !current.equals(prev)) {
-                            scheduleResize(screen, gui, terminal, 30);
+                            scheduleResize(screen, gui, terminal, 50);
                         }
                     }
                 } catch (InterruptedException e) {

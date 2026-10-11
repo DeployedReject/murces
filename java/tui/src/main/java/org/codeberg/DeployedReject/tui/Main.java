@@ -449,22 +449,20 @@ public class Main {
         }
 
         final ResponsiveTerminal termRef = terminal;
-        VirtualScreen virtualScreen = null;
+        Screen screen = null;
         MultiWindowTextGUI gui = null;
         try {
-            Screen baseScreen = new TerminalScreen(terminal);
-            virtualScreen = new VirtualScreen(baseScreen);
-            virtualScreen.setMinimumSize(new TerminalSize(68, 18));
-            virtualScreen.startScreen();
+            screen = new TerminalScreen(terminal);
+            screen.startScreen();
 
-            final VirtualScreen vsRef = virtualScreen;
+            final Screen screenRef = screen;
 
             TuiConfig config = ConfigManager.getInstance().getConfig();
-            gui = new MultiWindowTextGUI(virtualScreen);
+            gui = new MultiWindowTextGUI(screen);
             gui.setBlockingIO(false);
             gui.setTheme(Themes.createTheme(config.getTheme(), config.getTransparencyPercent(), config.isTrueColor()));
 
-            TerminalResizeHelper.setup(virtualScreen, gui, terminal);
+            TerminalResizeHelper.setup(screen, gui, terminal);
 
             gui.getGUIThread().setExceptionHandler(new com.googlecode.lanterna.gui2.TextGUIThread.ExceptionHandler() {
                 @Override
@@ -486,7 +484,7 @@ public class Main {
             }
 
             Thread shutdownHook = new Thread(() -> {
-                cleanupTerminal(vsRef, termRef);
+                cleanupTerminal(screenRef, termRef);
                 OrchestratorBridge.getInstance().stopOrchestrator();
             }, "MurcesShutdown");
             Runtime.getRuntime().addShutdownHook(shutdownHook);
@@ -507,7 +505,7 @@ public class Main {
             gui.addWindowAndWait(new MainWindow(gui));
 
         } catch (Throwable t) {
-            cleanupTerminal(virtualScreen, termRef);
+            cleanupTerminal(screen, termRef);
             System.err.println("\n[Murces Fatal Error] Exception encountered during TUI execution:");
             t.printStackTrace(System.err);
             if (Platform.isWindows()) {
@@ -522,16 +520,16 @@ public class Main {
                     ((com.googlecode.lanterna.gui2.AsynchronousTextGUIThread) gui.getGUIThread()).stop();
                 } catch (Exception ignored) {}
             }
-            cleanupTerminal(virtualScreen, termRef);
+            cleanupTerminal(screen, termRef);
             OrchestratorBridge.getInstance().stopOrchestrator();
             System.exit(0);
         }
     }
 
-    public static void cleanupTerminal(VirtualScreen virtualScreen, Terminal terminal) {
-        if (virtualScreen != null) {
+    public static void cleanupTerminal(Screen screen, Terminal terminal) {
+        if (screen != null) {
             try {
-                virtualScreen.stopScreen();
+                screen.stopScreen();
             } catch (Exception ignored) {}
         }
         if (terminal != null) {

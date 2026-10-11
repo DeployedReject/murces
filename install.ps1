@@ -253,10 +253,45 @@ if (Test-Path $murcesExe) {
     }
 }
 
-# Create companion murces.cmd helper in InstallDir to ensure chcp 65001 before executing murces.exe
+# Create companion murces.cmd and murces.ps1 helpers in InstallDir to ensure console UTF-8 and VT/raw input mode
 $murcesCmd = Join-Path $InstallDir "murces.cmd"
+$murcesPs1 = Join-Path $InstallDir "murces.ps1"
 if (Test-Path $murcesExe) {
     "@echo off`nchcp 65001 >nul`n`"%~dp0murces.exe`" %*" | Out-File -FilePath $murcesCmd -Encoding ascii
+    
+    $ps1Content = @'
+$Kernel32Def = @"
+using System;
+using System.Runtime.InteropServices;
+public class MurcesConsole {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr GetStdHandle(int nStdHandle);
+}
+"@
+if (-not ([System.Management.Automation.PSTypeName]'MurcesConsole').Type) {
+    Add-Type -TypeDefinition $Kernel32Def -ErrorAction SilentlyContinue
+}
+$hStdin = [MurcesConsole]::GetStdHandle(-10)
+$origMode = [uint32]0
+if ([MurcesConsole]::GetConsoleMode($hStdin, [ref]$origMode)) {
+    # Clear line input (0x2) and echo (0x4), enable virtual terminal input (0x200)
+    $rawMode = ($origMode -band -bnot 0x0006) -bor 0x0200
+    [MurcesConsole]::SetConsoleMode($hStdin, $rawMode) | Out-Null
+}
+$exe = Join-Path $PSScriptRoot "murces.exe"
+try {
+    & $exe $args
+} finally {
+    if ($origMode -ne 0) {
+        [MurcesConsole]::SetConsoleMode($hStdin, $origMode) | Out-Null
+    }
+}
+'@
+    $ps1Content | Out-File -FilePath $murcesPs1 -Encoding utf8
 }
 
 # Ensure InstallDir is added to User PATH environment variable

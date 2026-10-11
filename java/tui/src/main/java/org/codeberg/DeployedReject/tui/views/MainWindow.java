@@ -411,7 +411,7 @@ public class MainWindow extends BasicWindow {
                             return;
                         }
 
-                        if (c == 'Q' && currentView != mainMenuView) {
+                        if (c == 'Q') {
                             deliver.set(false);
                             exit();
                             return;
