@@ -275,7 +275,13 @@ murces
 ```
 
 #### Windows (PowerShell)
-Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe` to `%LOCALAPPDATA%\MurCes`:
+Run the native Windows installer in PowerShell to install `psmux` (terminal multiplexer), `playit.exe`, `tar`, `curl`, and `murces.exe` to `%LOCALAPPDATA%\MurCes`.
+
+> [!NOTE]
+> If script execution is disabled on your system (the default Windows security policy), first run:
+> ```powershell
+> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
 
 ```powershell
 # Run the automated PowerShell installer
