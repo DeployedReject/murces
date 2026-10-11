@@ -41,6 +41,38 @@ public class ResponsiveStreamTerminal extends StreamAnsiTerminal implements Resp
     }
 
     @Override
+    public com.googlecode.lanterna.input.KeyStroke readInput() throws IOException {
+        try {
+            com.googlecode.lanterna.input.KeyStroke ks = super.readInput();
+            if (ks != null && ks.getKeyType() == com.googlecode.lanterna.input.KeyType.EOF) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {}
+                return null;
+            }
+            return ks;
+        } catch (java.io.EOFException e) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {}
+            return null;
+        }
+    }
+
+    @Override
+    public com.googlecode.lanterna.input.KeyStroke pollInput() throws IOException {
+        try {
+            com.googlecode.lanterna.input.KeyStroke ks = super.pollInput();
+            if (ks != null && ks.getKeyType() == com.googlecode.lanterna.input.KeyType.EOF) {
+                return null;
+            }
+            return ks;
+        } catch (java.io.EOFException e) {
+            return null;
+        }
+    }
+
+    @Override
     public void notifyResized(TerminalSize newSize) {
         if (newSize != null) {
             onResized(newSize);

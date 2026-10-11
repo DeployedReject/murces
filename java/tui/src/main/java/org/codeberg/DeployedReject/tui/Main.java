@@ -506,9 +506,16 @@ public class Main {
 
             gui.addWindowAndWait(new MainWindow(gui));
 
-        } catch (IOException e) {
-            System.err.println("Error initializing terminal GUI: " + e.getMessage());
-            e.printStackTrace();
+        } catch (Throwable t) {
+            cleanupTerminal(virtualScreen, termRef);
+            System.err.println("\n[Murces Fatal Error] Exception encountered during TUI execution:");
+            t.printStackTrace(System.err);
+            if (Platform.isWindows()) {
+                System.err.println("\nPress Enter to exit...");
+                try {
+                    System.in.read();
+                } catch (Exception ignored) {}
+            }
         } finally {
             if (gui != null && gui.getGUIThread() instanceof com.googlecode.lanterna.gui2.AsynchronousTextGUIThread) {
                 try {

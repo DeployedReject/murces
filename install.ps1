@@ -100,6 +100,18 @@ if ($rawArch -eq "amd64" -or $rawArch -eq "x64") {
 $archLabel = "Windows $rawArch"
 Write-Color "✦ Architecture detected: $archLabel" "Magenta"
 
+# Determine InstallDir early so helper binaries (playit, psmux) land in a single PATH directory
+if ([string]::IsNullOrWhiteSpace($InstallDir)) {
+    if ($env:LOCALAPPDATA) {
+        $InstallDir = Join-Path $env:LOCALAPPDATA "MurCes"
+    } else {
+        $InstallDir = Join-Path $HOME ".murces"
+    }
+}
+if (-not (Test-Path $InstallDir)) {
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+}
+
 # Detect Windows Package Managers
 $hasWinget = [bool](Get-Command "winget" -ErrorAction SilentlyContinue)
 $hasScoop = [bool](Get-Command "scoop" -ErrorAction SilentlyContinue)
@@ -111,7 +123,7 @@ Write-Host ""
 
 # 2. Multiplexer Installation (psmux for Windows)
 Write-Color "[1/4] Terminal Multiplexer (psmux)" "White"
-$hasPsmux = [bool](Get-Command "psmux" -ErrorAction SilentlyContinue)
+$hasPsmux = [bool](Get-Command "psmux" -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $InstallDir "psmux.exe"))
 
 if ($hasPsmux) {
     Write-Color "  ✔ psmux is already installed and available in PATH." "Green"
@@ -136,9 +148,10 @@ if ($hasPsmux) {
         if (-not $installed) {
             Write-Color "  ➔ Downloading precompiled psmux binary..." "Cyan"
             $psmuxUrl = "https://github.com/psmux/psmux/releases/latest/download/psmux-windows-x86_64.zip"
-            if (Download-FileWithProgress $psmuxUrl "psmux.zip" "psmux release zip") {
-                Expand-Archive -Path "psmux.zip" -DestinationPath "." -Force
-                Remove-Item "psmux.zip" -Force
+            $psmuxZip = Join-Path $InstallDir "psmux.zip"
+            if (Download-FileWithProgress $psmuxUrl $psmuxZip "psmux release zip") {
+                Expand-Archive -Path $psmuxZip -DestinationPath $InstallDir -Force
+                Remove-Item $psmuxZip -Force
                 $installed = $true
             }
         }
@@ -182,10 +195,12 @@ if ($hasRclone) {
         } elseif ($hasChoco) {
             choco install rclone -y
         } else {
-            Download-FileWithProgress "https://downloads.rclone.org/rclone-current-windows-amd64.zip" "rclone.zip" "rclone package"
-            Expand-Archive -Path "rclone.zip" -DestinationPath "rclone-dist" -Force
-            Get-ChildItem -Path "rclone-dist" -Recurse -Filter "rclone.exe" | Copy-Item -Destination ".\rclone.exe"
-            Remove-Item "rclone.zip", "rclone-dist" -Recurse -Force
+            $rcloneZip = Join-Path $InstallDir "rclone.zip"
+            $rcloneDist = Join-Path $InstallDir "rclone-dist"
+            Download-FileWithProgress "https://downloads.rclone.org/rclone-current-windows-amd64.zip" $rcloneZip "rclone package"
+            Expand-Archive -Path $rcloneZip -DestinationPath $rcloneDist -Force
+            Get-ChildItem -Path $rcloneDist -Recurse -Filter "rclone.exe" | Copy-Item -Destination (Join-Path $InstallDir "rclone.exe")
+            Remove-Item $rcloneZip, $rcloneDist -Recurse -Force
         }
     } else {
         Write-Color "  - Skipped rclone installation." "DarkGray"
@@ -195,14 +210,15 @@ Write-Host ""
 
 # 4. Public Tunnels (playit.gg)
 Write-Color "[3/4] Public Tunnels (playit.gg)" "White"
-$hasPlayit = [bool](Get-Command "playit" -ErrorAction SilentlyContinue) -or (Test-Path ".\playit.exe")
+$playitExe = Join-Path $InstallDir "playit.exe"
+$hasPlayit = [bool](Get-Command "playit" -ErrorAction SilentlyContinue) -or (Test-Path $playitExe) -or (Test-Path ".\playit.exe")
 
 if ($hasPlayit) {
     Write-Color "  ✔ playit tunnel agent is already available." "Green"
 } else {
     if (Ask-Consent "Install playit client binary for zero-config public tunnels?" $true) {
         $playitUrl = "https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64.exe"
-        Download-FileWithProgress $playitUrl "playit.exe" "playit tunnel agent (Windows x64)" | Out-Null
+        Download-FileWithProgress $playitUrl $playitExe "playit tunnel agent (Windows x64)" | Out-Null
     } else {
         Write-Color "  - Skipped playit setup." "DarkGray"
     }
@@ -211,19 +227,6 @@ Write-Host ""
 
 # 5. MurCes Standalone Executable
 Write-Color "[4/4] MurCes Standalone Executable" "White"
-
-if ([string]::IsNullOrWhiteSpace($InstallDir)) {
-    if ($env:LOCALAPPDATA) {
-        $InstallDir = Join-Path $env:LOCALAPPDATA "MurCes"
-    } else {
-        $InstallDir = Join-Path $HOME ".murces"
-    }
-}
-
-if (-not (Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-}
-
 $murcesExe = Join-Path $InstallDir "murces.exe"
 Write-Color "  Install location: $InstallDir" "Cyan"
 
@@ -298,12 +301,12 @@ function Check-Component([string]$name, [string]$desc, [bool]$condition, [bool]$
 }
 
 $hasMurcesReady = (Test-Path $murcesExe) -or (Test-Path (Join-Path $InstallDir "murces.bat")) -or [bool](Get-Command "murces" -ErrorAction SilentlyContinue)
-Check-Component "murces" "MurCes Native Manager" $hasMurcesReady $true
-Check-Component "psmux" "Windows Process Multiplexer" ((Get-Command "psmux" -ErrorAction SilentlyContinue) -or (Test-Path ".\psmux.exe")) $true
-Check-Component "curl" "HTTP Package Downloader" [bool](Get-Command "curl.exe" -ErrorAction SilentlyContinue) $true
-Check-Component "tar" "World Archive Bundler" [bool](Get-Command "tar.exe" -ErrorAction SilentlyContinue) $true
-Check-Component "rclone" "Cloud Sync & Google Drive" [bool](Get-Command "rclone" -ErrorAction SilentlyContinue) $false
-Check-Component "playit" "Zero-Config Public Tunnels" ([bool](Get-Command "playit" -ErrorAction SilentlyContinue) -or (Test-Path ".\playit.exe")) $false
+Check-Component -name "murces" -desc "MurCes Native Manager" -condition $hasMurcesReady -required $true
+Check-Component -name "psmux" -desc "Windows Process Multiplexer" -condition ([bool]((Get-Command "psmux" -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $InstallDir "psmux.exe")) -or (Test-Path ".\psmux.exe"))) -required $true
+Check-Component -name "curl" -desc "HTTP Package Downloader" -condition ([bool](Get-Command "curl.exe" -ErrorAction SilentlyContinue)) -required $true
+Check-Component -name "tar" -desc "World Archive Bundler" -condition ([bool](Get-Command "tar.exe" -ErrorAction SilentlyContinue)) -required $true
+Check-Component -name "rclone" -desc "Cloud Sync & Google Drive" -condition ([bool]((Get-Command "rclone" -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $InstallDir "rclone.exe")))) -required $false
+Check-Component -name "playit" -desc "Zero-Config Public Tunnels" -condition ([bool]((Get-Command "playit" -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $InstallDir "playit.exe")) -or (Test-Path ".\playit.exe"))) -required $false
 
 Write-Host ""
 Write-Color "✦ Setup complete!" "Green"

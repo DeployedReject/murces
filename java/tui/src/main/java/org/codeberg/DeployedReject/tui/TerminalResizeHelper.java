@@ -72,7 +72,15 @@ public class TerminalResizeHelper {
         return null;
     }
 
+    private static volatile long lastWindowsQueryTime = 0;
+    private static volatile TerminalSize cachedWindowsSize = null;
+
     private static TerminalSize queryWindowsTerminalSize() {
+        long now = System.currentTimeMillis();
+        if (cachedWindowsSize != null && (now - lastWindowsQueryTime) < 1000) {
+            return cachedWindowsSize;
+        }
+        lastWindowsQueryTime = now;
         try {
             ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", "mode con");
             pb.redirectErrorStream(true);
@@ -100,10 +108,11 @@ public class TerminalResizeHelper {
             }
 
             if (cols >= 20 && rows >= 5) {
-                return new TerminalSize(cols, rows);
+                cachedWindowsSize = new TerminalSize(cols, rows);
+                return cachedWindowsSize;
             }
         } catch (Exception ignored) {}
-        return null;
+        return cachedWindowsSize;
     }
 
     public static synchronized void setup(Screen screen, MultiWindowTextGUI gui, ResponsiveTerminal terminal) {
