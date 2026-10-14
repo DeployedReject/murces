@@ -379,13 +379,14 @@ public class ServerHandler {
     }
     switch (job) {
       case 0:
-        File eulaFile = new File(serverDir != null ? serverDir : ".", "eula.txt");
+      case 1:
+        File sDir = new File(serverDir != null ? serverDir : ".");
+        File eulaFile = new File(sDir, "eula.txt");
         try (FileWriter eulaWriter = new FileWriter(eulaFile)) {
           eulaWriter.write("eula=true\n");
         } catch (Exception ignored) {
         }
         try {
-          File sDir = new File(serverDir != null ? serverDir : ".");
           org.codeberg.DeployedReject.utils.ServerJarMetadata.recordServerMetadata(sDir, loader, gVersion, lVersion);
         } catch (Exception ignored) {
         }
@@ -393,9 +394,9 @@ public class ServerHandler {
         comp.addProperty("status", 3);
         comp.addProperty("type", "server");
         Communicator.printer(comp);
-        break;
-      case 1:
-        startServer(false, String.valueOf(ram) + "G", null, null, sessionName, serverDir);
+        if (job == 1) {
+          startServer(false, String.valueOf(ram) + "G", null, null, sessionName, serverDir);
+        }
         break;
       case 2:
         stopServer(sessionName);

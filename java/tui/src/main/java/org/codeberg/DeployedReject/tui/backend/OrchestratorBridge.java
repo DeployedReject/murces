@@ -1671,6 +1671,14 @@ public class OrchestratorBridge {
       try {
         String lVersion = (loaderVersion != null && !loaderVersion.isEmpty()) ? loaderVersion : "latest";
         ServerHandler sh = new ServerHandler("server", serverType.toLowerCase(), gameVersion, lVersion, ram, job);
+        String sDirCfg = ConfigManager.getInstance().getConfig().getServerDir();
+        if (sDirCfg != null && !sDirCfg.trim().isEmpty()) {
+          sh.serverDir = sDirCfg.trim();
+        }
+        String sSessCfg = ConfigManager.getInstance().getConfig().getSessionName();
+        if (sSessCfg != null && !sSessCfg.trim().isEmpty()) {
+          sh.sessionName = sSessCfg.trim();
+        }
         sh.portableJdk = ConfigManager.getInstance().getConfig().isPortableJdk();
         sh.serverHandler();
       } catch (Exception e) {
@@ -1718,29 +1726,31 @@ public class OrchestratorBridge {
     if (isServerDownloading()) {
       return false;
     }
-    if (new File("server.jar.tmp").exists() || new File("BuildTools.jar").exists()) {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    File sDir = new File(cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty() ? cfg.getServerDir() : ".");
+    if (new File(sDir, "server.jar.tmp").exists() || new File(sDir, "BuildTools.jar").exists()) {
       return false;
     }
     if (getInstalledServerMetadata() != null) {
       return true;
     }
 
-    File fabricLaunch = new File("fabric-server-launch.jar");
+    File fabricLaunch = new File(sDir, "fabric-server-launch.jar");
     if (fabricLaunch.exists() && fabricLaunch.length() > 0) {
-      File mcJar = new File("server.jar");
-      File fabricMcJar = new File(".fabric", "server.jar");
-      if ((mcJar.exists() && mcJar.length() > 5_000_000) ||
-          (fabricMcJar.exists() && fabricMcJar.length() > 5_000_000)) {
+      File mcJar = new File(sDir, "server.jar");
+      File fabricMcJar = new File(new File(sDir, ".fabric"), "server.jar");
+      if ((mcJar.exists() && mcJar.length() > 1_000_000) ||
+          (fabricMcJar.exists() && fabricMcJar.length() > 1_000_000)) {
         return true;
       }
     }
 
-    File runSh = new File("run.sh");
+    File runSh = new File(sDir, "run.sh");
     if (runSh.exists() && runSh.length() > 0) {
       return true;
     }
 
-    File sJar = new File("server.jar");
+    File sJar = new File(sDir, "server.jar");
     if (sJar.exists() && sJar.length() > 5_000_000) {
       return true;
     }

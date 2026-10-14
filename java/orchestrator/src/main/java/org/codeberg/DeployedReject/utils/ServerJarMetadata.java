@@ -92,6 +92,19 @@ public class ServerJarMetadata {
             return false;
         }
 
+        boolean success = writeMetadataToJar(targetJar, serverType, gameVersion, loaderVersion);
+
+        // Also record to server.jar if it exists and is different from targetJar (e.g. Fabric server.jar alongside fabric-server-launch.jar)
+        File sJar = new File(serverDir, "server.jar");
+        if (sJar.exists() && !sJar.equals(targetJar) && sJar.length() > 0) {
+            writeMetadataToJar(sJar, serverType, gameVersion, loaderVersion);
+        }
+
+        return success;
+    }
+
+    private static boolean writeMetadataToJar(File targetJar, String serverType, String gameVersion, String loaderVersion) {
+        if (targetJar == null || !targetJar.exists() || targetJar.length() == 0) return false;
         try {
             long now = System.currentTimeMillis();
             JsonObject json = new JsonObject();
@@ -154,7 +167,7 @@ public class ServerJarMetadata {
         if (serverDir == null) serverDir = new File(".");
         List<File> candidates = findCandidateJars(serverDir);
         for (File jar : candidates) {
-            if (!jar.exists() || jar.length() < 1000) continue;
+            if (!jar.exists() || jar.length() < 50) continue;
             ServerJarMetadata meta = inspectJar(jar);
             if (meta != null) {
                 return meta;
@@ -203,13 +216,48 @@ public class ServerJarMetadata {
                     String specVersion = attr.getValue("Specification-Version");
                     String mainClass = attr.getValue("Main-Class");
                     String fabricLoader = attr.getValue("Fabric-Loader-Version");
+                    String classPath = attr.getValue("Class-Path");
 
                     String sType = null;
                     String gVer = null;
+                    String lVer = null;
 
                     if ("fabric-server-launch.jar".equalsIgnoreCase(jar.getName()) || fabricLoader != null
                             || (mainClass != null && mainClass.contains("fabricmc"))) {
                         sType = "fabric";
+                        if (fabricLoader != null) {
+                            lVer = fabricLoader;
+                        }
+                        if (classPath != null) {
+                            java.util.regex.Matcher m = java.util.regex.Pattern.compile("intermediary/([0-9.]+)/").matcher(classPath);
+                            if (m.find()) {
+                                gVer = m.group(1);
+                            }
+                            java.util.regex.Matcher ml = java.util.regex.Pattern.compile("fabric-loader/([0-9.]+)/").matcher(classPath);
+                            if (ml.find() && (lVer == null || lVer.isEmpty())) {
+                                lVer = ml.group(1);
+                            }
+                        }
+                        // Also check sibling server.jar if game version not yet discovered
+                        if (gVer == null && jar.getParentFile() != null) {
+                            File siblingServerJar = new File(jar.getParentFile(), "server.jar");
+                            if (siblingServerJar.exists()) {
+                                try (ZipFile sZip = new ZipFile(siblingServerJar)) {
+                                    ZipEntry sVerEntry = sZip.getEntry("version.json");
+                                    if (sVerEntry != null) {
+                                        try (InputStream svin = sZip.getInputStream(sVerEntry)) {
+                                            String svRaw = new String(svin.readAllBytes(), StandardCharsets.UTF_8);
+                                            JsonObject svObj = JsonParser.parseString(svRaw).getAsJsonObject();
+                                            if (svObj.has("id")) {
+                                                gVer = svObj.get("id").getAsString();
+                                            } else if (svObj.has("name")) {
+                                                gVer = svObj.get("name").getAsString();
+                                            }
+                                        }
+                                    }
+                                } catch (Exception ignored) {}
+                            }
+                        }
                     } else if (implTitle != null && implTitle.toLowerCase().contains("paper")) {
                         sType = "paper";
                     } else if (implTitle != null && (implTitle.toLowerCase().contains("spigot") || implTitle.toLowerCase().contains("craftbukkit"))) {
@@ -222,7 +270,7 @@ public class ServerJarMetadata {
 
                     // Attempt to extract game version from version.json inside Minecraft server jars
                     ZipEntry verJsonEntry = zip.getEntry("version.json");
-                    if (verJsonEntry != null) {
+                    if (verJsonEntry != null && gVer == null) {
                         try (InputStream vin = zip.getInputStream(verJsonEntry)) {
                             String vRaw = new String(vin.readAllBytes(), StandardCharsets.UTF_8);
                             JsonObject vObj = JsonParser.parseString(vRaw).getAsJsonObject();
@@ -244,12 +292,17 @@ public class ServerJarMetadata {
                         }
                     }
 
-                    if (sType == null && jar.getName().equals("server.jar") && zip.getEntry("net/minecraft/server/MinecraftServer.class") != null) {
-                        sType = "vanilla";
+                    if (sType == null && jar.getName().equals("server.jar")) {
+                        if (zip.getEntry("net/minecraft/server/MinecraftServer.class") != null
+                                || zip.getEntry("version.json") != null
+                                || zip.getEntry("META-INF/versions") != null
+                                || (mainClass != null && mainClass.contains("bundler"))) {
+                            sType = "vanilla";
+                        }
                     }
 
                     if (sType != null) {
-                        return new ServerJarMetadata(sType, gVer != null ? gVer : "unknown", "", jar.lastModified(), jar.getName());
+                        return new ServerJarMetadata(sType, gVer != null ? gVer : "unknown", lVer != null ? lVer : "", jar.lastModified(), jar.getName());
                     }
                 } catch (Exception ignored) {}
             }
@@ -286,7 +339,9 @@ public class ServerJarMetadata {
                 && !name.endsWith(".tmp")
                 && !name.equals("fabric-server-launch.jar")
                 && !name.equals("server.jar")
-                && !name.equals("BuildTools.jar"));
+                && !name.equals("BuildTools.jar")
+                && !name.equals("fabric-installer.jar")
+                && !name.endsWith("-installer.jar"));
         if (jars != null) {
             Arrays.sort(jars, (a, b) -> Long.compare(b.length(), a.length()));
             Collections.addAll(list, jars);
