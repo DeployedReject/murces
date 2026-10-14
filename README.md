@@ -27,7 +27,7 @@
 <p align="center">
   <img src="assets/demo.gif" alt="MurCes Live Demo" width="880" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
 </p>
-
+Could not find a higher resolution gif. Please refer to the assets folder to view <a href=https://github.com/DeployedReject/murces/raw/main/assets/demo.webm> demo.webm </a> for a better quality demo.
 </div>
 
 ---
