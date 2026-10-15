@@ -235,6 +235,7 @@ public class ModpackBrowseView implements WorkspaceView {
 
     downloadPanel = new Panel(new LinearLayout(Direction.VERTICAL));
     pickaxeAnim = new MinecraftPickaxeAnimation();
+    pickaxeAnim.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
     downloadPanel.addComponent(pickaxeAnim);
     downloadPanel.setVisible(false);
     root.addComponent(downloadPanel);
@@ -783,6 +784,8 @@ public class ModpackBrowseView implements WorkspaceView {
     resultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     dependenciesList.setPreferredSize(new TerminalSize(cardWidth - 2, Math.max(3, listHeight / 2)));
     detailsCard.setPreferredSize(new TerminalSize(cardWidth, listHeight + 4));
+
+    pickaxeAnim.setPreferredSize(new TerminalSize(wsWidth, 3));
 
     updateDetailsDisplay();
   }

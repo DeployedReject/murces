@@ -193,6 +193,13 @@ public class MainWindow extends BasicWindow {
         invalidate();
     }
 
+    public int getMainContentWidth() {
+        TerminalSize size = lastKnownTermSize != null ? lastKnownTermSize : (gui.getScreen() != null ? gui.getScreen().getTerminalSize() : new TerminalSize(80, 24));
+        int cols = size.getColumns();
+        int actWidth = Math.max(28, Math.min(65, (cols * 35) / 100));
+        return Math.max(30, cols - actWidth - 2);
+    }
+
     public WindowBasedTextGUI getGui() {
         return gui;
     }

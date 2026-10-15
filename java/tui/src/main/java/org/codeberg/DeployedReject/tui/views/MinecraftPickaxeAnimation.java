@@ -48,13 +48,13 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
     return new ComponentRenderer<>() {
       @Override
       public TerminalSize getPreferredSize(MinecraftPickaxeAnimation component) {
-        return new TerminalSize(36, 3);
+        return new TerminalSize(40, 3);
       }
 
       @Override
       public void drawComponent(TextGUIGraphics graphics, MinecraftPickaxeAnimation comp) {
         TerminalSize size = graphics.getSize();
-        int width = Math.max(30, size.getColumns());
+        int width = size.getColumns();
         int height = Math.max(1, size.getRows());
 
         graphics.setBackgroundColor(Themes.getLogBackgroundColor());
@@ -74,17 +74,23 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
           }
         }
 
-        int slotWidth = 5;
-        int totalSlots = Math.max(4, width / slotWidth);
-        int totalBlocks = totalSlots - 1;
+        // Side padding ensures download bar never sticks to borders or bleeds over
+        int sidePadding = Math.max(2, Math.min(4, width / 25));
+        int usableWidth = Math.max(10, width - (sidePadding * 2));
+
+        int slotWidth = 5; // e.g. "[██] "
+        int totalSlots = Math.max(3, usableWidth / slotWidth);
+        int totalBlocks = totalSlots - 1; // Remaining slots are blocks, 1 slot for pickaxe
+
+        // Left offset centers the dynamically calculated slots evenly within available width
+        int startX = sidePadding + Math.max(0, (usableWidth - (totalSlots * slotWidth)) / 2);
 
         double blockProgress = (effectiveProgress / 100.0) * totalBlocks;
         int activeBlock = Math.min(totalBlocks - 1, (int) blockProgress);
-        double subProgress = blockProgress - activeBlock;
+        double subProgress = Math.max(0.0, Math.min(1.0, blockProgress - activeBlock));
         boolean isComplete = (effectiveProgress >= 100.0);
 
         int pickSlot = isComplete ? (totalBlocks - 1) : activeBlock;
-
         int animRow = (height >= 3) ? 1 : 0;
 
         String toolIcon = GlyphHelper.isNerdFontEnabled() ? "⛏" : "/";
@@ -107,8 +113,8 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
         }
 
         for (int slot = 0; slot < totalSlots; slot++) {
-          int col = slot * slotWidth;
-          if (col + 4 > width) {
+          int col = startX + (slot * slotWidth);
+          if (col + 4 > width - sidePadding && col + 4 > width) {
             break;
           }
 
@@ -173,10 +179,11 @@ public class MinecraftPickaxeAnimation extends AbstractComponent<MinecraftPickax
             display = String.format("Mining... %5.2f%% [Block %d/%d]", effectiveProgress, activeBlock + 1, totalBlocks);
           }
 
-          if (display.length() > width) {
-            display = display.substring(0, width);
+          int maxTextWidth = Math.max(10, width - (startX * 2));
+          if (display.length() > maxTextWidth) {
+            display = display.substring(0, maxTextWidth);
           }
-          graphics.putString(0, textRow, display);
+          graphics.putString(startX, textRow, display);
         }
       }
     };

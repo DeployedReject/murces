@@ -152,7 +152,7 @@ public class InstallServerView implements WorkspaceView {
         serverNameBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         installDirBox.setPreferredSize(new TerminalSize(inputWidth, 1));
         ramComboBox.setPreferredSize(new TerminalSize(inputWidth, 1));
-        progressBar.setPreferredSize(new TerminalSize(Math.max(20, wsWidth - 6), 1));
+        progressBar.setPreferredSize(new TerminalSize(Math.max(20, wsWidth - 2), 1));
     }
 
     private void cycleEngine() {

@@ -195,13 +195,6 @@ public class PluginBrowseView implements WorkspaceView {
     midCols.addComponent(rightCol);
     browsePanel.addComponent(midCols);
 
-    statusLabel = new Label("Ready to search plugins.");
-    statusLabel.setForegroundColor(Themes.getLogSuccessColor());
-    browsePanel.addComponent(statusLabel);
-
-    pickaxeAnim = new MinecraftPickaxeAnimation();
-    browsePanel.addComponent(pickaxeAnim);
-
     Panel actionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
     actionRow.addComponent(downloadBtn);
     cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Download"), this::cancelDownload);
@@ -209,6 +202,14 @@ public class PluginBrowseView implements WorkspaceView {
     backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Menu"), mainWindow::showMainMenu);
     actionRow.addComponent(backBtn);
     browsePanel.addComponent(actionRow);
+
+    statusLabel = new Label("Ready to search plugins.");
+    statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+    browsePanel.addComponent(statusLabel);
+
+    pickaxeAnim = new MinecraftPickaxeAnimation();
+    pickaxeAnim.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
+    browsePanel.addComponent(pickaxeAnim);
 
     // ==========================================
     // TAB 1: Installed Plugins Manager UI Setup
@@ -656,9 +657,15 @@ public class PluginBrowseView implements WorkspaceView {
     if (newSize == null) return;
     this.currentTermWidth = newSize.getColumns();
     this.currentTermHeight = newSize.getRows();
-    int listWidth = Math.max(26, Math.min(38, (currentTermWidth * 42) / 100));
+
+    int actWidth = Math.max(28, Math.min(65, (currentTermWidth * 35) / 100));
+    int wsWidth = Math.max(40, currentTermWidth - actWidth - 2);
+
+    int listWidth = Math.max(26, Math.min(38, (wsWidth * 42) / 100));
     int listHeight = Math.max(6, Math.min(14, currentTermHeight - 16));
     resultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     installedPluginsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
+
+    pickaxeAnim.setPreferredSize(new TerminalSize(wsWidth, 3));
   }
 }

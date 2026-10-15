@@ -216,13 +216,6 @@ public class ModBrowseView implements WorkspaceView {
     midCols.addComponent(rightCol);
     singleModsPanel.addComponent(midCols);
 
-    statusLabel = new Label("Ready to browse mods.");
-    statusLabel.setForegroundColor(Themes.getLogSuccessColor());
-    singleModsPanel.addComponent(statusLabel);
-
-    pickaxeAnim = new MinecraftPickaxeAnimation();
-    singleModsPanel.addComponent(pickaxeAnim);
-
     Panel actionRow = new Panel(new LinearLayout(Direction.HORIZONTAL));
     actionRow.addComponent(downloadBtn);
     cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Download"), this::cancelDownload);
@@ -230,6 +223,14 @@ public class ModBrowseView implements WorkspaceView {
     backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
     actionRow.addComponent(backBtn);
     singleModsPanel.addComponent(actionRow);
+
+    statusLabel = new Label("Ready to browse mods.");
+    statusLabel.setForegroundColor(Themes.getLogSuccessColor());
+    singleModsPanel.addComponent(statusLabel);
+
+    pickaxeAnim = new MinecraftPickaxeAnimation();
+    pickaxeAnim.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
+    singleModsPanel.addComponent(pickaxeAnim);
 
     // ==========================================
     // Build Tab 1: Modpacks Panel
@@ -321,19 +322,20 @@ public class ModBrowseView implements WorkspaceView {
     packMidCols.addComponent(packRightCol);
     modpacksPanel.addComponent(packMidCols);
 
-    packStatusLabel = new Label("Ready to search modpacks.");
-    packStatusLabel.setForegroundColor(Themes.getLogSuccessColor());
-    modpacksPanel.addComponent(packStatusLabel);
-
-    packPickaxeAnim = new MinecraftPickaxeAnimation();
-    modpacksPanel.addComponent(packPickaxeAnim);
-
     Panel packActions = new Panel(new LinearLayout(Direction.HORIZONTAL));
     packActions.addComponent(packInstallBtn);
     packCancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Install"), this::cancelPackInstall);
     packActions.addComponent(packCancelBtn);
     packActions.addComponent(new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu));
     modpacksPanel.addComponent(packActions);
+
+    packStatusLabel = new Label("Ready to search modpacks.");
+    packStatusLabel.setForegroundColor(Themes.getLogSuccessColor());
+    modpacksPanel.addComponent(packStatusLabel);
+
+    packPickaxeAnim = new MinecraftPickaxeAnimation();
+    packPickaxeAnim.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
+    modpacksPanel.addComponent(packPickaxeAnim);
 
     // Initial Tab
     setTab(0);
@@ -1008,9 +1010,18 @@ public class ModBrowseView implements WorkspaceView {
     if (newSize == null) return;
     this.currentTermWidth = newSize.getColumns();
     this.currentTermHeight = newSize.getRows();
-    int listWidth = Math.max(26, Math.min(38, (currentTermWidth * 42) / 100));
+
+    int actWidth = Math.max(28, Math.min(65, (currentTermWidth * 35) / 100));
+    int wsWidth = Math.max(40, currentTermWidth - actWidth - 2);
+
+    int listWidth = Math.max(26, Math.min(38, (wsWidth * 42) / 100));
     int listHeight = Math.max(6, Math.min(14, currentTermHeight - 16));
     resultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
     packResultsList.setPreferredSize(new TerminalSize(listWidth, listHeight));
+
+    // Fill entire bottom of main window without crossing into activity window
+    TerminalSize animSize = new TerminalSize(wsWidth, 3);
+    pickaxeAnim.setPreferredSize(animSize);
+    packPickaxeAnim.setPreferredSize(animSize);
   }
 }
