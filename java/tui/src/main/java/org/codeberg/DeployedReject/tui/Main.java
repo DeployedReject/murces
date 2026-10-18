@@ -62,13 +62,15 @@ public class Main {
                 System.out.println("  murces servers                     List configured server profiles");
                 System.out.println("  murces switch <profile>            Switch active server profile");
                 System.out.println("  murces backup                      Run world backup");
-                System.out.println("  murces search-modpacks <query>     Search modpacks on Modrinth");
-                System.out.println("  murces install-modpack <slug>      Download & install modpack with dependencies");
+                System.out.println("  murces search-modpacks <query>     Search modpacks on Modrinth/CurseForge");
+                System.out.println("  murces install-modpack <slug>      Download & install modpack with dependencies [--force]");
+                System.out.println("  murces search-mods <query>         Search mods on Modrinth/CurseForge");
+                System.out.println("  murces install-mod <slug>          Download & install mod into mods/ [--force]");
                 System.out.println("  murces search-plugins <query>      Search plugins on Modrinth/CurseForge");
-                System.out.println("  murces install-plugin <slug>       Download & install plugin into plugins/");
+                System.out.println("  murces install-plugin <slug>       Download & install plugin into plugins/ [--force]");
                 System.out.println("  murces list-plugins                List installed plugins in plugins/");
                 System.out.println("  murces delete-plugin <file>        Delete an installed plugin");
-                System.out.println("  murces update-mods                 Update all installed mods to latest versions");
+                System.out.println("  murces update-mods                 Update all installed mods to latest versions [--force]");
                 System.out.println("  murces install-jdk [version]       Download portable OpenJDK (8/17/21)");
                 System.out.println("  murces --test-tui                  Run automated self-test of all TUI windows");
                 System.out.println("  murces --version                   Show version");
@@ -91,21 +93,23 @@ public class Main {
                 break;
             case "search-modpacks":
                 if (args.length < 2) {
-                    System.err.println("Usage: murces search-modpacks <query> [version] [loader]");
+                    System.err.println("Usage: murces search-modpacks <query> [version] [loader] [platform]");
                     System.exit(1);
                 }
                 String smQuery = args[1];
-                String smVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
-                String smLdr = args.length > 3 ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
-                System.out.println("Searching modpacks for '" + smQuery + "' (" + smVer + " / " + smLdr + ")...");
+                String smVer = args.length > 2 ? args[2] : "any";
+                String smLdr = args.length > 3 ? args[3] : "any";
+                String smPlat = args.length > 4 ? args[4] : "all";
+                System.out.println("Searching modpacks for '" + smQuery + "' (" + smVer + " / " + smLdr + " on " + smPlat + ")...");
                 try {
-                    java.util.List<OrchestratorBridge.ModpackResult> smRes = OrchestratorBridge.getInstance().searchModpacks("modrinth", smQuery, smVer, smLdr).get();
+                    java.util.List<OrchestratorBridge.ModpackResult> smRes = OrchestratorBridge.getInstance().searchModpacks(smPlat, smQuery, smVer, smLdr).get();
                     if (smRes.isEmpty()) {
                         System.out.println("No modpacks found.");
                     } else {
                         System.out.println("Found " + smRes.size() + " modpacks:");
                         for (OrchestratorBridge.ModpackResult mp : smRes) {
-                            System.out.println("  - " + mp.name + " (" + mp.slug + ") by " + mp.author + " [" + mp.downloads + " downloads]");
+                            String pTag = mp.platform != null ? "[" + mp.platform.toUpperCase() + "] " : "";
+                            System.out.println("  - " + pTag + mp.name + " (" + mp.slug + ") by " + mp.author + " [" + mp.downloads + " downloads]");
                         }
                     }
                 } catch (Exception e) {
@@ -114,36 +118,39 @@ public class Main {
                 break;
             case "install-modpack":
                 if (args.length < 2) {
-                    System.err.println("Usage: murces install-modpack <slug-or-id> [version] [loader] [--include-client]");
+                    System.err.println("Usage: murces install-modpack <slug-or-id> [version] [loader] [platform] [--include-client] [--force]");
                     System.exit(1);
                 }
                 String mpSlug = args[1];
                 String mpVer = args.length > 2 && !args[2].startsWith("--") ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
                 String mpLdr = args.length > 3 && !args[3].startsWith("--") ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
+                String mpPlat = args.length > 4 && !args[4].startsWith("--") ? args[4] : "modrinth";
                 boolean mpIncClient = false;
+                boolean mpForce = false;
                 for (String a : args) {
                     if ("--include-client".equalsIgnoreCase(a)) mpIncClient = true;
+                    if ("--force".equalsIgnoreCase(a) || "-f".equalsIgnoreCase(a)) mpForce = true;
                 }
 
                 org.codeberg.DeployedReject.utils.ServerJarMetadata mpMeta = OrchestratorBridge.getInstalledServerMetadata();
-                if (mpMeta == null) {
-                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing modpacks (launch TUI [I]).");
+                if (mpMeta == null && !mpForce) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing modpacks (launch TUI [I]) or use --force.");
                     System.exit(1);
                 }
                 var mpCompat = OrchestratorBridge.checkCompatibility(mpLdr, mpVer);
-                if (!mpCompat.isCompatible()) {
-                    System.err.println("[ERROR] " + mpCompat.getMessage());
+                if (!mpCompat.isCompatible() && !mpForce) {
+                    System.err.println("[ERROR] " + mpCompat.getMessage() + " (Pass --force to ignore)");
                     System.exit(1);
                 }
 
-                System.out.println("Resolving modpack '" + mpSlug + "' for MC " + mpVer + " (" + mpLdr + ")...");
+                System.out.println("Resolving modpack '" + mpSlug + "' on " + mpPlat + " for MC " + mpVer + " (" + mpLdr + ")...");
                 try {
-                    java.util.List<OrchestratorBridge.ModpackVersionInfo> vList = OrchestratorBridge.getInstance().getModpackVersions("modrinth", mpSlug, mpVer, mpLdr).get();
+                    java.util.List<OrchestratorBridge.ModpackVersionInfo> vList = OrchestratorBridge.getInstance().getModpackVersions(mpPlat, mpSlug, mpVer, mpLdr).get();
                     String vId = !vList.isEmpty() ? vList.get(0).versionId : mpSlug;
                     String mrpackUrl = !vList.isEmpty() ? vList.get(0).mrpackUrl : "";
                     System.out.println("Installing modpack version: " + (!vList.isEmpty() ? vList.get(0).versionName : vId) + " (includeClient=" + mpIncClient + ")...");
                     OrchestratorBridge.ModpackInstallSummary sum = OrchestratorBridge.getInstance().installModpack(
-                        "modrinth", mpSlug, vId, mrpackUrl, mpVer, mpLdr, mpIncClient,
+                        mpPlat, mpSlug, vId, mrpackUrl, mpVer, mpLdr, mpIncClient,
                         System.out::println,
                         pct -> {},
                         null
@@ -151,6 +158,85 @@ public class Main {
                     System.out.println(sum.formattedSummary());
                 } catch (Exception e) {
                     System.err.println("Failed to install modpack: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "search-mods":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces search-mods <query> [version] [loader] [modrinth|curseforge]");
+                    System.exit(1);
+                }
+                String smodQuery = args[1];
+                String smodVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String smodLdr = args.length > 3 ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
+                String smodPlat = args.length > 4 ? args[4] : "modrinth";
+                System.out.println("Searching mods for '" + smodQuery + "' (" + smodVer + " / " + smodLdr + " on " + smodPlat + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.ModResult> smodRes = OrchestratorBridge.getInstance().searchMods(smodPlat, smodQuery, smodVer, smodLdr).get();
+                    if (smodRes.isEmpty()) {
+                        System.out.println("No mods found.");
+                    } else {
+                        System.out.println("Found " + smodRes.size() + " mods:");
+                        for (OrchestratorBridge.ModResult m : smodRes) {
+                            System.out.println("  - " + m.name + " (" + m.id + ") by " + m.author);
+                            if (m.description != null && !m.description.isEmpty()) {
+                                System.out.println("    " + m.description);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Search failed: " + e.getMessage());
+                }
+                break;
+            case "install-mod":
+            case "download-mod":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces install-mod <slug-or-id> [version] [loader] [modrinth|curseforge] [--force]");
+                    System.exit(1);
+                }
+                String imSlug = args[1];
+                String imVer = args.length > 2 && !args[2].startsWith("--") ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String imLdr = args.length > 3 && !args[3].startsWith("--") ? args[3] : ConfigManager.getInstance().getConfig().getLoader();
+                String imPlat = args.length > 4 && !args[4].startsWith("--") ? args[4] : "modrinth";
+                boolean imForce = false;
+                for (String a : args) {
+                    if ("--force".equalsIgnoreCase(a) || "-f".equalsIgnoreCase(a)) imForce = true;
+                }
+
+                org.codeberg.DeployedReject.utils.ServerJarMetadata imMeta = OrchestratorBridge.getInstalledServerMetadata();
+                if (imMeta == null && !imForce) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing mods (launch TUI [I]) or use --force.");
+                    System.exit(1);
+                }
+                var imCompat = OrchestratorBridge.checkCompatibility(imLdr, imVer);
+                if (!imCompat.isCompatible() && !imForce) {
+                    System.err.println("[ERROR] " + imCompat.getMessage() + " (Pass --force to ignore)");
+                    System.exit(1);
+                }
+
+                System.out.println("Resolving mod '" + imSlug + "' on " + imPlat + " for MC " + imVer + " (" + imLdr + ")...");
+                try {
+                    java.util.List<OrchestratorBridge.ModVersionInfo> mvList = OrchestratorBridge.getInstance().getModVersions(imPlat, imSlug, imVer, imLdr).get();
+                    if (mvList.isEmpty()) {
+                        System.err.println("No compatible versions found for mod '" + imSlug + "' on " + imPlat + ".");
+                        System.exit(1);
+                    }
+                    OrchestratorBridge.ModVersionInfo topMod = mvList.get(0);
+                    System.out.println("Downloading mod: " + topMod.versionName + " (" + topMod.filename + ")...");
+                    boolean dlOk = OrchestratorBridge.getInstance().downloadModDirect(
+                        topMod.downloadUrl, topMod.filename, imLdr, imVer,
+                        dpi -> {
+                            System.out.print("\rProgress: " + (int)dpi.percent + "% [" + dpi.formattedSpeed() + " | ETA: " + dpi.formattedEta() + "]");
+                        }
+                    ).get();
+                    if (dlOk) {
+                        System.out.println("\nMod '" + topMod.filename + "' installed successfully into mods/.");
+                    } else {
+                        System.err.println("\nFailed to download mod.");
+                        System.exit(1);
+                    }
+                } catch (Exception e) {
+                    System.err.println("\nFailed to install mod: " + e.getMessage());
                     System.exit(1);
                 }
                 break;
@@ -180,22 +266,26 @@ public class Main {
                 break;
             case "install-plugin":
                 if (args.length < 2) {
-                    System.err.println("Usage: murces install-plugin <slug-or-id> [version] [server-type] [modrinth|curseforge]");
+                    System.err.println("Usage: murces install-plugin <slug-or-id> [version] [server-type] [modrinth|curseforge] [--force]");
                     System.exit(1);
                 }
                 String plSlug = args[1];
-                String plVer = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
-                String plType = args.length > 3 ? args[3] : "paper";
-                String plPlat = args.length > 4 ? args[4] : "modrinth";
+                String plVer = args.length > 2 && !args[2].startsWith("--") ? args[2] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String plType = args.length > 3 && !args[3].startsWith("--") ? args[3] : "paper";
+                String plPlat = args.length > 4 && !args[4].startsWith("--") ? args[4] : "modrinth";
+                boolean plForce = false;
+                for (String a : args) {
+                    if ("--force".equalsIgnoreCase(a) || "-f".equalsIgnoreCase(a)) plForce = true;
+                }
 
                 org.codeberg.DeployedReject.utils.ServerJarMetadata plMeta = OrchestratorBridge.getInstalledServerMetadata();
-                if (plMeta == null) {
-                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing plugins (launch TUI [I]).");
+                if (plMeta == null && !plForce) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before installing plugins (launch TUI [I]) or use --force.");
                     System.exit(1);
                 }
                 var plCompat = OrchestratorBridge.checkPluginCompatibility(plPlat, plVer);
-                if (!plCompat.isCompatible()) {
-                    System.err.println("[ERROR] " + plCompat.getMessage());
+                if (!plCompat.isCompatible() && !plForce) {
+                    System.err.println("[ERROR] " + plCompat.getMessage() + " (Pass --force to ignore)");
                     System.exit(1);
                 }
 
@@ -311,16 +401,20 @@ public class Main {
                 }
                 break;
             case "update-mods":
-                String uMc = args.length > 1 ? args[1] : ConfigManager.getInstance().getConfig().getGameVersion();
-                String uLd = args.length > 2 ? args[2] : ConfigManager.getInstance().getConfig().getLoader();
+                String uMc = args.length > 1 && !args[1].startsWith("--") ? args[1] : ConfigManager.getInstance().getConfig().getGameVersion();
+                String uLd = args.length > 2 && !args[2].startsWith("--") ? args[2] : ConfigManager.getInstance().getConfig().getLoader();
+                boolean uForce = false;
+                for (String a : args) {
+                    if ("--force".equalsIgnoreCase(a) || "-f".equalsIgnoreCase(a)) uForce = true;
+                }
                 org.codeberg.DeployedReject.utils.ServerJarMetadata uMeta = OrchestratorBridge.getInstalledServerMetadata();
-                if (uMeta == null) {
-                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before updating mods (launch TUI [I]).");
+                if (uMeta == null && !uForce) {
+                    System.err.println("[ERROR] No Minecraft server installed. You must install a server engine first before updating mods (launch TUI [I]) or use --force.");
                     System.exit(1);
                 }
                 var uCompat = OrchestratorBridge.checkCompatibility(uLd, uMc);
-                if (!uCompat.isCompatible()) {
-                    System.err.println("[ERROR] " + uCompat.getMessage());
+                if (!uCompat.isCompatible() && !uForce) {
+                    System.err.println("[ERROR] " + uCompat.getMessage() + " (Pass --force to ignore)");
                     System.exit(1);
                 }
                 System.out.println("Updating all mods for Minecraft " + uMc + " (" + uLd + ")...");

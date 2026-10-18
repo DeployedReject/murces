@@ -83,16 +83,36 @@ public class ServerJarMetadata {
 
     /**
      * Records standardized server metadata directly into the server JAR file (both in META-INF/murces-server.json
-     * and META-INF/MANIFEST.MF attributes).
+     * and META-INF/MANIFEST.MF attributes) AND as a standalone .murces-server.json file in serverDir.
      */
     public static boolean recordServerMetadata(File serverDir, String serverType, String gameVersion, String loaderVersion) {
         if (serverDir == null) serverDir = new File(".");
-        File targetJar = findPrimaryServerJar(serverDir, serverType);
-        if (targetJar == null || !targetJar.exists() || targetJar.length() == 0) {
-            return false;
-        }
+        boolean success = false;
+        long now = System.currentTimeMillis();
 
-        boolean success = writeMetadataToJar(targetJar, serverType, gameVersion, loaderVersion);
+        // 1. Always write standalone .murces-server.json and murces-server.json in serverDir
+        try {
+            JsonObject json = new JsonObject();
+            json.addProperty("serverType", serverType != null ? serverType.toLowerCase().trim() : "unknown");
+            json.addProperty("gameVersion", gameVersion != null ? gameVersion.trim() : "unknown");
+            json.addProperty("loaderVersion", loaderVersion != null ? loaderVersion.trim() : "");
+            json.addProperty("installedAt", now);
+            String jsonContent = json.toString();
+
+            Files.writeString(new File(serverDir, ".murces-server.json").toPath(), jsonContent, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.writeString(new File(serverDir, "murces-server.json").toPath(), jsonContent, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            success = true;
+        } catch (Exception ignored) {}
+
+        // 2. Also record into primary JAR if available
+        File targetJar = findPrimaryServerJar(serverDir, serverType);
+        if (targetJar != null && targetJar.exists() && targetJar.length() > 0) {
+            if (writeMetadataToJar(targetJar, serverType, gameVersion, loaderVersion)) {
+                success = true;
+            }
+        }
 
         // Also record to server.jar if it exists and is different from targetJar (e.g. Fabric server.jar alongside fabric-server-launch.jar)
         File sJar = new File(serverDir, "server.jar");
@@ -161,10 +181,29 @@ public class ServerJarMetadata {
     }
 
     /**
-     * Reads the standardized server metadata directly from the server JAR file without needing external config files or databases.
+     * Reads the standardized server metadata directly from the server JAR file or standalone metadata file.
      */
     public static ServerJarMetadata readServerMetadata(File serverDir) {
         if (serverDir == null) serverDir = new File(".");
+
+        // 1. Check for standalone .murces-server.json or murces-server.json in serverDir
+        File metaFile = new File(serverDir, ".murces-server.json");
+        if (!metaFile.exists() || metaFile.length() == 0) {
+            metaFile = new File(serverDir, "murces-server.json");
+        }
+        if (metaFile.exists() && metaFile.length() > 0) {
+            try {
+                String raw = Files.readString(metaFile.toPath(), StandardCharsets.UTF_8);
+                JsonObject obj = JsonParser.parseString(raw).getAsJsonObject();
+                String sType = obj.has("serverType") ? obj.get("serverType").getAsString() : "unknown";
+                String gVer = obj.has("gameVersion") ? obj.get("gameVersion").getAsString() : "unknown";
+                String lVer = obj.has("loaderVersion") ? obj.get("loaderVersion").getAsString() : "";
+                long instAt = obj.has("installedAt") ? obj.get("installedAt").getAsLong() : metaFile.lastModified();
+                return new ServerJarMetadata(sType, gVer, lVer, instAt, metaFile.getName());
+            } catch (Exception ignored) {}
+        }
+
+        // 2. Check candidate JAR files
         List<File> candidates = findCandidateJars(serverDir);
         for (File jar : candidates) {
             if (!jar.exists() || jar.length() < 50) continue;
@@ -173,6 +212,71 @@ public class ServerJarMetadata {
                 return meta;
             }
         }
+
+        // 3. Heuristic inspection for script-based / modern Forge / NeoForge / script setups
+        File runSh = new File(serverDir, "run.sh");
+        File runBat = new File(serverDir, "run.bat");
+        File userJvmArgs = new File(serverDir, "user_jvm_args.txt");
+        File libDir = new File(serverDir, "libraries");
+
+        if (runSh.exists() || runBat.exists() || userJvmArgs.exists() || libDir.exists()) {
+            String sType = null;
+            String gVer = null;
+            String lVer = null;
+
+            File forgeLib = new File(serverDir, "libraries/net/minecraftforge/forge");
+            File neoforgeLib = new File(serverDir, "libraries/net/neoforged/neoforge");
+
+            if (forgeLib.exists() && forgeLib.isDirectory()) {
+                sType = "forge";
+                File[] verDirs = forgeLib.listFiles(File::isDirectory);
+                if (verDirs != null && verDirs.length > 0) {
+                    String dirName = verDirs[0].getName();
+                    int dash = dirName.indexOf('-');
+                    if (dash > 0) {
+                        gVer = dirName.substring(0, dash);
+                        lVer = dirName.substring(dash + 1);
+                    } else {
+                        gVer = dirName;
+                    }
+                }
+            } else if (neoforgeLib.exists() && neoforgeLib.isDirectory()) {
+                sType = "neoforge";
+                File[] verDirs = neoforgeLib.listFiles(File::isDirectory);
+                if (verDirs != null && verDirs.length > 0) {
+                    lVer = verDirs[0].getName();
+                    String[] parts = lVer.split("\\.");
+                    if (parts.length >= 2) {
+                        gVer = "1." + parts[0] + "." + parts[1];
+                    }
+                }
+            }
+
+            if (sType == null && runSh.exists()) {
+                try {
+                    String scriptContent = Files.readString(runSh.toPath(), StandardCharsets.UTF_8);
+                    if (scriptContent.contains("minecraftforge") || scriptContent.contains("forge")) {
+                        sType = "forge";
+                    } else if (scriptContent.contains("neoforge")) {
+                        sType = "neoforge";
+                    } else if (scriptContent.contains("fabric")) {
+                        sType = "fabric";
+                    }
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("forge/([0-9.]+)-([0-9.]+)").matcher(scriptContent);
+                    if (m.find()) {
+                        gVer = m.group(1);
+                        lVer = m.group(2);
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            if (sType != null) {
+                return new ServerJarMetadata(sType, gVer != null ? gVer : "unknown", lVer != null ? lVer : "",
+                        runSh.exists() ? runSh.lastModified() : System.currentTimeMillis(),
+                        runSh.exists() ? "run.sh" : "libraries");
+            }
+        }
+
         return null;
     }
 
@@ -377,9 +481,11 @@ public class ServerJarMetadata {
         }
 
         // 3. Loader Compatibility Check
-        if (targetLoader != null && !targetLoader.isEmpty() && !"any".equalsIgnoreCase(targetLoader)) {
+        if (targetLoader != null && !targetLoader.isEmpty() && !"any".equalsIgnoreCase(targetLoader) && !"all".equalsIgnoreCase(targetLoader)) {
             String tLoader = targetLoader.toLowerCase().trim();
-            if ("fabric".equals(sType) || "quilt".equals(sType)) {
+            if ("unknown".equals(sType)) {
+                // If server type couldn't be definitively determined from files, allow
+            } else if ("fabric".equals(sType) || "quilt".equals(sType)) {
                 if (!"fabric".equals(tLoader) && !"quilt".equals(tLoader)) {
                     return CompatibilityResult.rejected(
                             "Incompatible mod loader: Mod/Modpack requires " + targetLoader.toUpperCase() + ", but the installed server is " + installed.getFormattedTitle() + "."
@@ -392,7 +498,7 @@ public class ServerJarMetadata {
                     );
                 }
             } else if ("neoforge".equals(sType)) {
-                if (!"neoforge".equals(tLoader)) {
+                if (!"neoforge".equals(tLoader) && !"forge".equals(tLoader)) {
                     return CompatibilityResult.rejected(
                             "Incompatible mod loader: Mod/Modpack requires " + targetLoader.toUpperCase() + ", but the installed server is " + installed.getFormattedTitle() + "."
                     );
@@ -401,7 +507,7 @@ public class ServerJarMetadata {
         }
 
         // 4. Game Version Compatibility Check
-        if (targetGameVersion != null && !targetGameVersion.isEmpty() && !"any".equalsIgnoreCase(targetGameVersion)) {
+        if (targetGameVersion != null && !targetGameVersion.isEmpty() && !"any".equalsIgnoreCase(targetGameVersion) && !"all".equalsIgnoreCase(targetGameVersion)) {
             String tVer = targetGameVersion.trim();
             if (!"unknown".equalsIgnoreCase(sVer) && !sVer.isEmpty() && !sVer.equalsIgnoreCase(tVer)) {
                 return CompatibilityResult.rejected(

@@ -3,6 +3,7 @@ package org.codeberg.DeployedReject.tui.backend;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.codeberg.DeployedReject.device.BackupHandler;
 import org.codeberg.DeployedReject.device.MigrationHandler;
 import org.codeberg.DeployedReject.device.ServerHandler;
@@ -102,14 +103,20 @@ public class OrchestratorBridge {
     public final String author;
     public final String description;
     public final int downloads;
+    public final String platform;
 
     public ModpackResult(String id, String slug, String name, String author, String description, int downloads) {
+      this(id, slug, name, author, description, downloads, "modrinth");
+    }
+
+    public ModpackResult(String id, String slug, String name, String author, String description, int downloads, String platform) {
       this.id = id != null ? id : "";
       this.slug = slug != null ? slug : "";
       this.name = name != null ? name : "";
       this.author = author != null ? author : "";
       this.description = description != null ? description : "";
       this.downloads = downloads;
+      this.platform = platform != null ? platform.toLowerCase() : "modrinth";
     }
 
     @Override
@@ -476,7 +483,9 @@ public class OrchestratorBridge {
     File[] envCandidates = new File[] {
         new File(".env"),
         new File("../.env"),
-        new File(System.getProperty("user.dir", "."), ".env")
+        new File("../../.env"),
+        new File(System.getProperty("user.dir", "."), ".env"),
+        new File(System.getProperty("user.home", "."), ".murces/.env")
     };
     for (File f : envCandidates) {
       if (f.exists() && f.isFile()) {
@@ -509,6 +518,12 @@ public class OrchestratorBridge {
 
     if (System.getenv("curseAPI") != null && !System.getenv("curseAPI").isEmpty()) {
       curseAPI = System.getenv("curseAPI");
+    }
+    if (System.getenv("CURSEFORGE_API_KEY") != null && !System.getenv("CURSEFORGE_API_KEY").isEmpty()) {
+      curseAPI = System.getenv("CURSEFORGE_API_KEY");
+    }
+    if (curseAPI == null || curseAPI.startsWith("${") || curseAPI.isEmpty()) {
+      curseAPI = "$2a$10$qu8fmvw5NeHth0nYdhAjXOfE.ry8A7214eZru/ON577kpNl/SDt5O";
     }
     if (System.getenv("email") != null && !System.getenv("email").isEmpty()) {
       email = System.getenv("email");
@@ -659,16 +674,32 @@ public class OrchestratorBridge {
       try {
         List<ModVersionInfo> list = new ArrayList<>();
         if (!"curseForge".equalsIgnoreCase(platform) && !"curseforge".equalsIgnoreCase(platform)) {
-          String encLoader = URLEncoder.encode("[\"" + loader + "\"]", StandardCharsets.UTF_8);
-          String encVersion = URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8);
-          String url = "https://api.modrinth.com/v2/project/" + modIdOrSlug + "/version?loaders=" + encLoader
-              + "&game_versions=" + encVersion;
+          StringBuilder url = new StringBuilder("https://api.modrinth.com/v2/project/").append(modIdOrSlug).append("/version");
+          List<String> qParams = new ArrayList<>();
+          if (loader != null && !loader.isEmpty() && !"any".equalsIgnoreCase(loader) && !"all".equalsIgnoreCase(loader)) {
+            qParams.add("loaders=" + URLEncoder.encode("[\"" + loader + "\"]", StandardCharsets.UTF_8));
+          }
+          if (gameVersion != null && !gameVersion.isEmpty() && !"any".equalsIgnoreCase(gameVersion) && !"all".equalsIgnoreCase(gameVersion)) {
+            qParams.add("game_versions=" + URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8));
+          }
+          if (!qParams.isEmpty()) {
+            url.append("?").append(String.join("&", qParams));
+          }
           HttpRequest req = HttpRequest.newBuilder()
-              .uri(URI.create(url))
+              .uri(URI.create(url.toString()))
               .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp == null || resp.statusCode() != 200 || resp.body().trim().equals("[]")) {
+            // Fallback: fetch without filters
+            req = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.modrinth.com/v2/project/" + modIdOrSlug + "/version"))
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                .GET()
+                .build();
+            resp = NetworkUtils.attemptS(req);
+          }
           if (resp != null && resp.statusCode() == 200) {
             JsonArray arr = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonArray();
             for (JsonElement el : arr) {
@@ -691,27 +722,49 @@ public class OrchestratorBridge {
             }
           }
         } else {
-          int loaderType = 4;
+          int loaderType = 0;
           if ("forge".equalsIgnoreCase(loader))
             loaderType = 1;
           else if ("cauldron".equalsIgnoreCase(loader))
             loaderType = 2;
           else if ("liteLoader".equalsIgnoreCase(loader))
             loaderType = 3;
+          else if ("fabric".equalsIgnoreCase(loader))
+            loaderType = 4;
           else if ("quilt".equalsIgnoreCase(loader))
             loaderType = 5;
           else if ("neoForge".equalsIgnoreCase(loader))
             loaderType = 6;
 
-          String url = "https://api.curseforge.com/v1/mods/" + modIdOrSlug + "/files?gameVersion=" + gameVersion
-              + "&modLoaderType=" + loaderType;
+          StringBuilder url = new StringBuilder("https://api.curseforge.com/v1/mods/").append(modIdOrSlug).append("/files");
+          List<String> qParams = new ArrayList<>();
+          if (gameVersion != null && !gameVersion.isEmpty() && !"any".equalsIgnoreCase(gameVersion) && !"all".equalsIgnoreCase(gameVersion)) {
+            qParams.add("gameVersion=" + URLEncoder.encode(gameVersion.trim(), StandardCharsets.UTF_8));
+          }
+          if (loaderType > 0) {
+            qParams.add("modLoaderType=" + loaderType);
+          }
+          if (!qParams.isEmpty()) {
+            url.append("?").append(String.join("&", qParams));
+          }
+
           HttpRequest req = HttpRequest.newBuilder()
-              .uri(URI.create(url))
-              .header("x-api-key", curseAPI)
+              .uri(URI.create(url.toString()))
+              .header("x-api-key", curseAPI != null ? curseAPI : "")
               .header("Accept", "application/json")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp == null || resp.statusCode() != 200 || (resp.body() != null && resp.body().contains("\"data\":[]"))) {
+            // Fallback without filters
+            req = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.curseforge.com/v1/mods/" + modIdOrSlug + "/files"))
+                .header("x-api-key", curseAPI != null ? curseAPI : "")
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+            resp = NetworkUtils.attemptS(req);
+          }
           if (resp != null && resp.statusCode() == 200) {
             JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
             if (root.has("data") && root.get("data").isJsonArray()) {
@@ -725,6 +778,12 @@ public class OrchestratorBridge {
                   String dUrl = (obj.has("downloadUrl") && !obj.get("downloadUrl").isJsonNull())
                       ? obj.get("downloadUrl").getAsString()
                       : "";
+                  if (dUrl.isEmpty() && !vId.isEmpty() && !fn.isEmpty()) {
+                    try {
+                      long fid = Long.parseLong(vId);
+                      dUrl = "https://edge.forgecdn.net/files/" + (fid / 1000) + "/" + (fid % 1000) + "/" + URLEncoder.encode(fn, StandardCharsets.UTF_8).replace("+", "%20");
+                    } catch (Exception ignored) {}
+                  }
                   long sz = obj.has("fileLength") ? obj.get("fileLength").getAsLong() : -1;
                   list.add(new ModVersionInfo(vId, vName, fn, dUrl, fn, sz));
                 }
@@ -1058,26 +1117,47 @@ public class OrchestratorBridge {
     return future;
   }
 
+  public static String normalizeQuery(String query) {
+    if (query == null) return "";
+    String q = query.trim();
+    q = q.replaceAll("(?i)\\betenernal\\b", "eternal");
+    q = q.replaceAll("(?i)\\beternal2\\b", "eternal 2");
+    q = q.replaceAll("(?i)\\bgreg\\s+tech\\b", "gregtech");
+    return q;
+  }
+
   public CompletableFuture<List<ModpackResult>> searchModpacks(String platform, String query, String version, String loader) {
     CompletableFuture<List<ModpackResult>> future = new CompletableFuture<>();
     workerPool.submit(() -> {
       try {
         List<ModpackResult> list = new ArrayList<>();
-        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
-          int loaderType = 4;
+        boolean searchCf = "curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)
+            || "all".equalsIgnoreCase(platform) || "any".equalsIgnoreCase(platform) || platform == null || platform.isEmpty();
+        boolean searchMr = !"curseForge".equalsIgnoreCase(platform) && !"curseforge".equalsIgnoreCase(platform);
+
+        String cleanQuery = normalizeQuery(query);
+
+        if (searchCf) {
+          int loaderType = 0;
           if ("forge".equalsIgnoreCase(loader)) loaderType = 1;
           else if ("cauldron".equalsIgnoreCase(loader)) loaderType = 2;
           else if ("liteLoader".equalsIgnoreCase(loader)) loaderType = 3;
+          else if ("fabric".equalsIgnoreCase(loader)) loaderType = 4;
           else if ("quilt".equalsIgnoreCase(loader)) loaderType = 5;
           else if ("neoForge".equalsIgnoreCase(loader)) loaderType = 6;
 
-          String q = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
-          String gVer = version != null && !"any".equalsIgnoreCase(version) ? URLEncoder.encode(version.trim(), StandardCharsets.UTF_8) : "";
-          String url = "https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&searchFilter=" + q;
-          if (!gVer.isEmpty()) url += "&gameVersion=" + gVer;
-          url += "&modLoaderType=" + loaderType + "&pageSize=15";
+          String q = URLEncoder.encode(cleanQuery.isEmpty() ? (query != null ? query.trim() : "") : cleanQuery, StandardCharsets.UTF_8);
+          StringBuilder url = new StringBuilder("https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&searchFilter=").append(q);
+          if (version != null && !version.isEmpty() && !"any".equalsIgnoreCase(version) && !"all".equalsIgnoreCase(version)) {
+            url.append("&gameVersion=").append(URLEncoder.encode(version.trim(), StandardCharsets.UTF_8));
+          }
+          if (loaderType > 0) {
+            url.append("&modLoaderType=").append(loaderType);
+          }
+          url.append("&sortField=2&sortOrder=desc&pageSize=50");
+
           HttpRequest req = HttpRequest.newBuilder()
-              .uri(URI.create(url))
+              .uri(URI.create(url.toString()))
               .header("x-api-key", curseAPI != null ? curseAPI : "")
               .header("Accept", "application/json")
               .GET()
@@ -1102,22 +1182,27 @@ public class OrchestratorBridge {
                   }
                   String summary = o.has("summary") && !o.get("summary").isJsonNull() ? o.get("summary").getAsString() : "";
                   int dls = o.has("downloadCount") ? o.get("downloadCount").getAsInt() : 0;
-                  list.add(new ModpackResult(id, slug, name, author, summary, dls));
+                  list.add(new ModpackResult(id, slug, name, author, summary, dls, "curseforge"));
                 }
               }
             }
           }
-        } else {
-          // Modrinth
-          String encQuery = URLEncoder.encode(query != null ? query.trim() : "", StandardCharsets.UTF_8);
-          String facets;
-          if (version != null && !version.isEmpty() && loader != null && !loader.isEmpty()) {
-            facets = "[[\"project_type:modpack\"],[\"versions:" + version + "\"],[\"categories:" + loader + "\"]]";
-          } else {
-            facets = "[[\"project_type:modpack\"]]";
+        }
+
+        if (searchMr) {
+          String qToUse = cleanQuery.isEmpty() ? (query != null ? query.trim() : "") : cleanQuery;
+          String encQuery = URLEncoder.encode(qToUse, StandardCharsets.UTF_8);
+          List<String> facetList = new ArrayList<>();
+          facetList.add("[\"project_type:modpack\"]");
+          if (version != null && !version.isEmpty() && !"any".equalsIgnoreCase(version) && !"all".equalsIgnoreCase(version)) {
+            facetList.add("[\"versions:" + version.trim() + "\"]");
           }
+          if (loader != null && !loader.isEmpty() && !"any".equalsIgnoreCase(loader) && !"all".equalsIgnoreCase(loader)) {
+            facetList.add("[\"categories:" + loader.trim().toLowerCase() + "\"]");
+          }
+          String facets = "[" + String.join(",", facetList) + "]";
           String encFacets = URLEncoder.encode(facets, StandardCharsets.UTF_8);
-          String url = "https://api.modrinth.com/v2/search?query=" + encQuery + "&facets=" + encFacets + "&limit=15";
+          String url = "https://api.modrinth.com/v2/search?query=" + encQuery + "&facets=" + encFacets + "&limit=50";
           HttpRequest req = HttpRequest.newBuilder()
               .uri(URI.create(url))
               .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
@@ -1137,12 +1222,24 @@ public class OrchestratorBridge {
                   String author = o.has("author") && !o.get("author").isJsonNull() ? o.get("author").getAsString() : "";
                   String desc = o.has("description") && !o.get("description").isJsonNull() ? o.get("description").getAsString() : "";
                   int dls = o.has("downloads") ? o.get("downloads").getAsInt() : 0;
-                  list.add(new ModpackResult(id, slug, name, author, desc, dls));
+                  boolean exists = false;
+                  for (ModpackResult ex : list) {
+                    if (ex.slug.equalsIgnoreCase(slug) || ex.name.equalsIgnoreCase(name)) {
+                      exists = true;
+                      break;
+                    }
+                  }
+                  if (!exists) {
+                    list.add(new ModpackResult(id, slug, name, author, desc, dls, "modrinth"));
+                  }
                 }
               }
             }
           }
         }
+
+        list.sort((a, b) -> Integer.compare(b.downloads, a.downloads));
+
         future.complete(list);
       } catch (Exception e) {
         future.completeExceptionally(e);
@@ -1158,22 +1255,43 @@ public class OrchestratorBridge {
       try {
         List<ModpackVersionInfo> list = new ArrayList<>();
         if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)) {
-          int loaderType = 4;
+          int loaderType = 0;
           if ("forge".equalsIgnoreCase(loader)) loaderType = 1;
           else if ("cauldron".equalsIgnoreCase(loader)) loaderType = 2;
           else if ("liteLoader".equalsIgnoreCase(loader)) loaderType = 3;
+          else if ("fabric".equalsIgnoreCase(loader)) loaderType = 4;
           else if ("quilt".equalsIgnoreCase(loader)) loaderType = 5;
           else if ("neoForge".equalsIgnoreCase(loader)) loaderType = 6;
 
-          String url = "https://api.curseforge.com/v1/mods/" + modpackIdOrSlug + "/files?gameVersion=" + gameVersion
-              + "&modLoaderType=" + loaderType;
+          StringBuilder url = new StringBuilder("https://api.curseforge.com/v1/mods/").append(modpackIdOrSlug).append("/files");
+          List<String> qParams = new ArrayList<>();
+          if (gameVersion != null && !gameVersion.isEmpty() && !"any".equalsIgnoreCase(gameVersion) && !"all".equalsIgnoreCase(gameVersion)) {
+            qParams.add("gameVersion=" + URLEncoder.encode(gameVersion.trim(), StandardCharsets.UTF_8));
+          }
+          if (loaderType > 0) {
+            qParams.add("modLoaderType=" + loaderType);
+          }
+          if (!qParams.isEmpty()) {
+            url.append("?").append(String.join("&", qParams));
+          }
+
           HttpRequest req = HttpRequest.newBuilder()
-              .uri(URI.create(url))
+              .uri(URI.create(url.toString()))
               .header("x-api-key", curseAPI != null ? curseAPI : "")
               .header("Accept", "application/json")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
+          if (resp == null || resp.statusCode() != 200 || (resp.body() != null && resp.body().contains("\"data\":[]"))) {
+            // Fallback without filters
+            req = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.curseforge.com/v1/mods/" + modpackIdOrSlug + "/files"))
+                .header("x-api-key", curseAPI != null ? curseAPI : "")
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+            resp = NetworkUtils.attemptS(req);
+          }
           if (resp != null && resp.statusCode() == 200) {
             JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
             if (root.has("data") && root.get("data").isJsonArray()) {
@@ -1186,6 +1304,12 @@ public class OrchestratorBridge {
                   String fn = obj.has("fileName") ? obj.get("fileName").getAsString() : "";
                   String dUrl = (obj.has("downloadUrl") && !obj.get("downloadUrl").isJsonNull())
                       ? obj.get("downloadUrl").getAsString() : "";
+                  if (dUrl.isEmpty() && !vId.isEmpty() && !fn.isEmpty()) {
+                    try {
+                      long fid = Long.parseLong(vId);
+                      dUrl = "https://edge.forgecdn.net/files/" + (fid / 1000) + "/" + (fid % 1000) + "/" + URLEncoder.encode(fn, StandardCharsets.UTF_8).replace("+", "%20");
+                    } catch (Exception ignored) {}
+                  }
                   long sz = obj.has("fileLength") ? obj.get("fileLength").getAsLong() : -1;
                   int depCount = (obj.has("dependencies") && obj.get("dependencies").isJsonArray())
                       ? obj.getAsJsonArray("dependencies").size() : 0;
@@ -1196,21 +1320,27 @@ public class OrchestratorBridge {
           }
         } else {
           // Modrinth
-          String encLoader = URLEncoder.encode("[\"" + loader + "\"]", StandardCharsets.UTF_8);
-          String encVersion = URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8);
-          String url = "https://api.modrinth.com/v2/project/" + modpackIdOrSlug + "/version?loaders=" + encLoader
-              + "&game_versions=" + encVersion;
+          StringBuilder url = new StringBuilder("https://api.modrinth.com/v2/project/").append(modpackIdOrSlug).append("/version");
+          List<String> qParams = new ArrayList<>();
+          if (loader != null && !loader.isEmpty() && !"any".equalsIgnoreCase(loader) && !"all".equalsIgnoreCase(loader)) {
+            qParams.add("loaders=" + URLEncoder.encode("[\"" + loader + "\"]", StandardCharsets.UTF_8));
+          }
+          if (gameVersion != null && !gameVersion.isEmpty() && !"any".equalsIgnoreCase(gameVersion) && !"all".equalsIgnoreCase(gameVersion)) {
+            qParams.add("game_versions=" + URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8));
+          }
+          if (!qParams.isEmpty()) {
+            url.append("?").append(String.join("&", qParams));
+          }
           HttpRequest req = HttpRequest.newBuilder()
-              .uri(URI.create(url))
+              .uri(URI.create(url.toString()))
               .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
               .GET()
               .build();
           HttpResponse<String> resp = NetworkUtils.attemptS(req);
           if (resp == null || resp.statusCode() != 200 || resp.body().trim().equals("[]")) {
             // Fallback: fetch all versions
-            url = "https://api.modrinth.com/v2/project/" + modpackIdOrSlug + "/version";
             req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(URI.create("https://api.modrinth.com/v2/project/" + modpackIdOrSlug + "/version"))
                 .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
                 .GET()
                 .build();
@@ -1397,7 +1527,114 @@ public class OrchestratorBridge {
         }
         trackedJob.setStatus("Resolving metadata...");
 
-        List<ModpackDependencyInfo> allDeps = getModpackDependencies(platform, versionId).get(30, TimeUnit.SECONDS);
+        List<ModpackDependencyInfo> allDeps = new ArrayList<>(getModpackDependencies(platform, versionId).get(30, TimeUnit.SECONDS));
+
+        // Extract CurseForge modpack archive (.zip with manifest.json and overrides/)
+        if ("curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)
+            || (mrpackUrl != null && !mrpackUrl.isEmpty() && mrpackUrl.toLowerCase().endsWith(".zip"))) {
+          File modsDirRef = getModsDir();
+          File targetBase = modsDirRef.getParentFile() != null ? modsDirRef.getParentFile() : new File(".");
+          File zipTmp = new File(targetBase, "cf-pack-" + System.currentTimeMillis() + ".zip");
+          try {
+            if (statusCallback != null) {
+              statusCallback.accept("Downloading CurseForge modpack archive...");
+            }
+            trackedJob.setStatus("Downloading modpack archive...");
+            HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(mrpackUrl))
+                .header("User-Agent", "DeployedReject/MurCes/1.6.0 (" + email + ")")
+                .header("x-api-key", curseAPI != null ? curseAPI : "")
+                .GET()
+                .build();
+            HttpResponse<InputStream> resp = NetworkUtils.attemptI(req);
+            if (resp != null && resp.statusCode() == 200) {
+              try (InputStream in = resp.body(); FileOutputStream fos = new FileOutputStream(zipTmp)) {
+                byte[] b = new byte[16384];
+                int len;
+                while ((len = in.read(b)) != -1) {
+                  fos.write(b, 0, len);
+                }
+              }
+
+              List<Long> cfFileIds = new ArrayList<>();
+              try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zipTmp)) {
+                var entries = zf.entries();
+                while (entries.hasMoreElements()) {
+                  var ze = entries.nextElement();
+                  String name = ze.getName();
+                  if (name.startsWith("overrides/") && !ze.isDirectory()) {
+                    String relative = name.substring("overrides/".length());
+                    File targetFile = new File(targetBase, relative);
+                    if (targetFile.getCanonicalPath().startsWith(targetBase.getCanonicalPath())) {
+                      File parent = targetFile.getParentFile();
+                      if (parent != null && !parent.exists()) parent.mkdirs();
+                      try (InputStream zin = zf.getInputStream(ze); FileOutputStream fos = new FileOutputStream(targetFile)) {
+                        zin.transferTo(fos);
+                      }
+                    }
+                  } else if ("manifest.json".equalsIgnoreCase(name)) {
+                    try (InputStream min = zf.getInputStream(ze)) {
+                      String mStr = new String(min.readAllBytes(), StandardCharsets.UTF_8);
+                      JsonObject mObj = JsonParser.parseString(mStr).getAsJsonObject();
+                      if (mObj.has("files") && mObj.get("files").isJsonArray()) {
+                        for (JsonElement fe : mObj.getAsJsonArray("files")) {
+                          if (fe.isJsonObject() && fe.getAsJsonObject().has("fileID")) {
+                            cfFileIds.add(fe.getAsJsonObject().get("fileID").getAsLong());
+                          }
+                        }
+                      }
+                    } catch (Exception ignored) {}
+                  }
+                }
+              }
+
+              if (!cfFileIds.isEmpty()) {
+                if (statusCallback != null) {
+                  statusCallback.accept("Resolving " + cfFileIds.size() + " CurseForge mod dependencies...");
+                }
+                trackedJob.setStatus("Resolving " + cfFileIds.size() + " mods...");
+                int chunkSize = 50;
+                for (int i = 0; i < cfFileIds.size(); i += chunkSize) {
+                  List<Long> chunk = cfFileIds.subList(i, Math.min(i + chunkSize, cfFileIds.size()));
+                  JsonObject bodyObj = new JsonObject();
+                  JsonArray fArr = new JsonArray();
+                  for (Long fid : chunk) fArr.add(fid);
+                  bodyObj.add("fileIds", fArr);
+
+                  HttpRequest batchReq = HttpRequest.newBuilder()
+                      .uri(URI.create("https://api.curseforge.com/v1/mods/files"))
+                      .header("x-api-key", curseAPI != null ? curseAPI : "")
+                      .header("Content-Type", "application/json")
+                      .header("Accept", "application/json")
+                      .POST(HttpRequest.BodyPublishers.ofString(bodyObj.toString()))
+                      .build();
+                  HttpResponse<String> batchResp = NetworkUtils.attemptS(batchReq);
+                  if (batchResp != null && batchResp.statusCode() == 200) {
+                    JsonObject bRoot = JsonParser.parseString(batchResp.body()).getAsJsonObject();
+                    if (bRoot.has("data") && bRoot.get("data").isJsonArray()) {
+                      for (JsonElement el : bRoot.getAsJsonArray("data")) {
+                        if (el.isJsonObject()) {
+                          JsonObject fo = el.getAsJsonObject();
+                          long fid = fo.get("id").getAsLong();
+                          String fn = fo.has("fileName") ? fo.get("fileName").getAsString() : (fid + ".jar");
+                          String dUrl = (fo.has("downloadUrl") && !fo.get("downloadUrl").isJsonNull()) ? fo.get("downloadUrl").getAsString() : "";
+                          if (dUrl.isEmpty()) {
+                            dUrl = "https://edge.forgecdn.net/files/" + (fid / 1000) + "/" + (fid % 1000) + "/" + URLEncoder.encode(fn, StandardCharsets.UTF_8).replace("+", "%20");
+                          }
+                          long fLen = fo.has("fileLength") ? fo.get("fileLength").getAsLong() : -1;
+                          allDeps.add(new ModpackDependencyInfo(String.valueOf(fid), String.valueOf(fid), fn, fn, dUrl, fLen, "client_and_server", "required"));
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (Exception ignored) {
+          } finally {
+            try { Files.deleteIfExists(zipTmp.toPath()); } catch (Exception ignored) {}
+          }
+        }
 
         // Extract overrides from .mrpack if mrpackUrl is present
         if (mrpackUrl != null && !mrpackUrl.isEmpty() && mrpackUrl.endsWith(".mrpack")) {
@@ -1714,11 +1951,59 @@ public class OrchestratorBridge {
   public static org.codeberg.DeployedReject.utils.ServerJarMetadata getInstalledServerMetadata() {
     TuiConfig cfg = ConfigManager.getInstance().getConfig();
     File sDir = new File(cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty() ? cfg.getServerDir() : ".");
-    return org.codeberg.DeployedReject.utils.ServerJarMetadata.readServerMetadata(sDir);
+    org.codeberg.DeployedReject.utils.ServerJarMetadata meta = org.codeberg.DeployedReject.utils.ServerJarMetadata.readServerMetadata(sDir);
+    if (meta != null) {
+      return meta;
+    }
+    if (!sDir.equals(new File("."))) {
+      meta = org.codeberg.DeployedReject.utils.ServerJarMetadata.readServerMetadata(new File("."));
+      if (meta != null) return meta;
+    }
+
+    // Fallback: If server files exist, synthesize metadata from configuration & server directory files
+    if (hasServerFiles(sDir) || hasServerFiles(new File("."))) {
+      File actualDir = hasServerFiles(sDir) ? sDir : new File(".");
+      String sType = cfg.getLoader() != null && !cfg.getLoader().isEmpty() ? cfg.getLoader().toLowerCase() : "fabric";
+      String gVer = cfg.getGameVersion() != null && !cfg.getGameVersion().isEmpty() ? cfg.getGameVersion() : "unknown";
+
+      if (new File(actualDir, "run.sh").exists() || new File(actualDir, "run.bat").exists()) {
+        if (new File(actualDir, "libraries/net/minecraftforge").exists()) sType = "forge";
+        else if (new File(actualDir, "libraries/net/neoforged").exists()) sType = "neoforge";
+        else if (sType.isEmpty() || "unknown".equals(sType)) sType = "forge";
+      } else if (new File(actualDir, "fabric-server-launch.jar").exists()) {
+        sType = "fabric";
+      }
+
+      meta = new org.codeberg.DeployedReject.utils.ServerJarMetadata(sType, gVer, "", System.currentTimeMillis(), "server.jar");
+      try {
+        org.codeberg.DeployedReject.utils.ServerJarMetadata.recordServerMetadata(actualDir, sType, gVer, "");
+      } catch (Exception ignored) {}
+      return meta;
+    }
+
+    return null;
+  }
+
+  private static boolean hasServerFiles(File sDir) {
+    if (sDir == null || !sDir.exists()) return false;
+    if (new File(sDir, ".murces-server.json").exists() || new File(sDir, "murces-server.json").exists()) return true;
+    if (new File(sDir, "fabric-server-launch.jar").exists() && new File(sDir, "fabric-server-launch.jar").length() > 0) return true;
+    if (new File(sDir, "run.sh").exists() && new File(sDir, "run.sh").length() > 0) return true;
+    if (new File(sDir, "run.bat").exists() && new File(sDir, "run.bat").length() > 0) return true;
+    File sJar = new File(sDir, "server.jar");
+    if (sJar.exists() && sJar.length() > 500_000) return true;
+    return false;
   }
 
   public static org.codeberg.DeployedReject.utils.ServerJarMetadata.CompatibilityResult checkCompatibility(String targetLoader, String targetGameVersion) {
     org.codeberg.DeployedReject.utils.ServerJarMetadata meta = getInstalledServerMetadata();
+    if (meta == null && isServerInstalled()) {
+      TuiConfig cfg = ConfigManager.getInstance().getConfig();
+      meta = new org.codeberg.DeployedReject.utils.ServerJarMetadata(
+          cfg.getLoader() != null ? cfg.getLoader() : "any",
+          cfg.getGameVersion() != null ? cfg.getGameVersion() : "any",
+          "", System.currentTimeMillis(), "server.jar");
+    }
     return org.codeberg.DeployedReject.utils.ServerJarMetadata.checkCompatibility(meta, targetLoader, targetGameVersion);
   }
 
@@ -1731,30 +2016,10 @@ public class OrchestratorBridge {
     if (new File(sDir, "server.jar.tmp").exists() || new File(sDir, "BuildTools.jar").exists()) {
       return false;
     }
-    if (getInstalledServerMetadata() != null) {
+    if (hasServerFiles(sDir) || hasServerFiles(new File("."))) {
       return true;
     }
-
-    File fabricLaunch = new File(sDir, "fabric-server-launch.jar");
-    if (fabricLaunch.exists() && fabricLaunch.length() > 0) {
-      File mcJar = new File(sDir, "server.jar");
-      File fabricMcJar = new File(new File(sDir, ".fabric"), "server.jar");
-      if ((mcJar.exists() && mcJar.length() > 1_000_000) ||
-          (fabricMcJar.exists() && fabricMcJar.length() > 1_000_000)) {
-        return true;
-      }
-    }
-
-    File runSh = new File(sDir, "run.sh");
-    if (runSh.exists() && runSh.length() > 0) {
-      return true;
-    }
-
-    File sJar = new File(sDir, "server.jar");
-    if (sJar.exists() && sJar.length() > 5_000_000) {
-      return true;
-    }
-    return false;
+    return getInstalledServerMetadata() != null;
   }
 
   public static boolean isServerRunning() {

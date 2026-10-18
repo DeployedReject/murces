@@ -119,7 +119,7 @@ public class ModBrowseView implements WorkspaceView {
     singleModsPanel = new Panel(new LinearLayout(Direction.VERTICAL));
 
     platformBox = new ComboBox<>("Modrinth", "CurseForge");
-    loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
+    loaderBox = new ComboBox<>("any", "fabric", "forge", "neoforge", "quilt");
     versionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
     searchBox = new TextBox(new TerminalSize(16, 1), "jei");
     searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
@@ -238,7 +238,7 @@ public class ModBrowseView implements WorkspaceView {
     modpacksPanel = new Panel(new LinearLayout(Direction.VERTICAL));
 
     packPlatformBox = new ComboBox<>("Modrinth", "CurseForge");
-    packLoaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
+    packLoaderBox = new ComboBox<>("any", "fabric", "forge", "neoforge", "quilt");
     packVersionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
     packSearchBox = new TextBox(new TerminalSize(16, 1), "cobblemon");
     packSearchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch Packs"), this::onPackSearch);

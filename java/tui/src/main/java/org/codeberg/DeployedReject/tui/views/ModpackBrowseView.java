@@ -70,7 +70,7 @@ public class ModpackBrowseView implements WorkspaceView {
     this.root = new Panel(new LinearLayout(Direction.VERTICAL));
 
     platformBox = new ComboBox<>("Modrinth", "CurseForge");
-    loaderBox = new ComboBox<>("fabric", "forge", "neoforge", "quilt");
+    loaderBox = new ComboBox<>("any", "fabric", "forge", "neoforge", "quilt");
     versionComboBox = MinecraftVersionHelper.createVersionComboBox(mainWindow.getGui(), new TerminalSize(10, 1));
     searchBox = new TextBox(new TerminalSize(16, 1), "cobblemon");
     searchBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_SEARCH + " [S]earch"), this::onSearch);
