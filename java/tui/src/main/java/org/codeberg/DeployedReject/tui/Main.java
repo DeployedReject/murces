@@ -145,7 +145,7 @@ public class Main {
                             System.exit(1);
                         }
                     }
-                    org.codeberg.DeployedReject.utils.OrchestratorBridge.installFromZip(zipFile, impForce);
+                    OrchestratorBridge.installFromZip(zipFile, impForce);
                     System.out.println("[INFO] Server import completed.");
                 } catch (Exception e) {
                     System.err.println("[ERROR] Import failed: " + e.getMessage());
