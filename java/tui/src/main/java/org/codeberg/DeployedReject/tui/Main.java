@@ -116,7 +116,42 @@ public class Main {
                     System.err.println("Search failed: " + e.getMessage());
                 }
                 break;
-            case "install-modpack":
+                        case "import-server":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces import-server <url-or-path> [--force]");
+                    System.exit(1);
+                }
+                String src = args[1];
+                boolean impForce = false;
+                for (String a : args) { if ("--force".equalsIgnoreCase(a) || "-f".equalsIgnoreCase(a)) impForce = true; }
+                try {
+                    java.io.File zipFile;
+                    if (src.startsWith("http://") || src.startsWith("https://")) {
+                        // download to temp file
+                        java.net.URL url = new java.net.URL(src);
+                        java.io.InputStream in = url.openStream();
+                        zipFile = java.nio.file.Files.createTempFile("import_server", ".zip").toFile();
+                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile)) {
+                            byte[] buffer = new byte[8192];
+                            int len;
+                            while ((len = in.read(buffer)) != -1) {
+                                fos.write(buffer, 0, len);
+                            }
+                        }
+                    } else {
+                        zipFile = new java.io.File(src);
+                        if (!zipFile.exists()) {
+                            System.err.println("[ERROR] File not found: " + src);
+                            System.exit(1);
+                        }
+                    }
+                    org.codeberg.DeployedReject.utils.OrchestratorBridge.installFromZip(zipFile, impForce);
+                    System.out.println("[INFO] Server import completed.");
+                } catch (Exception e) {
+                    System.err.println("[ERROR] Import failed: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
                 if (args.length < 2) {
                     System.err.println("Usage: murces install-modpack <slug-or-id> [version] [loader] [platform] [--include-client] [--force]");
                     System.exit(1);

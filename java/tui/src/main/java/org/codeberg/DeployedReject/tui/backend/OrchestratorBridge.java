@@ -1117,7 +1117,19 @@ public class OrchestratorBridge {
     return future;
   }
 
-  public static String normalizeQuery(String query) {
+    public static String normalizeQuery(String query) {
+        if (query == null) return "";
+        String q = query.trim();
+        // Replace known misspellings and variations
+        q = q.replaceAll("(?i)\\betenernal\\b", "eternal");
+        q = q.replaceAll("(?i)\\beternal2\\b", "eternal 2");
+        q = q.replaceAll("(?i)\\bgreg\\s+tech\\b", "gregtech");
+        // Handle "GregTech: New Horizon" variations
+        q = q.replaceAll("(?i)gregtech[:\\s]*new\\s*horizon", "gregtech new horizon");
+        // Collapse multiple spaces
+        q = q.replaceAll("\\s+", " ");
+        return q;
+    }
     if (query == null) return "";
     String q = query.trim();
     q = q.replaceAll("(?i)\\betenernal\\b", "eternal");
