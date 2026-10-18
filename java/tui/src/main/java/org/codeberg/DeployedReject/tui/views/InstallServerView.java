@@ -25,6 +25,7 @@ public class InstallServerView implements WorkspaceView {
     private final Label progressLabel;
     private final Button installOnlyBtn;
     private final Button installStartBtn;
+    private final Button importBtn;
     private final Button cancelBtn;
     private final Button backBtn;
     private final Map<Character, Runnable> hotkeys = new HashMap<>();
@@ -46,6 +47,7 @@ public class InstallServerView implements WorkspaceView {
         portableJdkCheck.setChecked(org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().isPortableJdk());
         installOnlyBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PACKAGE + " [I]nstall Only"), () -> runInstall(0));
         installStartBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_PLAY + " [S]tart & Install"), () -> runInstall(1));
+        importBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_DOWNLOAD + " [M] Direct Import (ZIP/URL)"), this::promptImport);
         cancelBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [X] Cancel Installation"), this::cancelInstallation);
         backBtn = new Button(GlyphHelper.apply(GlyphHelper.ICON_BACK + " [B]ack to Main Menu"), mainWindow::showMainMenu);
 
@@ -84,6 +86,8 @@ public class InstallServerView implements WorkspaceView {
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(installStartBtn);
         actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
+        actionPanel.addComponent(importBtn);
+        actionPanel.addComponent(new EmptySpace(new TerminalSize(1, 1)));
         actionPanel.addComponent(cancelBtn);
         root.addComponent(actionPanel);
 
@@ -101,6 +105,7 @@ public class InstallServerView implements WorkspaceView {
 
         hotkeys.put('I', KeyboardNavigationHelper.action(installOnlyBtn, () -> runInstall(0)));
         hotkeys.put('S', KeyboardNavigationHelper.action(installStartBtn, () -> runInstall(1)));
+        hotkeys.put('M', KeyboardNavigationHelper.action(importBtn, this::promptImport));
         hotkeys.put('X', KeyboardNavigationHelper.action(cancelBtn, this::cancelInstallation));
         hotkeys.put('E', this::cycleEngine);
         hotkeys.put('V', () -> MinecraftVersionHelper.cycleVersion(gameVersionComboBox));
@@ -265,6 +270,114 @@ public class InstallServerView implements WorkspaceView {
                     installStartBtn.setEnabled(true);
                     progressLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Installation stopped: " + e.getMessage()));
                     ActivityLogger.err("Installation stopped: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void promptImport() {
+        if (OrchestratorBridge.isServerDownloading()) {
+            ActivityLogger.warn("An operation is already in progress!");
+            return;
+        }
+
+        String input = com.googlecode.lanterna.gui2.dialogs.TextInputDialog.showDialog(
+            mainWindow.getGui(),
+            "Direct Import Server (ZIP / URL)",
+            "Enter path to local server .zip or direct download URL:",
+            ""
+        );
+
+        if (input == null || input.trim().isEmpty()) {
+            return;
+        }
+
+        final String src = input.trim();
+        String sDir = installDirBox.getText().trim();
+        if (!sDir.isEmpty()) {
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().getConfig().setServerDir(sDir);
+            org.codeberg.DeployedReject.tui.config.ConfigManager.getInstance().save();
+        }
+
+        installOnlyBtn.setEnabled(false);
+        installStartBtn.setEnabled(false);
+        importBtn.setEnabled(false);
+        progressBar.setValue(0);
+        progressLabel.setText("[BUSY] Preparing import...");
+        ActivityLogger.info("Starting direct server import from: " + src);
+
+        new Thread(() -> {
+            try {
+                java.io.File zipFile;
+                if (src.startsWith("http://") || src.startsWith("https://")) {
+                    mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                        progressLabel.setText("[BUSY] Downloading server archive...");
+                        ActivityLogger.info("Downloading server archive from " + src);
+                    });
+                    java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                        .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
+                        .build();
+                    java.net.http.HttpRequest dlReq = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(src))
+                        .header("User-Agent", "MurCes/1.6")
+                        .GET()
+                        .build();
+                    zipFile = java.nio.file.Files.createTempFile("import_server_", ".zip").toFile();
+                    java.net.http.HttpResponse<java.io.InputStream> dlResp = httpClient.send(
+                        dlReq, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+                    if (dlResp.statusCode() != 200) {
+                        throw new java.io.IOException("Download failed with HTTP " + dlResp.statusCode());
+                    }
+                    try (java.io.InputStream in = dlResp.body();
+                         java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile)) {
+                        byte[] buffer = new byte[65536];
+                        int len;
+                        while ((len = in.read(buffer)) != -1) {
+                            fos.write(buffer, 0, len);
+                        }
+                    }
+                } else {
+                    zipFile = new java.io.File(src);
+                    if (!zipFile.exists()) {
+                        throw new java.io.FileNotFoundException("File not found: " + src);
+                    }
+                }
+
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    progressBar.setValue(50);
+                    progressLabel.setText("[BUSY] Extracting and configuring server...");
+                    ActivityLogger.info("Extracting server archive...");
+                });
+
+                OrchestratorBridge.installFromZip(zipFile, true);
+
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    progressBar.setValue(100);
+                    installOnlyBtn.setEnabled(true);
+                    installStartBtn.setEnabled(true);
+                    importBtn.setEnabled(true);
+                    progressLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CHECK + " [OK] Server imported successfully!"));
+                    ActivityLogger.ok("Direct server import completed successfully!");
+                    com.googlecode.lanterna.gui2.dialogs.MessageDialog.showMessageDialog(
+                        mainWindow.getGui(),
+                        "Import Complete",
+                        "Server files have been successfully imported and configured!",
+                        com.googlecode.lanterna.gui2.dialogs.MessageDialogButton.OK
+                    );
+                });
+            } catch (Exception e) {
+                mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                    installOnlyBtn.setEnabled(true);
+                    installStartBtn.setEnabled(true);
+                    importBtn.setEnabled(true);
+                    progressLabel.setText(GlyphHelper.apply(GlyphHelper.ICON_CROSS + " [ERR] Import failed: " + e.getMessage()));
+                    ActivityLogger.err("Import failed: " + e.getMessage());
+                    com.googlecode.lanterna.gui2.dialogs.MessageDialog.showMessageDialog(
+                        mainWindow.getGui(),
+                        "Import Error",
+                        "Failed to import server: " + e.getMessage(),
+                        com.googlecode.lanterna.gui2.dialogs.MessageDialogButton.OK
+                    );
                 });
             }
         }).start();

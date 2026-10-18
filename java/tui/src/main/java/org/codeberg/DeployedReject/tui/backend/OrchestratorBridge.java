@@ -1123,9 +1123,11 @@ public class OrchestratorBridge {
         // Replace known misspellings and variations
         q = q.replaceAll("(?i)\\betenernal\\b", "eternal");
         q = q.replaceAll("(?i)\\beternal2\\b", "eternal 2");
+        // Handle "GregTech: New Horizon(s)" variations -> CurseForge title is "GT New Horizons"
+        if (q.matches("(?i).*greg\\s*tech.*new\\s*horizon.*") || q.matches("(?i).*gt\\s*new\\s*horizon.*") || q.equalsIgnoreCase("gtnh")) {
+            return "GT New Horizons";
+        }
         q = q.replaceAll("(?i)\\bgreg\\s+tech\\b", "gregtech");
-        // Handle "GregTech: New Horizon" variations
-        q = q.replaceAll("(?i)gregtech[:\\s]*new\\s*horizon", "gregtech new horizon");
         // Collapse multiple spaces
         q = q.replaceAll("\\s+", " ");
         return q;
@@ -1605,16 +1607,6 @@ public class OrchestratorBridge {
             System.err.println("[WARN] Failed to install bundled server engine: " + e.getMessage());
           }
         }
-        // After extracting the modpack archive, check for a bundled server engine
-        if (hasServerFiles(targetBase)) {
-          if (statusCallback != null) statusCallback.accept("Installing bundled server engine from modpack...");
-          try {
-            installBundledServerEngine(targetBase);
-            System.out.println("[INFO] Bundled server engine installed.");
-          } catch (Exception e) {
-            System.err.println("[WARN] Failed to install bundled server engine: " + e.getMessage());
-          }
-        }
         if (!cfFileIds.isEmpty()) {
                 if (statusCallback != null) {
                   statusCallback.accept("Resolving " + cfFileIds.size() + " CurseForge mod dependencies...");
@@ -2042,17 +2034,49 @@ public class OrchestratorBridge {
 
     // Attempt to record metadata based on what was copied
     try {
-      // Guess loader and game version from config (or defaults)
-      String loader = cfg.getLoader() != null && !cfg.getLoader().isEmpty() ? cfg.getLoader().toLowerCase() : "fabric";
-      String gameVer = cfg.getGameVersion() != null && !cfg.getGameVersion().isEmpty() ? cfg.getGameVersion() : "unknown";
+      String loader = cfg.getLoader() != null && !cfg.getLoader().isEmpty() ? cfg.getLoader().toLowerCase() : "";
+      String gameVer = cfg.getGameVersion() != null && !cfg.getGameVersion().isEmpty() ? cfg.getGameVersion() : "";
+
+      // Inspect target directory to accurately detect loader
+      if (new File(targetDir, "fabric-server-launch.jar").exists() || new File(targetDir, "fabric-server-launcher.jar").exists()) {
+        loader = "fabric";
+      } else if (new File(targetDir, "quilt-server-launch.jar").exists()) {
+        loader = "quilt";
+      } else if (new File(targetDir, "libraries/net/neoforged").exists() || new File(targetDir, "neoforge-installer.jar").exists()) {
+        loader = "neoforge";
+      } else if (new File(targetDir, "libraries/net/minecraftforge").exists() || new File(targetDir, "forge-installer.jar").exists()
+          || new File(targetDir, "run.sh").exists() || new File(targetDir, "user_jvm_args.txt").exists()) {
+        if (loader.isEmpty() || "unknown".equals(loader) || "fabric".equals(loader)) loader = "forge";
+      } else {
+        File[] jars = targetDir.listFiles(f -> f.isFile() && f.getName().endsWith(".jar"));
+        if (jars != null) {
+          for (File j : jars) {
+            String n = j.getName().toLowerCase();
+            if (n.startsWith("paper")) { loader = "paper"; break; }
+            if (n.startsWith("purpur")) { loader = "purpur"; break; }
+            if (n.startsWith("spigot") || n.startsWith("craftbukkit")) { loader = "spigot"; break; }
+            if (n.startsWith("sponge")) { loader = "sponge"; break; }
+            if (n.startsWith("velocity")) { loader = "velocity"; break; }
+            if (n.startsWith("forge")) { loader = "forge"; break; }
+            if (n.startsWith("neoforge")) { loader = "neoforge"; break; }
+            if (n.startsWith("fabric")) { loader = "fabric"; break; }
+          }
+        }
+      }
+      if (loader.isEmpty()) loader = "forge";
+      if (gameVer.isEmpty()) gameVer = "any";
+
       org.codeberg.DeployedReject.utils.ServerJarMetadata.recordServerMetadata(targetDir, loader, gameVer, "");
+      cfg.setLoader(loader);
+      if (!"any".equals(gameVer)) cfg.setGameVersion(gameVer);
+      ConfigManager.getInstance().save();
     } catch (Exception ignored) {}
   }
 
   /**
    * Install a server engine from a zip file (URL download or local path).
-   * Extracts the zip to a temp directory, detects server files, and installs them.
-   * If force=true and no server files detected, contents are still copied to server dir.
+   * Supports all server types: Fabric, Forge, NeoForge, Paper, Purpur, Spigot, Quilt, Vanilla, Sponge, etc.
+   * Auto-unwraps single-subdirectory zips (e.g. GTNH, Forge packs that wrap everything in one folder).
    */
   public static void installFromZip(File zipFile, boolean force) throws IOException {
     File tempDir = java.nio.file.Files.createTempDirectory("import_server_").toFile();
@@ -2061,26 +2085,48 @@ public class OrchestratorBridge {
       while (entries.hasMoreElements()) {
         java.util.zip.ZipEntry entry = entries.nextElement();
         File outFile = new File(tempDir, entry.getName());
+        // Guard against zip-slip
+        if (!outFile.getCanonicalPath().startsWith(tempDir.getCanonicalPath() + File.separator)) continue;
         if (entry.isDirectory()) {
           outFile.mkdirs();
         } else {
           outFile.getParentFile().mkdirs();
           try (java.io.InputStream in = zip.getInputStream(entry);
                java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile)) {
-            byte[] buf = new byte[8192];
+            byte[] buf = new byte[65536];
             int len;
             while ((len = in.read(buf)) != -1) fos.write(buf, 0, len);
           }
         }
       }
     }
-    if (hasServerFiles(tempDir)) {
-      installBundledServerEngine(tempDir);
+
+    // Auto-unwrap: if zip has a single top-level subdirectory and server files are inside it,
+    // use that subdirectory as the source (common pattern for GTNH, Forge packs, etc.)
+    File sourceDir = tempDir;
+    File[] topLevel = tempDir.listFiles();
+    if (topLevel != null && topLevel.length == 1 && topLevel[0].isDirectory()) {
+      File singleSubdir = topLevel[0];
+      if (hasServerFilesInDir(singleSubdir) || hasServerFilesInSubdirs(singleSubdir)) {
+        sourceDir = singleSubdir;
+      }
+    }
+
+    if (hasServerFiles(sourceDir)) {
+      installBundledServerEngine(sourceDir);
     } else if (force) {
-      installBundledServerEngine(tempDir);
+      installBundledServerEngine(sourceDir);
     } else {
+      // Cleanup before throwing
+      try {
+        java.nio.file.Files.walk(tempDir.toPath())
+            .sorted(java.util.Comparator.reverseOrder())
+            .map(java.nio.file.Path::toFile)
+            .forEach(java.io.File::delete);
+      } catch (Exception ignored) {}
       throw new IOException("No server files detected in zip. Use --force to install anyway.");
     }
+    // Cleanup
     try {
       java.nio.file.Files.walk(tempDir.toPath())
           .sorted(java.util.Comparator.reverseOrder())
@@ -2092,12 +2138,60 @@ public class OrchestratorBridge {
 
   private static boolean hasServerFiles(File sDir) {
     if (sDir == null || !sDir.exists()) return false;
-    if (new File(sDir, ".murces-server.json").exists() || new File(sDir, "murces-server.json").exists()) return true;
-    if (new File(sDir, "fabric-server-launch.jar").exists() && new File(sDir, "fabric-server-launch.jar").length() > 0) return true;
-    if (new File(sDir, "run.sh").exists() && new File(sDir, "run.sh").length() > 0) return true;
-    if (new File(sDir, "run.bat").exists() && new File(sDir, "run.bat").length() > 0) return true;
-    File sJar = new File(sDir, "server.jar");
-    if (sJar.exists() && sJar.length() > 500_000) return true;
+    // Check this directory and one level of subdirectories (zips often wrap in a folder)
+    return hasServerFilesInDir(sDir) || hasServerFilesInSubdirs(sDir);
+  }
+
+  private static boolean hasServerFilesInSubdirs(File sDir) {
+    File[] children = sDir.listFiles(File::isDirectory);
+    if (children == null) return false;
+    for (File child : children) {
+      if (hasServerFilesInDir(child)) return true;
+    }
+    return false;
+  }
+
+  private static boolean hasServerFilesInDir(File d) {
+    if (d == null || !d.exists()) return false;
+    // Murces metadata
+    if (new File(d, ".murces-server.json").exists()) return true;
+    if (new File(d, "murces-server.json").exists()) return true;
+    // Fabric
+    if (new File(d, "fabric-server-launch.jar").exists()) return true;
+    if (new File(d, "fabric-server-launcher.jar").exists()) return true;
+    // Forge / NeoForge
+    if (new File(d, "run.sh").exists()) return true;
+    if (new File(d, "run.bat").exists()) return true;
+    if (new File(d, "user_jvm_args.txt").exists()) return true;
+    if (new File(d, "forge-installer.jar").exists()) return true;
+    if (new File(d, "neoforge-installer.jar").exists()) return true;
+    // Check for forge/neoforge installer jars by pattern
+    File[] forgeJars = d.listFiles(f -> {
+      String n = f.getName().toLowerCase();
+      return f.isFile() && (n.startsWith("forge-") || n.startsWith("neoforge-")) && n.endsWith(".jar");
+    });
+    if (forgeJars != null && forgeJars.length > 0) return true;
+    // Paper / Purpur / Spigot / Sponge / Velocity (single server jar)
+    File[] serverJars = d.listFiles(f -> {
+      String n = f.getName().toLowerCase();
+      return f.isFile() && n.endsWith(".jar") && f.length() > 1_000_000 && (
+          n.startsWith("paper") || n.startsWith("purpur") || n.startsWith("spigot")
+          || n.startsWith("craftbukkit") || n.startsWith("sponge") || n.startsWith("velocity")
+          || n.startsWith("waterfall") || n.startsWith("bungeecord") || n.equals("server.jar")
+          || n.startsWith("minecraft_server") || n.startsWith("server-")
+      );
+    });
+    if (serverJars != null && serverJars.length > 0) return true;
+    // Quilt
+    if (new File(d, "quilt-server-launch.jar").exists()) return true;
+    // start scripts
+    if (new File(d, "start.sh").exists()) return true;
+    if (new File(d, "start.bat").exists()) return true;
+    if (new File(d, "StartServer.sh").exists()) return true;
+    if (new File(d, "StartServer.bat").exists()) return true;
+    // eula or server.properties implies it's a server directory
+    if (new File(d, "eula.txt").exists()) return true;
+    if (new File(d, "server.properties").exists()) return true;
     return false;
   }
 
