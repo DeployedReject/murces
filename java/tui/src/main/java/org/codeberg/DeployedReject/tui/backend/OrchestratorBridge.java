@@ -1588,7 +1588,27 @@ public class OrchestratorBridge {
                 }
               }
 
-              if (!cfFileIds.isEmpty()) {
+              // After extracting the modpack archive, check for a bundled server engine
+        if (hasServerFiles(targetBase)) {
+          if (statusCallback != null) statusCallback.accept("Installing bundled server engine from modpack...");
+          try {
+            installBundledServerEngine(targetBase);
+            System.out.println("[INFO] Bundled server engine installed.");
+          } catch (Exception e) {
+            System.err.println("[WARN] Failed to install bundled server engine: " + e.getMessage());
+          }
+        }
+        // After extracting the modpack archive, check for a bundled server engine
+        if (hasServerFiles(targetBase)) {
+          if (statusCallback != null) statusCallback.accept("Installing bundled server engine from modpack...");
+          try {
+            installBundledServerEngine(targetBase);
+            System.out.println("[INFO] Bundled server engine installed.");
+          } catch (Exception e) {
+            System.err.println("[WARN] Failed to install bundled server engine: " + e.getMessage());
+          }
+        }
+        if (!cfFileIds.isEmpty()) {
                 if (statusCallback != null) {
                   statusCallback.accept("Resolving " + cfFileIds.size() + " CurseForge mod dependencies...");
                 }
@@ -1982,6 +2002,44 @@ public class OrchestratorBridge {
     }
 
     return null;
+  }
+
+  /**
+   * Install a bundled server engine from an extracted directory.
+   * Copies all files from <sourceDir> into the configured server directory
+   * and records server metadata.
+   */
+  private static void installBundledServerEngine(File sourceDir) throws IOException {
+    // Determine target server directory from config (fallback to current dir)
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    File targetDir = cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty()
+        ? new File(cfg.getServerDir()) : new File(".");
+    // Ensure target exists
+    if (!targetDir.exists()) targetDir.mkdirs();
+
+    // Recursively copy everything from sourceDir to targetDir
+    java.nio.file.Files.walk(sourceDir.toPath()).forEach(srcPath -> {
+      try {
+        java.nio.file.Path rel = sourceDir.toPath().relativize(srcPath);
+        java.nio.file.Path destPath = targetDir.toPath().resolve(rel);
+        if (java.nio.file.Files.isDirectory(srcPath)) {
+          java.nio.file.Files.createDirectories(destPath);
+        } else {
+          java.nio.file.Files.copy(srcPath, destPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+      } catch (IOException e) {
+        // Log but continue
+        System.err.println("[WARN] Failed to copy " + srcPath + " -> " + e.getMessage());
+      }
+    });
+
+    // Attempt to record metadata based on what was copied
+    try {
+      // Guess loader and game version from config (or defaults)
+      String loader = cfg.getLoader() != null && !cfg.getLoader().isEmpty() ? cfg.getLoader().toLowerCase() : "fabric";
+      String gameVer = cfg.getGameVersion() != null && !cfg.getGameVersion().isEmpty() ? cfg.getGameVersion() : "unknown";
+      org.codeberg.DeployedReject.utils.ServerJarMetadata.recordServerMetadata(targetDir, loader, gameVer, "");
+    } catch (Exception ignored) {}
   }
 
   private static boolean hasServerFiles(File sDir) {
