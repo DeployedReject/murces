@@ -1130,13 +1130,7 @@ public class OrchestratorBridge {
         q = q.replaceAll("\\s+", " ");
         return q;
     }
-    if (query == null) return "";
-    String q = query.trim();
-    q = q.replaceAll("(?i)\\betenernal\\b", "eternal");
-    q = q.replaceAll("(?i)\\beternal2\\b", "eternal 2");
-    q = q.replaceAll("(?i)\\bgreg\\s+tech\\b", "gregtech");
-    return q;
-  }
+
 
   public CompletableFuture<List<ModpackResult>> searchModpacks(String platform, String query, String version, String loader) {
     CompletableFuture<List<ModpackResult>> future = new CompletableFuture<>();
