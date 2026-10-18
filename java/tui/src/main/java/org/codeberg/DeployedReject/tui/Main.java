@@ -71,6 +71,10 @@ public class Main {
                 System.out.println("  murces list-plugins                List installed plugins in plugins/");
                 System.out.println("  murces delete-plugin <file>        Delete an installed plugin");
                 System.out.println("  murces update-mods                 Update all installed mods to latest versions [--force]");
+                System.out.println("  murces import-server <url|file>    Directly import server from zip or URL [--force]");
+                System.out.println("  murces whitelist [on|off|add|del]  Manage server whitelist and players");
+                System.out.println("  murces ban <player> [reason]       Ban player (add to blacklist)");
+                System.out.println("  murces pardon <player>             Pardon / unban player");
                 System.out.println("  murces install-jdk [version]       Download portable OpenJDK (8/17/21)");
                 System.out.println("  murces --test-tui                  Run automated self-test of all TUI windows");
                 System.out.println("  murces --version                   Show version");
@@ -158,6 +162,114 @@ public class Main {
                     System.out.println("[INFO] Server import completed.");
                 } catch (Exception e) {
                     System.err.println("[ERROR] Import failed: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "whitelist":
+                if (args.length < 2) {
+                    System.out.println("Whitelist status: " + (org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.isWhitelistEnabled() ? "ENABLED" : "DISABLED"));
+                    java.util.List<org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry> wl = org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.getWhitelist();
+                    System.out.println("Whitelisted players (" + wl.size() + "):");
+                    for (org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry e : wl) {
+                        System.out.println("  - " + e.name + " (" + e.uuid + ")");
+                    }
+                    System.out.println("\nUsage: murces whitelist <on|off|add|remove|list> [player]");
+                    return;
+                }
+                String wlSub = args[1].toLowerCase();
+                try {
+                    if ("on".equals(wlSub) || "enable".equals(wlSub) || "true".equals(wlSub)) {
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.setWhitelistEnabled(true);
+                        System.out.println("[OK] Whitelist enabled.");
+                    } else if ("off".equals(wlSub) || "disable".equals(wlSub) || "false".equals(wlSub)) {
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.setWhitelistEnabled(false);
+                        System.out.println("[OK] Whitelist disabled.");
+                    } else if ("add".equals(wlSub)) {
+                        if (args.length < 3) {
+                            System.err.println("Usage: murces whitelist add <player-name-or-uuid>");
+                            System.exit(1);
+                        }
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.addWhitelist(args[2]);
+                        System.out.println("[OK] Added '" + args[2] + "' to whitelist.");
+                    } else if ("remove".equals(wlSub) || "del".equals(wlSub)) {
+                        if (args.length < 3) {
+                            System.err.println("Usage: murces whitelist remove <player-name-or-uuid>");
+                            System.exit(1);
+                        }
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.removeWhitelist(args[2]);
+                        System.out.println("[OK] Removed '" + args[2] + "' from whitelist.");
+                    } else if ("list".equals(wlSub)) {
+                        java.util.List<org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry> wl = org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.getWhitelist();
+                        System.out.println("Whitelisted players (" + wl.size() + "):");
+                        for (org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry e : wl) {
+                            System.out.println("  - " + e.name + " (" + e.uuid + ")");
+                        }
+                    } else {
+                        // shorthand: murces whitelist <player> -> add
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.addWhitelist(args[1]);
+                        System.out.println("[OK] Added '" + args[1] + "' to whitelist.");
+                    }
+                } catch (Exception e) {
+                    System.err.println("[ERROR] Whitelist operation failed: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "blacklist":
+            case "ban":
+                if (args.length < 2) {
+                    java.util.List<org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry> bl = org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.getBlacklist();
+                    System.out.println("Banned players (" + bl.size() + "):");
+                    for (org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry e : bl) {
+                        System.out.println("  - " + e.name + " (" + e.uuid + ") - " + e.reason);
+                    }
+                    System.out.println("\nUsage: murces ban <player> [reason] OR murces blacklist <add|remove|list> <player>");
+                    return;
+                }
+                String blAction = args[1];
+                try {
+                    if ("add".equalsIgnoreCase(blAction)) {
+                        if (args.length < 3) {
+                            System.err.println("Usage: murces blacklist add <player> [reason]");
+                            System.exit(1);
+                        }
+                        String reason = args.length > 3 ? args[3] : "Banned by operator";
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.addBlacklist(args[2], reason);
+                        System.out.println("[OK] Banned player '" + args[2] + "' (" + reason + ").");
+                    } else if ("remove".equalsIgnoreCase(blAction) || "pardon".equalsIgnoreCase(blAction) || "del".equalsIgnoreCase(blAction)) {
+                        if (args.length < 3) {
+                            System.err.println("Usage: murces blacklist remove <player>");
+                            System.exit(1);
+                        }
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.removeBlacklist(args[2]);
+                        System.out.println("[OK] Pardoned player '" + args[2] + "'.");
+                    } else if ("list".equalsIgnoreCase(blAction)) {
+                        java.util.List<org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry> bl = org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.getBlacklist();
+                        System.out.println("Banned players (" + bl.size() + "):");
+                        for (org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.Entry e : bl) {
+                            System.out.println("  - " + e.name + " (" + e.uuid + ") - " + e.reason);
+                        }
+                    } else {
+                        // shorthand: murces ban <player> [reason]
+                        String reason = args.length > 2 ? args[2] : "Banned by operator";
+                        org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.addBlacklist(blAction, reason);
+                        System.out.println("[OK] Banned player '" + blAction + "' (" + reason + ").");
+                    }
+                } catch (Exception e) {
+                    System.err.println("[ERROR] Blacklist operation failed: " + e.getMessage());
+                    System.exit(1);
+                }
+                break;
+            case "pardon":
+            case "unban":
+                if (args.length < 2) {
+                    System.err.println("Usage: murces pardon <player-name-or-uuid>");
+                    System.exit(1);
+                }
+                try {
+                    org.codeberg.DeployedReject.tui.backend.PlayerAccessManager.removeBlacklist(args[1]);
+                    System.out.println("[OK] Pardoned player '" + args[1] + "'.");
+                } catch (Exception e) {
+                    System.err.println("[ERROR] Failed to pardon player: " + e.getMessage());
                     System.exit(1);
                 }
                 break;

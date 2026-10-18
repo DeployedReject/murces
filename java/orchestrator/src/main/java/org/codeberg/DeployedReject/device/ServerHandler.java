@@ -170,12 +170,19 @@ public class ServerHandler {
       }
     }
 
-    File runScript = Platform.isWindows()
-        ? (new File(workDir, "run.bat").exists() ? new File(workDir, "run.bat")
-            : (new File(workDir, "run.cmd").exists() ? new File(workDir, "run.cmd") : new File(workDir, "run.sh")))
-        : new File(workDir, "run.sh");
+    File runScript = null;
+    String[] candidateScripts = Platform.isWindows()
+        ? new String[]{"run.bat", "run.cmd", "startserver.bat", "startserver-java9.bat", "start.bat", "StartServer.bat", "launch.bat", "run.sh", "startserver.sh", "startserver-java9.sh", "start.sh", "StartServer.sh"}
+        : new String[]{"run.sh", "startserver.sh", "startserver-java9.sh", "start.sh", "StartServer.sh", "launch.sh", "run.bat", "startserver.bat"};
+    for (String sName : candidateScripts) {
+      File candidate = new File(workDir, sName);
+      if (candidate.exists()) {
+        runScript = candidate;
+        break;
+      }
+    }
 
-    if (runScript.exists()) {
+    if (runScript != null && runScript.exists()) {
       try {
         if (!Platform.isWindows()) {
           new ProcessBuilder("chmod", "+x", runScript.getAbsolutePath()).start().waitFor();
@@ -206,7 +213,7 @@ public class ServerHandler {
         Process p = pb.start();
         int code = p.waitFor();
         if (code == 0) {
-          return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "'.");
+          return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "' via " + runScript.getName() + ".");
         } else {
           return new ProcessResult(code, "Failed to start server " + mux + " session (code " + code + ").");
         }
@@ -215,9 +222,48 @@ public class ServerHandler {
       }
     }
 
+    // Determine target jar by scanning for known server launchers
     String targetJar = "server.jar";
     if (new File(workDir, "fabric-server-launch.jar").exists()) {
       targetJar = "fabric-server-launch.jar";
+    } else if (new File(workDir, "fabric-server-launcher.jar").exists()) {
+      targetJar = "fabric-server-launcher.jar";
+    } else if (new File(workDir, "quilt-server-launch.jar").exists()) {
+      targetJar = "quilt-server-launch.jar";
+    } else if (new File(workDir, "server.jar").exists()) {
+      targetJar = "server.jar";
+    } else {
+      // Find Forge universal/server jar or Paper/Spigot jar
+      File[] jars = workDir.listFiles(f -> f.isFile() && f.getName().endsWith(".jar"));
+      if (jars != null) {
+        // Priority 1: Forge server / universal jar (e.g. forge-1.7.10-10.13.4.1614-1.7.10-universal.jar)
+        for (File j : jars) {
+          String n = j.getName().toLowerCase();
+          if (n.startsWith("forge-") && (n.contains("universal") || n.contains("server"))) {
+            targetJar = j.getName();
+            break;
+          }
+        }
+        // Priority 2: Any forge jar
+        if ("server.jar".equals(targetJar)) {
+          for (File j : jars) {
+            if (j.getName().toLowerCase().startsWith("forge-")) {
+              targetJar = j.getName();
+              break;
+            }
+          }
+        }
+        // Priority 3: Paper / Purpur / Spigot
+        if ("server.jar".equals(targetJar)) {
+          for (File j : jars) {
+            String n = j.getName().toLowerCase();
+            if (n.startsWith("paper") || n.startsWith("purpur") || n.startsWith("spigot")) {
+              targetJar = j.getName();
+              break;
+            }
+          }
+        }
+      }
     }
 
     List<String> cmd = new ArrayList<>(Arrays.asList(

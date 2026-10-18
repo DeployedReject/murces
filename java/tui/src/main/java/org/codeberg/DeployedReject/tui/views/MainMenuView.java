@@ -55,7 +55,7 @@ public class MainMenuView implements WorkspaceView {
         menuList.addItem(GlyphHelper.apply("3.  " + GlyphHelper.ICON_CONFIG + " [C]onfigure Properties"), mainWindow::showConfigServer);
         menuList.addItem(GlyphHelper.apply("4.  " + GlyphHelper.ICON_TUNNEL + " [N]etwork & Playit Tunnel"), mainWindow::showTunnelConfig);
         menuList.addItem(GlyphHelper.apply("5.  " + GlyphHelper.ICON_SAVE + " [B]ackups (World)"), mainWindow::showBackup);
-        menuList.addItem(GlyphHelper.apply("6.  " + GlyphHelper.ICON_USER + " [P]layer UUID Migration"), mainWindow::showMigratePlayer);
+        menuList.addItem(GlyphHelper.apply("6.  " + GlyphHelper.ICON_USER + " [P]layer Access (Whitelist, Bans, Migration)"), mainWindow::showMigratePlayer);
         menuList.addItem(GlyphHelper.apply("7.  " + GlyphHelper.ICON_DOWNLOAD + " [D]ownload & Browse Mods (Mods & Modpacks)"), mainWindow::showModBrowse);
         menuList.addItem(GlyphHelper.apply("8.  " + GlyphHelper.ICON_MOD + " [M]anage Installed Mods"), mainWindow::showModManage);
         menuList.addItem(GlyphHelper.apply("9.  " + GlyphHelper.ICON_PACKAGE + " Plu[g]ins (Browse & Manage)"), mainWindow::showPluginBrowse);

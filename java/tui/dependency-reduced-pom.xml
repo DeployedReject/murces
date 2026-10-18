@@ -72,6 +72,7 @@
                 <buildArg>-R:StackSize=1m</buildArg>
                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                 <buildArg>-H:+StripDebugInfo</buildArg>
+                <buildArg>--enable-url-protocols=https,http</buildArg>
               </buildArgs>
             </configuration>
           </plugin>
