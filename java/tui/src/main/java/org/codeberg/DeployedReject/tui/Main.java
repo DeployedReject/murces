@@ -116,7 +116,7 @@ public class Main {
                     System.err.println("Search failed: " + e.getMessage());
                 }
                 break;
-                        case "import-server":
+            case "import-server":
                 if (args.length < 2) {
                     System.err.println("Usage: murces import-server <url-or-path> [--force]");
                     System.exit(1);
@@ -127,7 +127,6 @@ public class Main {
                 try {
                     java.io.File zipFile;
                     if (src.startsWith("http://") || src.startsWith("https://")) {
-                        // download to temp file
                         java.net.URL url = new java.net.URL(src);
                         java.io.InputStream in = url.openStream();
                         zipFile = java.nio.file.Files.createTempFile("import_server", ".zip").toFile();
@@ -152,6 +151,7 @@ public class Main {
                     System.exit(1);
                 }
                 break;
+            case "install-modpack":
                 if (args.length < 2) {
                     System.err.println("Usage: murces install-modpack <slug-or-id> [version] [loader] [platform] [--include-client] [--force]");
                     System.exit(1);

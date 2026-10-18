@@ -2048,6 +2048,47 @@ public class OrchestratorBridge {
     } catch (Exception ignored) {}
   }
 
+  /**
+   * Install a server engine from a zip file (URL download or local path).
+   * Extracts the zip to a temp directory, detects server files, and installs them.
+   * If force=true and no server files detected, contents are still copied to server dir.
+   */
+  public static void installFromZip(File zipFile, boolean force) throws IOException {
+    File tempDir = java.nio.file.Files.createTempDirectory("import_server_").toFile();
+    try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile)) {
+      java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+      while (entries.hasMoreElements()) {
+        java.util.zip.ZipEntry entry = entries.nextElement();
+        File outFile = new File(tempDir, entry.getName());
+        if (entry.isDirectory()) {
+          outFile.mkdirs();
+        } else {
+          outFile.getParentFile().mkdirs();
+          try (java.io.InputStream in = zip.getInputStream(entry);
+               java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile)) {
+            byte[] buf = new byte[8192];
+            int len;
+            while ((len = in.read(buf)) != -1) fos.write(buf, 0, len);
+          }
+        }
+      }
+    }
+    if (hasServerFiles(tempDir)) {
+      installBundledServerEngine(tempDir);
+    } else if (force) {
+      installBundledServerEngine(tempDir);
+    } else {
+      throw new IOException("No server files detected in zip. Use --force to install anyway.");
+    }
+    try {
+      java.nio.file.Files.walk(tempDir.toPath())
+          .sorted(java.util.Comparator.reverseOrder())
+          .map(java.nio.file.Path::toFile)
+          .forEach(java.io.File::delete);
+    } catch (Exception ignored) {}
+  }
+
+
   private static boolean hasServerFiles(File sDir) {
     if (sDir == null || !sDir.exists()) return false;
     if (new File(sDir, ".murces-server.json").exists() || new File(sDir, "murces-server.json").exists()) return true;
