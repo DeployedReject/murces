@@ -127,11 +127,21 @@ public class Main {
                 try {
                     java.io.File zipFile;
                     if (src.startsWith("http://") || src.startsWith("https://")) {
-                        java.net.URL url = new java.net.URL(src);
-                        java.io.InputStream in = url.openStream();
+                        java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                            .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
+                            .build();
+                        java.net.http.HttpRequest dlReq = java.net.http.HttpRequest.newBuilder()
+                            .uri(java.net.URI.create(src))
+                            .header("User-Agent", "MurCes/1.6")
+                            .GET()
+                            .build();
                         zipFile = java.nio.file.Files.createTempFile("import_server", ".zip").toFile();
-                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile)) {
-                            byte[] buffer = new byte[8192];
+                        java.net.http.HttpResponse<java.io.InputStream> dlResp = httpClient.send(
+                            dlReq, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+                        System.out.println("[INFO] Downloading from " + src + " (HTTP " + dlResp.statusCode() + ")...");
+                        try (java.io.InputStream in = dlResp.body();
+                             java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile)) {
+                            byte[] buffer = new byte[65536];
                             int len;
                             while ((len = in.read(buffer)) != -1) {
                                 fos.write(buffer, 0, len);

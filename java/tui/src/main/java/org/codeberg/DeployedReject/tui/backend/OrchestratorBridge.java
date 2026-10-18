@@ -1139,7 +1139,8 @@ public class OrchestratorBridge {
         List<ModpackResult> list = new ArrayList<>();
         boolean searchCf = "curseForge".equalsIgnoreCase(platform) || "curseforge".equalsIgnoreCase(platform)
             || "all".equalsIgnoreCase(platform) || "any".equalsIgnoreCase(platform) || platform == null || platform.isEmpty();
-        boolean searchMr = !"curseForge".equalsIgnoreCase(platform) && !"curseforge".equalsIgnoreCase(platform);
+        boolean searchMr = "modrinth".equalsIgnoreCase(platform)
+            || "all".equalsIgnoreCase(platform) || "any".equalsIgnoreCase(platform) || platform == null || platform.isEmpty();
 
         String cleanQuery = normalizeQuery(query);
 
