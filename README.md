@@ -48,6 +48,10 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **Built-in Mod Ecosystem & 1-Key Updates**: Query both **Modrinth** and **CurseForge** directly in your terminal. All mods are stored using canonical `<slug>-<version>.jar` naming, enabling instant 1-key bulk updates (`[U]`) with semantic version comparison and automatic legacy jar cleanup.
 - **Safe World State Flushing**: Performs live memory flushing (`save-off` &rarr; `save-all` &rarr; tar archive &rarr; `save-on`) to eliminate backup chunk corruption, with automated retention rotation and optional `rclone` cloud replication.
 - **Zero-Config Port Forwarding**: Built-in Playit.gg integration (`-p`) creates secure public tunnels on demand without touching router NAT tables.
+- **Player Access Control**: Manage the **whitelist** and **blacklist** (bans) of your server straight from the dashboard. Toggles, additions, pardons, and reason tracking are written to `whitelist.json` / `banned-players.json` and pushed live into the running server console.
+- **Native Playit.gg Tunnel Console**: Claim and link a Playit agent without ever leaving the TUI, inspect the live route table, sync `server.properties` to the tunnel port, and toggle the background tunnel daemon with one key.
+- **Multi-Server Profiles**: Keep several servers side by side (each with its own directory, `tmux` session, port, loader, and RAM budget) and switch between them from the CLI with a single command.
+- **Bring Your Own Server**: Import an existing server distribution from a `.zip` on disk or a direct download URL, with automatic loader detection (Fabric, Forge, NeoForge, Paper, Purpur, Spigot, Quilt, Vanilla).
 
 ---
 
@@ -64,6 +68,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **Navigation Hub**: Direct keyboard access to engine installers, mod managers, backups, and configs.
 - **Activity & Diagnostics Panel**: Real-time status logs for theme changes, network queries, and download triggers.
 - **Embedded Console**: Immediate visibility into the underlying Minecraft server output.
+- **Twelve-Way Quick Launch**: Jump straight to Server Control, Engine Installer, Properties, Playit Tunnel, Backups, Player Access, Mods, Modpacks, Plugins, Themes, Jobs, or Exit.
 
 ---
 
@@ -79,6 +84,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **One-Click Actions**: Start, restart, or safely terminate the Minecraft daemon with graceful world saves.
 - **In-Game Command Prompt**: Dispatch console commands directly into the `mcsv` session without manually attaching tmux.
 - **Networking Controls**: Toggle Playit.gg public tunnels and adjust runtime memory allocations on the fly.
+- **Session Identity**: Rename the server and its backing `tmux` session inline, then persist it with `[S]ave`.
 
 ---
 
@@ -90,14 +96,31 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
   <img src="assets/engine_installer.png" alt="Server Engine Setup" width="880" style="border-radius: 6px;" />
 </p>
 
-- **Supported Loaders**: Fabric, Paper, Forge, NeoForge, Spigot, and Vanilla.
+- **Supported Loaders**: Fabric, Paper, Forge, Spigot, and Vanilla from the picker &mdash; NeoForge and Quilt distributions are auto-detected when you import them.
 - **Dynamic Version Resolver**: Queries live version manifests for both game releases and loader builds.
 - **Portable OpenJDK Provisioning**: Toggle `[J]` to automatically download and isolate the exact required Eclipse Temurin Java version (8, 17, or 21) into `jdks/` for your selected Minecraft release.
 - **Heap Allocation**: Fine-tune `-Xms` and `-Xmx` RAM allocations without modifying startup shell scripts.
+- **Direct Import**: Press `[M]` to import a pre-built server distribution from a `.zip` file or a direct HTTP(S) URL without leaving the installer.
 
 ---
 
-### 4. In-TUI Mod & Modpack Browser (Dual-Tabbed)
+### 4. Network & Playit.gg Tunnel
+
+> Claim, link, and supervise public tunnels without touching your router's NAT table.
+
+<p align="center">
+  <img src="assets/tunnel_config.png" alt="Playit.gg Tunnel and Network Configuration" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Agent Claim & Link**: Press `[C]` to mint a claim URL and match code, then link the agent from the Playit.gg dashboard.
+- **Daemon Supervision**: `[T]` toggles the background `playitd` tunnel runner inside its own detached session.
+- **Live Route Table**: `[R]` refreshes the active tunnel routes and public domains mapped onto your local port.
+- **Port Sync**: `[S]` rewrites `server-port` in `server.properties` so it always matches the tunnel's local port.
+- **Credential Reset**: `[X]` wipes the cached `playitagent.txt` credentials so you can re-link from scratch.
+
+---
+
+### 5. In-TUI Mod & Modpack Browser (Dual-Tabbed)
 
 > Search, inspect, and install mods and full modpacks from Modrinth and CurseForge without leaving your terminal.
 
@@ -109,14 +132,27 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 - **Universal Index**: Search Modrinth and CurseForge API providers on the fly.
 - **Smart Filtering**: Automatically filters releases by your active server loader (Fabric, Forge, NeoForge, Quilt) and game version.
 - **Canonical Naming**: Downloads are automatically named `<slug>-<version>.jar`, making tracking and version management effortless.
-- **Modpack Dependency Inspector**: Inspects modpack manifests, queries dependencies, excludes client-only mods by default, and unpacks config overrides (`overrides/`).
 - **Atomic Telemetry**: Real-time progress bar downloads into `.tmp` staging before atomic deployment to `mods/`.
+
+#### Modpack Browser Tab
+
+<p align="center">
+  <img src="assets/modpack_browser.png" alt="Modpack Browser and Dependency Inspector" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Modpack Dependency Inspector**: Inspects modpack manifests, queries dependencies, excludes client-only mods by default, and unpacks config overrides (`overrides/`).
+- **Bundled Server Detection**: Modpacks that ship their own engine (Forge / NeoForge / GTNH style packs) are detected and installed automatically.
+- **Pagination & Description Modes**: Page through the catalogue with `[` / `]` and flip between summary and full description views.
 
 ---
 
-### 5. Dedicated Plugin Workspace (Paper, Spigot, Bukkit)
+### 6. Dedicated Plugin Workspace (Paper, Spigot, Bukkit)
 
 > Search, inspect, download, and manage Minecraft plugins stored cleanly in `plugins/`.
+
+<p align="center">
+  <img src="assets/plugin_browser.png" alt="Plugin Browser and Downloader" width="880" style="border-radius: 6px;" />
+</p>
 
 - **Platform Support**: Browse plugins on both Modrinth (`project_type:plugin`) and CurseForge (`Bukkit Plugins`).
 - **Server Engine Compatibility**: Verifies server type from jar metadata (allows Paper/Spigot, rejects Vanilla or Fabric/Forge with diagnostics logging).
@@ -124,9 +160,13 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
   - `[1] Browse & Download`: Live search, pagination, detailed descriptions, version selector, and animated pickaxe progress bar.
   - `[2] Installed Plugins Manager`: Lists all `.jar` files in `plugins/`, parses plugin YAML metadata (`plugin.yml` / `paper-plugin.yml`), and supports 1-key deletion (`[D]`).
 
+<p align="center">
+  <img src="assets/plugin_installed.png" alt="Installed Plugin Manager" width="880" style="border-radius: 6px;" />
+</p>
+
 ---
 
-### 6. Installed Mods Manager
+### 7. Installed Mods Manager
 
 > Audit, update, and maintain your active server mods directory cleanly.
 
@@ -141,7 +181,43 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 7. Searchable `server.properties` Editor
+### 8. Player Access: Whitelist, Bans & UUID Migration
+
+> One workspace for every player-facing control: whitelist entries, bans with reasons, and identity migration.
+
+<p align="center">
+  <img src="assets/player_access.png" alt="Player Access Whitelist Tab" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Three-Tab Layout**: `[1] Whitelist`, `[2] Blacklist / Bans`, and `[3] UUID Migration` share a single workspace.
+- **Whitelist Toggle**: Flip `white-list` in `server.properties` and MurCes immediately dispatches `whitelist on` / `whitelist off` plus a `whitelist reload` into the live server console.
+- **1-Key Membership**: `[A]dd Player` accepts a username or UUID, resolves the offline-mode UUID automatically, and writes a canonical `whitelist.json` entry.
+- **Instant Removal**: `[R]emove Player` drops the selected entry (or prompts for a name) and syncs the running server with `whitelist remove`.
+- **Duplicate Safe**: Adds are idempotent — re-adding an existing player is a no-op instead of a corrupt file.
+
+#### Blacklist / Bans Tab
+
+<p align="center">
+  <img src="assets/player_access_bans.png" alt="Player Access Blacklist and Bans Tab" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Reasoned Bans**: `[A]dd Ban` captures an optional reason and stores it in `banned-players.json` with `source` and `expires` metadata.
+- **Live Ban Dispatch**: Bans are pushed to the running server with `ban <player> <reason>` the moment you confirm.
+- **One-Key Pardon**: `[P]ardon / Remove` issues `pardon <player>` and cleans the ban record.
+
+#### UUID Migration Tab
+
+<p align="center">
+  <img src="assets/player_migration.png" alt="Player UUID Migration" width="880" style="border-radius: 6px;" />
+</p>
+
+- **Identity Mapping**: Migrate stats, advancements, and playerdata from an old player name or UUID to a new one.
+- **Automatic Backup Safeguard**: Bundles existing playerdata, usercache, stats, and advancements into a safety archive before modifying files.
+- **Offline/Online Migration**: Resolve UUID discrepancies caused by switching between offline-mode and Mojang authentication.
+
+---
+
+### 9. Searchable `server.properties` Editor
 
 > Tweak server configuration with a keyboard-driven visual inspector.
 
@@ -156,7 +232,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 ---
 
-### 8. World Backups & Live Memory Flushing
+### 10. World Backups & Live Memory Flushing
 
 > Safe level snapshots that flush memory buffers first to guarantee zero world corruption.
 
@@ -216,21 +292,7 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 
 ---
 
-### 9. Player UUID & Data Migration
-
-> Seamlessly transfer inventories, stats, and advancements between player UUIDs.
-
-<p align="center">
-  <img src="assets/player_migration.png" alt="Player UUID Migration Tool" width="880" style="border-radius: 6px;" />
-</p>
-
-- **Identity Mapping**: Migrate stats, advancements, and playerdata from an old player name or UUID to a new one.
-- **Automatic Backup Safeguard**: Bundles existing playerdata, usercache, stats, and advancements into a safety archive before modifying files.
-- **Offline/Online Migration**: Resolve UUID discrepancies caused by switching between offline-mode and Mojang authentication.
-
----
-
-### 10. Themes, Transparency & Glyphs
+### 11. Themes, Transparency & Glyphs
 
 > Complete visual customization to match your personal terminal setup.
 
@@ -242,10 +304,11 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 - **Terminal Transparency**: Adjustable from `0%` (solid opaque) to `100%` (full terminal background passthrough).
 - **Glyph Engine**: Native Nerd Font icon support with automatic graceful fallback for bare Linux TTYs.
 - **Aesthetic Touches**: Optional 24-bit TrueColor rendering and animated pickaxe dirt-breaking loading spinner.
+- **Runtime Guards**: Enforce a minimum window size (>= 70x18), point the asset directory at any folder, and auto-download portable JDKs for the Minecraft versions you use.
 
 ---
 
-### 11. Active Tasks & Job Telemetry
+### 12. Active Tasks & Job Telemetry
 
 > Monitor asynchronous background operations in real time.
 
@@ -256,6 +319,18 @@ The orchestrator handles automated save flushing, tar archiving, snapshot rotati
 - Real-time tracking of non-blocking server installations, engine updates, and mod downloads.
 - Detailed task telemetry showing active step, bytes transferred, and speed.
 - Emergency controls to cancel selected jobs (`[C]`) or terminate all workers (`[K]`).
+
+---
+
+### 13. Multi-Server Profiles & Custom Server Import
+
+> Run several servers from one binary, or adopt an existing distribution you already trust.
+
+- **Profile Per Server**: Every profile stores its own directory, `tmux` session, game version, loader, RAM budget, and port inside `murces.json`.
+- **Zero-Config Switching**: `murces servers` lists what you have, `murces switch <profile>` re-points the dashboard at another one.
+- **Directory Agnostic Startup**: `--dir` and `--session` flags let scripts start a server that lives outside the current folder.
+- **Bring Your Own Distribution**: `murces import-server <url|file>` unpacks a `.zip` (or downloads one), auto-detects the engine, records metadata, and refuses to guess when nothing recognizable is found (override with `--force`).
+- **Script-Aware Launching**: Detects `run.sh`, `startserver.sh`, `launch.sh`, `run.bat`, `startserver.bat` and friends, then falls back to auto-detecting `fabric-server-launch.jar`, `quilt-server-launch.jar`, Forge universal jars, or Paper/Purpur/Spigot jars.
 
 ---
 
@@ -322,6 +397,25 @@ curl -sSL https://raw.githubusercontent.com/DeployedReject/murces/main/uninstall
 
 ---
 
+### 2. Bringing Your Own Server
+
+Already running a server distribution you like? Import it instead of reinstalling:
+
+```bash
+# Import from a local archive
+./murces import-server ~/downloads/my-server.zip
+
+# Import straight from a URL
+./murces import-server https://example.com/my-server.zip
+
+# Force the install even if no engine files are recognised
+./murces import-server ~/downloads/my-server.zip --force
+```
+
+The archive is unpacked into the active server profile's directory, the loader is auto-detected, and the engine metadata is recorded so the TUI can manage it like any other installation.
+
+---
+
 ## CLI Commands
 
 MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
@@ -333,22 +427,48 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | Command                                     | Description                                                             | Flags / Arguments                             |
 | ------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
 | `./murces`                                  | Launches the interactive Lanterna TUI dashboard                         | None                                          |
-| `./murces start`                            | Starts Minecraft in a detached `tmux`/`psmux` session                   | `-p`, `--public` _(starts Playit.gg tunnel)_  |
-| `./murces stop`                             | Sends graceful `stop` command and terminates the session                | None                                          |
-| `./murces status`                           | Checks if the Minecraft server daemon is active                         | None                                          |
+| `./murces start`                            | Starts Minecraft in a detached `tmux`/`psmux` session                   | `-p`, `--public` _(starts Playit.gg tunnel)_, `--session <name>`, `--dir <path>` |
+| `./murces stop`                             | Sends graceful `stop` command and terminates the session                | `--session <name>`                            |
+| `./murces status`                           | Checks if the Minecraft server daemon is active                         | `--session <name>`                            |
 | `./murces server-name [name]`               | Gets or sets the server name & synchronized background session name     | `[name]` _(optional)_                         |
-| `./murces search-modpacks <query> [ver] [loader]` | Searches Modrinth/CurseForge modpacks by game version and loader  | `[query] [version] [loader]`                  |
+| `./murces servers`                          | Lists all configured server profiles and the active one                 | None                                          |
+| `./murces switch <profile>`                 | Switches the active server profile (directory, session, port, loader)  | `<profile-name>`                              |
+| `./murces server-port <port>`               | Updates `server-port` inside `server.properties`                       | `[dirOrFile]` _(optional)_                    |
+| `./murces tunnel <setup\|status\|reset>`    | Manages the Playit.gg agent & tunnel lifecycle natively                 | `setup`, `status`, `reset`                    |
+| `./murces search-modpacks <query> [ver] [loader]` | Searches Modrinth/CurseForge modpacks by game version and loader  | `[query] [version] [loader] [platform]`       |
 | `./murces install-modpack <slug> [ver] [loader]`  | Resolves dependencies, downloads jars, & extracts modpack overrides | `[slug-or-id] [ver] [loader] [--include-client]` |
+| `./murces search-mods <query> [ver] [loader]` | Searches Modrinth/CurseForge for individual mods                       | `[query] [version] [loader] [platform]`       |
+| `./murces install-mod <slug> [ver] [loader]` | Downloads & installs a single mod into `mods/`                          | `[slug-or-id] [ver] [loader] [--force]`       |
 | `./murces search-plugins <query> [ver] [engine]`  | Searches Modrinth/CurseForge Paper & Bukkit plugins                   | `[query] [version] [server-type]`             |
 | `./murces install-plugin <slug> [ver] [engine]`   | Downloads & installs plugin jar into `plugins/`                         | `[slug-or-id] [version] [server-type]`        |
 | `./murces list-plugins`                     | Lists all installed `.jar` plugins in `plugins/`                        | None                                          |
 | `./murces delete-plugin <filename>`         | Deletes a plugin from `plugins/`                                        | `<filename>`                                  |
+| `./murces import-server <url\|file>`         | Imports a server distribution from a `.zip` file or direct URL          | `--force` _(optional)_                        |
+| `./murces whitelist [on\|off\|add\|del] [player]` | Toggles the whitelist and manages `whitelist.json` entries           | `on`, `off`, `add`, `remove`, `list`          |
+| `./murces ban <player> [reason]`            | Bans a player (adds to `banned-players.json`)                            | `[reason]` _(optional)_                        |
+| `./murces pardon <player>`                  | Pardons / unbans a player                                               | `<player-name-or-uuid>`                       |
 | `./murces backup`                           | Flushes world memory, creates a `.tar` snapshot, and cleans old backups | None                                          |
 | `./murces update-mods [version] [loader]`   | Upgrades all installed server mods to latest compatible versions        | `[gameVersion] [loader]` _(optional)_         |
-| `./murces install-jdk [version]`            | Downloads and provisions portable OpenJDK for target MC/Java version    | `[mcVersion]` or `8|17|21`                    |
+| `./murces install-jdk [version]`            | Downloads and provisions portable OpenJDK for target MC/Java version    | `[mcVersion]` or `8\|17\|21`                    |
 | `./murces --test-tui`                       | Runs headless self-test across all TUI screens and exits                | None                                          |
 | `./murces --help`                           | Displays available command options and syntax                           | None                                          |
 | `./murces --version`                        | Outputs current release version information                             | None                                          |
+
+### Access Control Recipes
+
+```bash
+# Turn the whitelist on, then let two players in
+./murces whitelist on
+./murces whitelist add Notch
+./murces whitelist add Dinnerbone
+
+# Review the roster
+./murces whitelist list
+
+# Ban a griefer with a reason, then undo it if needed
+./murces ban Griefer99 "Griefing spawn area"
+./murces pardon Griefer99
+```
 
 ---
 
@@ -364,17 +484,32 @@ MurCes functions both as an interactive TUI and as a fast, scriptable CLI tool:
 | `[S]`                   | Open **Server Control & Console**                              |
 | `[I]`                   | Open **Install Server Engine**                                 |
 | `[C]`                   | Open **Configure Properties** (`server.properties`)            |
+| `[N]`                   | Open **Network & Playit Tunnel** _(from Main Menu)_                    |
 | `[B]`                   | Open **World Backups**                                         |
-| `[P]`                   | Open **Player UUID Migration**                                 |
+| `[P]`                   | Open **Player Access** (Whitelist, Bans, Migration)            |
 | `[D]`                   | Open **Download & Browse Mods (Mods & Modpacks Tabs)**         |
 | `[M]`                   | Open **Manage Installed Mods**                                 |
 | `[G]`                   | Open **Plugins (Browse & Manage)**                             |
-| `[1]` / `[2]`           | Switch tabs in Mods (`[1] Single Mods` / `[2] Modpacks`) and Plugins (`[1] Browse` / `[2] Installed`) |
+| `[1]` / `[2]` / `[3]`   | Switch tabs in Mods (`[1] Single Mods` / `[2] Modpacks`), Plugins (`[1] Browse` / `[2] Installed`), and Player Access (`[1] Whitelist` / `[2] Blacklist` / `[3] UUID Migration`) |
 | `[U]`                   | **Update All Mods** (inside Manage Installed Mods view)        |
 | `[Z]`                   | Open **Customization & Themes**                                |
 | `[N]`                   | Edit **Server Name / Session** (in Server Control & Setup)      |
 | `[Q]` / `[E]`           | Exit MurCes (from any view)                                    |
 | `[Ctrl+C]` / `[Ctrl+Q]` | Immediate emergency shutdown and terminal restore              |
+
+### View-Specific Hotkeys
+
+| View                    | Keys                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| **Network & Playit Tunnel** | `[C]` Claim agent • `[T]` Toggle daemon • `[R]` Refresh routes • `[S]` Sync port • `[X]` Reset credentials |
+| **Server Control**     | `[S]` Start • `[T]` Terminate • `[R]` Restart • `[U]` Update status • `[D]` Dispatch command • `[M]` Cycle RAM • `[K]` Open tunnel config • `[N]` Edit server name |
+| **Engine Installer**   | `[I]` Install only • `[S]` Start & install • `[M]` Direct import (ZIP/URL) • `[X]` Cancel • `[E]` Cycle engine • `[V]` Cycle version • `[O]` Loader version • `[D]` Install dir • `[J]` Portable JDK |
+| **Player Access**       | `[A]` Add player / ban • `[R]` Remove whitelist entry • `[P]` Pardon • `[M]` Migrate     |
+| **Mods & Modpacks**     | `[S]` Search • `[D]` Download • `[I]` Install modpack • `[P]` Cycle platform • `[O]` Cycle loader • `[V]` Cycle version • `[K]` Cycle file version • `[M]` Toggle description mode • `[X]` Cancel |
+| **Plugins**             | `[S]` Search • `[D]` Download (browse) / Delete selected (installed) • `[Y]` Cycle server type • `[K]` Cycle plugin version • `[M]` Toggle description mode • `[R]` Refresh installed • `[X]` Cancel download |
+| **Installed Mods**      | `[U]` Update all • `[D]` Delete mod • `[R]` Refresh                                     |
+| **World Backups**       | `[K]` Backup now • `[D]` Delete backup • `[R]` Refresh • `[S]` Save options              |
+| **Active Tasks**        | `[C]` Cancel selected job • `[K]` Kill all jobs • `[R]` Refresh                        |
 
 ---
 
@@ -566,6 +701,43 @@ cd ../..
 ```ini
 curseAPI="YOUR_CURSEFORGE_API_KEY"
 email="your_developer_email@example.com"
+```
+
+### Runtime Configuration File
+
+Every persistent preference lives in `murces.json` next to your server directory:
+
+```json
+{
+  "theme": "Gruvbox Dark",
+  "transparencyPercent": 0,
+  "trueColor": true,
+  "enforceMinSize": true,
+  "pickaxeAnimation": true,
+  "nerdFontMode": "auto",
+  "sessionName": "mcsv",
+  "serverDir": "server",
+  "activeServer": "survival",
+  "serverProfiles": {
+    "survival": {
+      "name": "survival",
+      "directory": "server",
+      "sessionName": "mcsv",
+      "gameVersion": "1.21.1",
+      "loader": "fabric",
+      "ram": "4G",
+      "port": 25565
+    }
+  },
+  "portableJdk": false,
+  "gameVersion": "1.21.1",
+  "loader": "fabric",
+  "backupSourceFolder": "world",
+  "backupTargetFolder": "backup",
+  "backupRetentionLimit": 3,
+  "backupCloudSync": false,
+  "backupCloudRemote": "minecraftdrive"
+}
 ```
 
 ---
