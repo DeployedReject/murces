@@ -22,10 +22,14 @@ import org.codeberg.DeployedReject.utils.Shell;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.BufferedReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.codeberg.DeployedReject.utils.Platform;
 
@@ -170,17 +174,7 @@ public class ServerHandler {
       }
     }
 
-    File runScript = null;
-    String[] candidateScripts = Platform.isWindows()
-        ? new String[]{"run.bat", "run.cmd", "startserver.bat", "startserver-java9.bat", "start.bat", "StartServer.bat", "launch.bat", "run.sh", "startserver.sh", "startserver-java9.sh", "start.sh", "StartServer.sh"}
-        : new String[]{"run.sh", "startserver.sh", "startserver-java9.sh", "start.sh", "StartServer.sh", "launch.sh", "run.bat", "startserver.bat"};
-    for (String sName : candidateScripts) {
-      File candidate = new File(workDir, sName);
-      if (candidate.exists()) {
-        runScript = candidate;
-        break;
-      }
-    }
+    File runScript = findStartupScript(workDir);
 
     if (runScript != null && runScript.exists()) {
       try {
@@ -189,21 +183,33 @@ public class ServerHandler {
         }
         ProcessBuilder pb;
         List<String> scriptCmd = new ArrayList<>(Arrays.asList(mux, "new-session", "-d", "-s", sess));
+        String scriptName = runScript.getName().toLowerCase(Locale.ROOT);
         if (Platform.isWindows()) {
-          if (runScript.getName().endsWith(".sh")) {
+          if (scriptName.endsWith(".sh")) {
             scriptCmd.addAll(Arrays.asList("sh", runScript.getName(), "nogui"));
           } else {
             scriptCmd.addAll(Arrays.asList("cmd.exe", "/c", runScript.getName(), "nogui"));
           }
         } else {
+          String interpreter = "sh";
+          if (scriptName.endsWith(".sh")) {
+            try (BufferedReader reader = Files.newBufferedReader(runScript.toPath(), StandardCharsets.UTF_8)) {
+              String shebang = reader.readLine();
+              if (shebang != null && shebang.toLowerCase(Locale.ROOT).contains("bash")) {
+                interpreter = "bash";
+              }
+            }
+          }
           if (jdkHome != null && !jdkHome.isEmpty()) {
             String binPath = new File(jdkHome, "bin").getAbsolutePath();
-            scriptCmd.addAll(Arrays.asList("env", "PATH=" + binPath + ":" + System.getenv("PATH"), "JAVA_HOME=" + jdkHome, "./" + runScript.getName(), "nogui"));
+            scriptCmd.addAll(Arrays.asList("env", "PATH=" + binPath + ":" + System.getenv("PATH"),
+                "JAVA_HOME=" + jdkHome, interpreter, runScript.getName(), "nogui"));
           } else {
-            scriptCmd.addAll(Arrays.asList("./" + runScript.getName(), "nogui"));
+            scriptCmd.addAll(Arrays.asList(interpreter, runScript.getName(), "nogui"));
           }
         }
         pb = new ProcessBuilder(scriptCmd);
+        pb.redirectErrorStream(true);
         pb.directory(workDir);
         if (jdkHome != null && !jdkHome.isEmpty()) {
           String binPath = new File(jdkHome, "bin").getAbsolutePath();
@@ -211,12 +217,25 @@ public class ServerHandler {
           pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
         }
         Process p = pb.start();
-        int code = p.waitFor();
-        if (code == 0) {
-          return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "' via " + runScript.getName() + ".");
-        } else {
-          return new ProcessResult(code, "Failed to start server " + mux + " session (code " + code + ").");
+        p.getOutputStream().close();
+        String commandOutput;
+        try (InputStream output = p.getInputStream()) {
+          commandOutput = new String(output.readAllBytes(), StandardCharsets.UTF_8).trim();
         }
+        int code = p.waitFor();
+        if (code != 0) {
+          return new ProcessResult(code, "Failed to start server session '" + sess + "' (code " + code + ")"
+              + (commandOutput.isEmpty() ? "." : ": " + commandOutput));
+        }
+        for (int attempt = 0; attempt < 20; attempt++) {
+          Process check = new ProcessBuilder(mux, "has-session", "-t", sess).start();
+          if (check.waitFor() == 0) {
+            return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "' via " + runScript.getName() + ".");
+          }
+          Thread.sleep(100);
+        }
+        return new ProcessResult(1, "The server process exited during startup; no " + mux + " session '" + sess
+            + "' remains. Check the server startup logs in " + workDir.getAbsolutePath() + ".");
       } catch (Exception e) {
         return new ProcessResult(1, "Failed to launch " + runScript.getName() + ": " + e.getMessage());
       }
@@ -266,34 +285,44 @@ public class ServerHandler {
       }
     }
 
-    List<String> cmd = new ArrayList<>(Arrays.asList(
-        mux, "new-session", "-d", "-s", sess,
-        javaExec,
-        "-Xmx" + ramArg,
-        "-Xms" + ramArg,
-        "-XX:+UseG1GC",
-        "-XX:+ParallelRefProcEnabled",
-        "-XX:MaxGCPauseMillis=200",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+DisableExplicitGC",
-        "-XX:+AlwaysPreTouch",
-        "-XX:G1NewSizePercent=30",
-        "-XX:G1MaxNewSizePercent=40",
-        "-XX:G1HeapRegionSize=8M",
-        "-XX:G1ReservePercent=20",
-        "-XX:G1HeapWastePercent=5",
-        "-XX:G1MixedGCCountTarget=4",
-        "-XX:InitiatingHeapOccupancyPercent=15",
-        "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5",
-        "-XX:SurvivorRatio=32",
-        "-XX:+PerfDisableSharedMem",
-        "-XX:MaxTenuringThreshold=1",
-        "-Dusing.aikars.flags=https://mcflags.emc.gs",
-        "-Daikars.new.flags=true",
-        "-jar",
-        targetJar,
-        "nogui"));
+    File argsFile = findPlatformServerArgs(workDir);
+    List<String> cmd = new ArrayList<>(Arrays.asList(mux, "new-session", "-d", "-s", sess, javaExec));
+    if (argsFile == null) {
+      cmd.addAll(Arrays.asList(
+          "-Xmx" + ramArg,
+          "-Xms" + ramArg,
+          "-XX:+UseG1GC",
+          "-XX:+ParallelRefProcEnabled",
+          "-XX:MaxGCPauseMillis=200",
+          "-XX:+UnlockExperimentalVMOptions",
+          "-XX:+DisableExplicitGC",
+          "-XX:+AlwaysPreTouch",
+          "-XX:G1NewSizePercent=30",
+          "-XX:G1MaxNewSizePercent=40",
+          "-XX:G1HeapRegionSize=8M",
+          "-XX:G1ReservePercent=20",
+          "-XX:G1HeapWastePercent=5",
+          "-XX:G1MixedGCCountTarget=4",
+          "-XX:InitiatingHeapOccupancyPercent=15",
+          "-XX:G1MixedGCLiveThresholdPercent=90",
+          "-XX:G1RSetUpdatingPauseTimePercent=5",
+          "-XX:SurvivorRatio=32",
+          "-XX:+PerfDisableSharedMem",
+          "-XX:MaxTenuringThreshold=1",
+          "-Dusing.aikars.flags=https://mcflags.emc.gs",
+          "-Daikars.new.flags=true",
+          "-jar", targetJar, "nogui"));
+    } else {
+      if (userJvmArgs.exists()) {
+        cmd.add("@" + userJvmArgs.getName());
+      } else {
+        cmd.add("-Xmx" + ramArg);
+        cmd.add("-Xms" + ramArg);
+      }
+      cmd.add("@" + workDir.toPath().toAbsolutePath().normalize()
+          .relativize(argsFile.toPath().toAbsolutePath().normalize()));
+      cmd.add("nogui");
+    }
 
     try {
       ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -304,15 +333,121 @@ public class ServerHandler {
         pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
       }
       Process p = pb.start();
-      int code = p.waitFor();
-      if (code == 0) {
-        return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "'.");
-      } else {
-        return new ProcessResult(code, "Failed to start server " + mux + " session (code " + code + ").");
+      p.getOutputStream().close();
+      String commandOutput;
+      try (InputStream output = p.getInputStream()) {
+        commandOutput = new String(output.readAllBytes(), StandardCharsets.UTF_8).trim();
       }
+      int code = p.waitFor();
+      if (code != 0) {
+        return new ProcessResult(code, "Failed to start server session '" + sess + "' (code " + code + ")"
+            + (commandOutput.isEmpty() ? "." : ": " + commandOutput));
+      }
+      for (int attempt = 0; attempt < 20; attempt++) {
+        Process check = new ProcessBuilder(mux, "has-session", "-t", sess).start();
+        if (check.waitFor() == 0) {
+          return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess
+              + (argsFile != null ? "' using " + argsFile.getName() + "." : "'."));
+        }
+        Thread.sleep(100);
+      }
+      return new ProcessResult(1, "The server process exited during startup; no " + mux + " session '" + sess
+          + "' remains. Check the server startup logs in " + workDir.getAbsolutePath() + ".");
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to launch server session: " + e.getMessage());
     }
+  }
+
+  private static File findStartupScript(File workDir) {
+    File[] candidates = workDir.listFiles(file -> {
+      if (!file.isFile()) return false;
+      String name = file.getName().toLowerCase(Locale.ROOT);
+      return Platform.isWindows()
+          ? name.endsWith(".bat") || name.endsWith(".cmd")
+          : name.endsWith(".sh");
+    });
+    if (candidates == null) return null;
+    return Arrays.stream(candidates)
+        .sorted((left, right) -> {
+          int rank = Integer.compare(startupScriptRank(left), startupScriptRank(right));
+          return rank != 0 ? rank : left.getName().compareToIgnoreCase(right.getName());
+        })
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static int startupScriptRank(File script) {
+    String name = script.getName().toLowerCase(Locale.ROOT);
+    int rank = 10;
+    if (name.startsWith("run")) rank = 0;
+    else if (name.contains("startserver")) rank = 1;
+    else if (name.startsWith("start")) rank = 2;
+    else if (name.contains("launch")) rank = 3;
+    if (name.contains("server")) rank--;
+    return rank;
+  }
+
+  private static File findPlatformServerArgs(File workDir) {
+    Path root = workDir.toPath().toAbsolutePath().normalize();
+    try (Stream<Path> files = Files.walk(root, 10)) {
+      return files.filter(Files::isRegularFile)
+          .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".txt"))
+          .map(path -> new AbstractMap.SimpleEntry<>(path, scoreServerArgumentFile(path, root)))
+          .filter(candidate -> candidate.getValue() >= 6)
+          .sorted((left, right) -> {
+            int score = Integer.compare(right.getValue(), left.getValue());
+            return score != 0 ? score : left.getKey().compareTo(right.getKey());
+          })
+          .map(candidate -> candidate.getKey().toFile())
+          .findFirst()
+          .orElse(null);
+    } catch (Exception e) {
+      System.err.println("[WARN] Could not search for platform-specific server arguments: " + e.getMessage());
+    }
+    return null;
+  }
+
+  private static int scoreServerArgumentFile(Path candidate, Path root) {
+    String filename = candidate.getFileName().toString().toLowerCase(Locale.ROOT);
+    if (filename.equals("user_jvm_args.txt") || filename.equals("eula.txt")) return -1;
+    try {
+      long size = Files.size(candidate);
+      if (size == 0 || size > 1024 * 1024) return -1;
+      String contents = Files.readString(candidate, StandardCharsets.UTF_8);
+      String normalized = contents.toLowerCase(Locale.ROOT);
+      boolean hasLaunchArgs = matchesArgumentLine(normalized,
+          "^\\s*(?:-cp|-classpath|--class-path|--module-path|-p|-jar)\\s+")
+          || normalized.matches("(?s).*(?:net\\.minecraft\\.server\\.main|net\\.minecraftforge\\.|net\\.neoforged\\.|cpw\\.mods\\.|bootstraplauncher).*");
+      if (!hasLaunchArgs) return -1;
+
+      int score = 0;
+      if (matchesArgumentLine(normalized, "^\\s*(?:-cp|-classpath|--class-path|--module-path|-p)\\s+")) score += 8;
+      if (matchesArgumentLine(normalized, "^\\s*-jar\\s+\\S+\\.jar(?:\\s|$)")) score += 8;
+      if (normalized.matches("(?s).*(?:net\\.minecraft\\.server\\.main|net\\.minecraftforge\\.|net\\.neoforged\\.|cpw\\.mods\\.|bootstraplauncher).*")) score += 8;
+      if (matchesArgumentLine(normalized, "^\\s*--launchtarget\\s+\\S+")) score += 3;
+      if (matchesArgumentLine(normalized, "^\\s*--fml\\.[\\w.-]+")) score += 2;
+      if (filename.contains("args") || filename.contains("java")) score += 2;
+
+      String lowerPath = root.relativize(candidate).toString().toLowerCase(Locale.ROOT);
+      if (lowerPath.contains("libraries") && (lowerPath.contains("minecraftforge") || lowerPath.contains("neoforged"))) {
+        score += 4;
+      }
+      if (Platform.isWindows()) {
+        if (filename.contains("win") || filename.contains("windows")) score += 2;
+        if (filename.contains("unix") || filename.contains("linux")) score -= 8;
+      } else {
+        if (filename.contains("unix") || filename.contains("linux")) score += 2;
+        if (filename.contains("win") || filename.contains("windows")) score -= 8;
+      }
+      return score;
+    } catch (Exception e) {
+      System.err.println("[WARN] Could not inspect server argument file " + candidate + ": " + e.getMessage());
+      return -1;
+    }
+  }
+
+  private static boolean matchesArgumentLine(String contents, String regex) {
+    return Pattern.compile(regex, Pattern.MULTILINE).matcher(contents).find();
   }
 
   public static ProcessResult stopServer() {
