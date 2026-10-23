@@ -2348,6 +2348,7 @@ public class OrchestratorBridge {
   }
 
   public static ProcessResult startServer(boolean publicTunnel, String ram, String sessionName, String serverDir) {
+    ServerHandler.setDiagnosticLogger(OrchestratorBridge.getInstance()::log);
     TuiConfig cfg = ConfigManager.getInstance().getConfig();
     boolean usePortable = cfg.isPortableJdk();
     String javaCmd = null;

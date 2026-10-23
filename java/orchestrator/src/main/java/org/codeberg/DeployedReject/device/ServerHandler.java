@@ -23,17 +23,35 @@ import org.codeberg.DeployedReject.utils.Shell;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.regex.Pattern;
+import java.util.function.Consumer;
 
 import org.codeberg.DeployedReject.utils.Platform;
 
 public class ServerHandler {
+
+  private static volatile Consumer<String> diagnosticLogger = System.err::println;
+
+  public static void setDiagnosticLogger(Consumer<String> logger) {
+    diagnosticLogger = logger != null ? logger : System.err::println;
+  }
+
+  private static void diagnostic(String message) {
+    try {
+      diagnosticLogger.accept(message);
+    } catch (Exception e) {
+      System.err.println(message);
+    }
+  }
 
   public String type;
   public String loader;
@@ -141,8 +159,17 @@ public class ServerHandler {
       javaExec = "java";
     }
 
-    if (isServerRunning(sess)) {
+    ProcessResult existingSession = runLoggedCommand(Arrays.asList(mux, "has-session", "-t", sess), workDir, null);
+    if (existingSession.exitCode == 0) {
       return new ProcessResult(1, "Minecraft server session '" + sess + "' is already running.");
+    }
+
+    File startupLog = new File(workDir, "murces-startup.log");
+    try {
+      Files.writeString(startupLog.toPath(), "=== MurCes server start: " + new java.util.Date() + " ===\n",
+          StandardCharsets.UTF_8);
+    } catch (Exception e) {
+      diagnostic("[WARN] Could not initialize server startup log " + startupLog.getAbsolutePath() + ": " + e.getMessage());
     }
 
     File eulaFile = new File(workDir, "eula.txt");
@@ -179,9 +206,12 @@ public class ServerHandler {
     if (runScript != null && runScript.exists()) {
       try {
         if (!Platform.isWindows()) {
-          new ProcessBuilder("chmod", "+x", runScript.getAbsolutePath()).start().waitFor();
+          ProcessResult chmodResult = runLoggedCommand(
+              Arrays.asList("chmod", "+x", runScript.getAbsolutePath()), workDir, null);
+          if (chmodResult.exitCode != 0) {
+            diagnostic("[WARN] chmod failed, continuing with the script interpreter: " + chmodResult.output);
+          }
         }
-        ProcessBuilder pb;
         List<String> scriptCmd = new ArrayList<>(Arrays.asList(mux, "new-session", "-d", "-s", sess));
         String scriptName = runScript.getName().toLowerCase(Locale.ROOT);
         if (Platform.isWindows()) {
@@ -208,34 +238,29 @@ public class ServerHandler {
             scriptCmd.addAll(Arrays.asList(interpreter, runScript.getName(), "nogui"));
           }
         }
-        pb = new ProcessBuilder(scriptCmd);
-        pb.redirectErrorStream(true);
-        pb.directory(workDir);
+        Map<String, String> environment = new HashMap<>();
         if (jdkHome != null && !jdkHome.isEmpty()) {
           String binPath = new File(jdkHome, "bin").getAbsolutePath();
-          pb.environment().put("JAVA_HOME", jdkHome);
-          pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
+          environment.put("JAVA_HOME", jdkHome);
+          environment.put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
         }
-        Process p = pb.start();
-        p.getOutputStream().close();
-        String commandOutput;
-        try (InputStream output = p.getInputStream()) {
-          commandOutput = new String(output.readAllBytes(), StandardCharsets.UTF_8).trim();
-        }
-        int code = p.waitFor();
-        if (code != 0) {
-          return new ProcessResult(code, "Failed to start server session '" + sess + "' (code " + code + ")"
-              + (commandOutput.isEmpty() ? "." : ": " + commandOutput));
+        List<String> launchCommand = new ArrayList<>(scriptCmd.subList(0, 5));
+        List<String> actualCommand = scriptCmd.subList(5, scriptCmd.size());
+        launchCommand.add(Platform.isWindows() ? String.join(" ", actualCommand)
+            : loggedShellCommand(actualCommand, startupLog, environment));
+        ProcessResult launchResult = runLoggedCommand(launchCommand, workDir, environment);
+        if (launchResult.exitCode != 0) {
+          return new ProcessResult(launchResult.exitCode, "Failed to start server session '" + sess + "'"
+              + (launchResult.output.isEmpty() ? "." : ": " + launchResult.output));
         }
         for (int attempt = 0; attempt < 20; attempt++) {
-          Process check = new ProcessBuilder(mux, "has-session", "-t", sess).start();
-          if (check.waitFor() == 0) {
+          ProcessResult check = runLoggedCommand(Arrays.asList(mux, "has-session", "-t", sess), workDir, null);
+          if (check.exitCode == 0) {
             return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess + "' via " + runScript.getName() + ".");
           }
           Thread.sleep(100);
         }
-        return new ProcessResult(1, "The server process exited during startup; no " + mux + " session '" + sess
-            + "' remains. Check the server startup logs in " + workDir.getAbsolutePath() + ".");
+        return startupFailure(sess, startupLog);
       } catch (Exception e) {
         return new ProcessResult(1, "Failed to launch " + runScript.getName() + ": " + e.getMessage());
       }
@@ -325,37 +350,108 @@ public class ServerHandler {
     }
 
     try {
-      ProcessBuilder pb = new ProcessBuilder(cmd);
-      pb.directory(workDir);
+      Map<String, String> environment = new HashMap<>();
       if (jdkHome != null && !jdkHome.isEmpty()) {
         String binPath = new File(jdkHome, "bin").getAbsolutePath();
-        pb.environment().put("JAVA_HOME", jdkHome);
-        pb.environment().put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
+        environment.put("JAVA_HOME", jdkHome);
+        environment.put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
       }
-      Process p = pb.start();
-      p.getOutputStream().close();
-      String commandOutput;
-      try (InputStream output = p.getInputStream()) {
-        commandOutput = new String(output.readAllBytes(), StandardCharsets.UTF_8).trim();
-      }
-      int code = p.waitFor();
-      if (code != 0) {
-        return new ProcessResult(code, "Failed to start server session '" + sess + "' (code " + code + ")"
-            + (commandOutput.isEmpty() ? "." : ": " + commandOutput));
+      List<String> launchCommand = new ArrayList<>(cmd.subList(0, 5));
+      List<String> actualCommand = cmd.subList(5, cmd.size());
+      launchCommand.add(Platform.isWindows() ? String.join(" ", actualCommand)
+          : loggedShellCommand(actualCommand, startupLog, environment));
+      ProcessResult launchResult = runLoggedCommand(launchCommand, workDir, environment);
+      if (launchResult.exitCode != 0) {
+        return new ProcessResult(launchResult.exitCode, "Failed to start server session '" + sess + "'"
+            + (launchResult.output.isEmpty() ? "." : ": " + launchResult.output));
       }
       for (int attempt = 0; attempt < 20; attempt++) {
-        Process check = new ProcessBuilder(mux, "has-session", "-t", sess).start();
-        if (check.waitFor() == 0) {
+        ProcessResult check = runLoggedCommand(Arrays.asList(mux, "has-session", "-t", sess), workDir, null);
+        if (check.exitCode == 0) {
           return new ProcessResult(0, "Minecraft server started in " + mux + " session '" + sess
               + (argsFile != null ? "' using " + argsFile.getName() + "." : "'."));
         }
         Thread.sleep(100);
       }
-      return new ProcessResult(1, "The server process exited during startup; no " + mux + " session '" + sess
-          + "' remains. Check the server startup logs in " + workDir.getAbsolutePath() + ".");
+      return startupFailure(sess, startupLog);
     } catch (Exception e) {
       return new ProcessResult(1, "Failed to launch server session: " + e.getMessage());
     }
+  }
+
+  private static String loggedShellCommand(List<String> command, File logFile, Map<String, String> environment) {
+    StringBuilder script = new StringBuilder();
+    for (Map.Entry<String, String> variable : environment.entrySet()) {
+      script.append("export ").append(variable.getKey()).append("=")
+          .append(shellQuote(variable.getValue())).append("; ");
+    }
+    script.append("set +e; ").append(shellCommand(command))
+        .append(" 2>&1 | tee -a ").append(shellQuote(logFile.getAbsolutePath()))
+        .append("; status=${PIPESTATUS[0]}; printf '\\n[MurCes] Server process exited with code %s\\n' \"$status\"")
+        .append(" | tee -a ").append(shellQuote(logFile.getAbsolutePath()))
+        .append("; exit \"$status\"");
+    return "bash -lc " + shellQuote(script.toString());
+  }
+
+  private static ProcessResult runLoggedCommand(List<String> command, File workingDirectory,
+      Map<String, String> environment) {
+    diagnostic("[CMD] " + shellCommand(command) + " (cwd=" + workingDirectory.getAbsolutePath() + ")");
+    try {
+      ProcessBuilder builder = new ProcessBuilder(command);
+      builder.redirectErrorStream(true);
+      builder.directory(workingDirectory);
+      if (environment != null) builder.environment().putAll(environment);
+      Process process = builder.start();
+      process.getOutputStream().close();
+      String output;
+      try (InputStream stream = process.getInputStream()) {
+        output = new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim();
+      }
+      int exitCode = process.waitFor();
+      diagnostic("[CMD] exit=" + exitCode + " for " + shellCommand(command)
+          + (output.isEmpty() ? "" : " output: " + output));
+      return new ProcessResult(exitCode, output);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      diagnostic("[ERR:] Command interrupted: " + shellCommand(command));
+      return new ProcessResult(1, "Command interrupted.");
+    } catch (IOException e) {
+      diagnostic("[ERR:] Could not run command " + shellCommand(command) + ": " + e.getMessage());
+      return new ProcessResult(1, e.getMessage());
+    }
+  }
+
+  private static String shellCommand(List<String> command) {
+    return command.stream().map(ServerHandler::shellQuote).collect(java.util.stream.Collectors.joining(" "));
+  }
+
+  private static String shellQuote(String value) {
+    return "'" + value.replace("'", "'\\''") + "'";
+  }
+
+  private static ProcessResult startupFailure(String session, File startupLog) {
+    String detail = "Server process exited during startup; tmux session '" + session + "' is no longer running.";
+    try {
+      if (startupLog.isFile()) {
+        List<String> lines = Files.readAllLines(startupLog.toPath(), StandardCharsets.UTF_8);
+        int start = Math.max(0, lines.size() - 60);
+        String tail = String.join("\n", lines.subList(start, lines.size())).trim();
+        if (!tail.isEmpty()) {
+          detail += "\nStartup log (" + startupLog.getAbsolutePath() + "):\n" + tail;
+          diagnostic("[ERR:] Server startup failed. Final output:\n" + tail);
+        } else {
+          detail += "\nNo output was captured. Startup log: " + startupLog.getAbsolutePath();
+          diagnostic("[ERR:] Server exited without output. Startup log: " + startupLog.getAbsolutePath());
+        }
+      } else {
+        detail += "\nStartup log was not created: " + startupLog.getAbsolutePath();
+        diagnostic("[ERR:] Server exited before producing a startup log.");
+      }
+    } catch (IOException e) {
+      detail += "\nCould not read startup log: " + e.getMessage();
+      diagnostic("[ERR:] Could not read server startup log: " + e.getMessage());
+    }
+    return new ProcessResult(1, detail);
   }
 
   private static File findStartupScript(File workDir) {
