@@ -209,13 +209,23 @@ public class ServerHandler {
       if (installerJar != null) {
         diagnostic("[INFO] Found Forge installer " + installerJar.getAbsolutePath()
             + "; running its headless --installServer setup before launching the server.");
+        File installerTempDir = new File(workDir, ".murces-installer-tmp");
+        try {
+          Files.createDirectories(installerTempDir.toPath());
+        } catch (IOException e) {
+          return new ProcessResult(1, "Could not create Forge installer temporary directory "
+              + installerTempDir.getAbsolutePath() + ": " + e.getMessage());
+        }
+        diagnostic("[INFO] Forge installer temporary files will use " + installerTempDir.getAbsolutePath());
         Map<String, String> environment = new HashMap<>();
         if (jdkHome != null && !jdkHome.isEmpty()) {
           String binPath = new File(jdkHome, "bin").getAbsolutePath();
           environment.put("JAVA_HOME", jdkHome);
           environment.put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
         }
-        List<String> installerCommand = Arrays.asList(javaExec, "-jar", installerJar.getName(), "--installServer");
+        List<String> installerCommand = Arrays.asList(javaExec,
+            "-Djava.io.tmpdir=" + installerTempDir.getAbsolutePath(),
+            "-jar", installerJar.getName(), "--installServer");
         ProcessResult installResult = runLoggedCommand(installerCommand, workDir, environment);
         try {
           Files.writeString(startupLog.toPath(),
