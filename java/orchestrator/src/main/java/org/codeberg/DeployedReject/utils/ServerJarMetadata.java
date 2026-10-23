@@ -5,8 +5,6 @@ import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -16,9 +14,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Standardized server engine and version metadata embedded directly inside the server JAR archive
- * (META-INF/murces-server.json and META-INF/MANIFEST.MF attributes).
- * Eliminates the need for external databases or config files to determine server type and version.
+ * Standardized server engine and version metadata stored alongside the server files.
+ * Server JARs are never modified, preserving signatures and archive integrity.
  */
 public class ServerJarMetadata {
 
@@ -81,16 +78,11 @@ public class ServerJarMetadata {
                 '}';
     }
 
-    /**
-     * Records standardized server metadata directly into the server JAR file (both in META-INF/murces-server.json
-     * and META-INF/MANIFEST.MF attributes) AND as a standalone .murces-server.json file in serverDir.
-     */
+    /** Records server metadata alongside the server files without modifying any JARs. */
     public static boolean recordServerMetadata(File serverDir, String serverType, String gameVersion, String loaderVersion) {
         if (serverDir == null) serverDir = new File(".");
-        boolean success = false;
         long now = System.currentTimeMillis();
 
-        // 1. Always write standalone .murces-server.json and murces-server.json in serverDir
         try {
             JsonObject json = new JsonObject();
             json.addProperty("serverType", serverType != null ? serverType.toLowerCase().trim() : "unknown");
@@ -103,78 +95,7 @@ public class ServerJarMetadata {
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             Files.writeString(new File(serverDir, "murces-server.json").toPath(), jsonContent, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            success = true;
-        } catch (Exception ignored) {}
-
-        // 2. Also record into primary JAR if available
-        File targetJar = findPrimaryServerJar(serverDir, serverType);
-        if (targetJar != null && targetJar.exists() && targetJar.length() > 0) {
-            if (writeMetadataToJar(targetJar, serverType, gameVersion, loaderVersion)) {
-                success = true;
-            }
-        }
-
-        // Also record to server.jar if it exists and is different from targetJar (e.g. Fabric server.jar alongside fabric-server-launch.jar)
-        File sJar = new File(serverDir, "server.jar");
-        if (sJar.exists() && !sJar.equals(targetJar) && sJar.length() > 0) {
-            writeMetadataToJar(sJar, serverType, gameVersion, loaderVersion);
-        }
-
-        return success;
-    }
-
-    private static boolean writeMetadataToJar(File targetJar, String serverType, String gameVersion, String loaderVersion) {
-        if (targetJar == null || !targetJar.exists() || targetJar.length() == 0) return false;
-        try {
-            long now = System.currentTimeMillis();
-            JsonObject json = new JsonObject();
-            json.addProperty("serverType", serverType != null ? serverType.toLowerCase().trim() : "unknown");
-            json.addProperty("gameVersion", gameVersion != null ? gameVersion.trim() : "unknown");
-            json.addProperty("loaderVersion", loaderVersion != null ? loaderVersion.trim() : "");
-            json.addProperty("installedAt", now);
-            String jsonContent = json.toString();
-
-            Path jarPath = targetJar.toPath();
-            Map<String, String> env = new HashMap<>();
-            env.put("create", "false");
-
-            URI jarUri = URI.create("jar:" + jarPath.toUri());
-            try (FileSystem zipfs = FileSystems.newFileSystem(jarUri, env)) {
-                Path metaInf = zipfs.getPath("META-INF");
-                if (!Files.exists(metaInf)) {
-                    Files.createDirectories(metaInf);
-                }
-
-                // 1. Write META-INF/murces-server.json
-                Path jsonPath = zipfs.getPath(META_JSON_ENTRY);
-                Files.writeString(jsonPath, jsonContent, StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-                // 2. Write META-INF/MANIFEST.MF
-                Path manifestPath = zipfs.getPath("META-INF", "MANIFEST.MF");
-                Manifest manifest = new Manifest();
-                if (Files.exists(manifestPath)) {
-                    try (InputStream in = Files.newInputStream(manifestPath)) {
-                        manifest.read(in);
-                    } catch (Exception ignored) {}
-                }
-                Attributes attr = manifest.getMainAttributes();
-                if (!attr.containsKey(Attributes.Name.MANIFEST_VERSION)) {
-                    attr.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                }
-                attr.putValue(MANIFEST_ATTR_SERVER_TYPE, serverType != null ? serverType.toLowerCase().trim() : "unknown");
-                attr.putValue(MANIFEST_ATTR_GAME_VERSION, gameVersion != null ? gameVersion.trim() : "unknown");
-                if (loaderVersion != null && !loaderVersion.isEmpty()) {
-                    attr.putValue(MANIFEST_ATTR_LOADER_VERSION, loaderVersion.trim());
-                }
-                attr.putValue(MANIFEST_ATTR_INSTALLED_AT, String.valueOf(now));
-
-                try (OutputStream out = Files.newOutputStream(manifestPath,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-                    manifest.write(out);
-                }
-                return true;
-            }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -412,24 +333,6 @@ public class ServerJarMetadata {
             }
         } catch (Exception ignored) {}
         return null;
-    }
-
-    private static File findPrimaryServerJar(File serverDir, String serverType) {
-        if ("fabric".equalsIgnoreCase(serverType)) {
-            File fab = new File(serverDir, "fabric-server-launch.jar");
-            if (fab.exists()) return fab;
-        }
-        File sJar = new File(serverDir, "server.jar");
-        if (sJar.exists()) return sJar;
-        File fab = new File(serverDir, "fabric-server-launch.jar");
-        if (fab.exists()) return fab;
-
-        File[] jars = serverDir.listFiles((dir, name) -> name.endsWith(".jar") && !name.endsWith(".tmp"));
-        if (jars != null && jars.length > 0) {
-            Arrays.sort(jars, (a, b) -> Long.compare(b.length(), a.length()));
-            return jars[0];
-        }
-        return sJar;
     }
 
     private static List<File> findCandidateJars(File serverDir) {
