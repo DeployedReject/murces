@@ -10,6 +10,7 @@ import java.util.stream.Stream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.AbstractMap;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -202,6 +204,36 @@ public class ServerHandler {
     }
 
     File runScript = findStartupScript(workDir);
+    if (runScript == null && findPlatformServerArgs(workDir) == null && !hasKnownServerJar(workDir)) {
+      File installerJar = findForgeInstaller(workDir);
+      if (installerJar != null) {
+        diagnostic("[INFO] Found Forge installer " + installerJar.getAbsolutePath()
+            + "; running its headless --installServer setup before launching the server.");
+        Map<String, String> environment = new HashMap<>();
+        if (jdkHome != null && !jdkHome.isEmpty()) {
+          String binPath = new File(jdkHome, "bin").getAbsolutePath();
+          environment.put("JAVA_HOME", jdkHome);
+          environment.put("PATH", binPath + File.pathSeparator + System.getenv("PATH"));
+        }
+        List<String> installerCommand = Arrays.asList(javaExec, "-jar", installerJar.getName(), "--installServer");
+        ProcessResult installResult = runLoggedCommand(installerCommand, workDir, environment);
+        try {
+          Files.writeString(startupLog.toPath(),
+              installResult.output + System.lineSeparator() + "[MurCes] Forge installer exited with code "
+                  + installResult.exitCode + System.lineSeparator(),
+              StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+          diagnostic("[WARN] Could not append Forge installer output to " + startupLog.getAbsolutePath() + ": " + e.getMessage());
+        }
+        if (installResult.exitCode != 0) {
+          return new ProcessResult(installResult.exitCode,
+              "Forge server installation failed (exit " + installResult.exitCode + ")."
+                  + (installResult.output.isEmpty() ? "" : "\n" + installResult.output)
+                  + "\nSee " + startupLog.getAbsolutePath());
+        }
+        runScript = findStartupScript(workDir);
+      }
+    }
 
     if (runScript != null && runScript.exists()) {
       try {
@@ -266,6 +298,8 @@ public class ServerHandler {
       }
     }
 
+    diagnostic("[INFO] No usable platform startup script found; resolving a server JAR or Java argument file.");
+
     // Determine target jar by scanning for known server launchers
     String targetJar = "server.jar";
     if (new File(workDir, "fabric-server-launch.jar").exists()) {
@@ -278,7 +312,8 @@ public class ServerHandler {
       targetJar = "server.jar";
     } else {
       // Find Forge universal/server jar or Paper/Spigot jar
-      File[] jars = workDir.listFiles(f -> f.isFile() && f.getName().endsWith(".jar"));
+      File[] jars = workDir.listFiles(f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar")
+          && !f.getName().toLowerCase(Locale.ROOT).contains("installer"));
       if (jars != null) {
         // Priority 1: Forge server / universal jar (e.g. forge-1.7.10-10.13.4.1614-1.7.10-universal.jar)
         for (File j : jars) {
@@ -311,6 +346,14 @@ public class ServerHandler {
     }
 
     File argsFile = findPlatformServerArgs(workDir);
+    if (argsFile == null && (!new File(workDir, targetJar).isFile() || isInstallerJar(new File(workDir, targetJar)))) {
+      return new ProcessResult(1,
+          "No usable server startup script, Java server argument file, or server JAR was found in "
+              + workDir.getAbsolutePath() + ". Forge installer JARs are not server launchers.");
+    }
+    if (argsFile != null) {
+      diagnostic("[INFO] Using detected server Java arguments from " + argsFile.getAbsolutePath());
+    }
     List<String> cmd = new ArrayList<>(Arrays.asList(mux, "new-session", "-d", "-s", sess, javaExec));
     if (argsFile == null) {
       cmd.addAll(Arrays.asList(
@@ -468,8 +511,64 @@ public class ServerHandler {
           int rank = Integer.compare(startupScriptRank(left), startupScriptRank(right));
           return rank != 0 ? rank : left.getName().compareToIgnoreCase(right.getName());
         })
+        .filter(ServerHandler::isServerStartupScript)
         .findFirst()
         .orElse(null);
+  }
+
+  private static boolean hasKnownServerJar(File workDir) {
+    if (new File(workDir, "server.jar").isFile()
+        || new File(workDir, "fabric-server-launch.jar").isFile()
+        || new File(workDir, "fabric-server-launcher.jar").isFile()
+        || new File(workDir, "quilt-server-launch.jar").isFile()) {
+      return true;
+    }
+    File[] jars = workDir.listFiles(file -> file.isFile()
+        && file.getName().toLowerCase(Locale.ROOT).endsWith(".jar")
+        && !isInstallerJar(file));
+    if (jars == null) return false;
+    return Arrays.stream(jars).anyMatch(file -> {
+      String name = file.getName().toLowerCase(Locale.ROOT);
+      return name.startsWith("forge-") || name.startsWith("neoforge-")
+          || name.startsWith("paper") || name.startsWith("purpur")
+          || name.startsWith("spigot") || name.startsWith("craftbukkit");
+    });
+  }
+
+  private static File findForgeInstaller(File workDir) {
+    File[] jars = workDir.listFiles(file -> file.isFile() && isInstallerJar(file));
+    if (jars == null) return null;
+    return Arrays.stream(jars)
+        .filter(file -> {
+          String name = file.getName().toLowerCase(Locale.ROOT);
+          return name.startsWith("forge-") || name.startsWith("neoforge-") || name.equals("installer.jar");
+        })
+        .sorted(Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static boolean isInstallerJar(File jar) {
+    return jar.getName().toLowerCase(Locale.ROOT).contains("installer")
+        && jar.getName().toLowerCase(Locale.ROOT).endsWith(".jar");
+  }
+
+  private static boolean isServerStartupScript(File script) {
+    try {
+      String contents = Files.readString(script.toPath(), StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
+      boolean launchesInstaller = contents.contains("net.minecraftforge.installer.simpleinstaller")
+          || Pattern.compile("(?i)(?:java|javaw)[^\\r\\n]*-jar[^\\r\\n]*\\S*installer[^\\r\\n]*\\.jar")
+              .matcher(contents).find();
+      if (launchesInstaller) {
+        diagnostic("[WARN] Skipping " + script.getName()
+            + ": it launches the Forge installer, not the server. Looking for server arguments or a server JAR instead.");
+        return false;
+      }
+      return true;
+    } catch (IOException e) {
+      diagnostic("[WARN] Could not inspect startup script " + script.getAbsolutePath() + ": " + e.getMessage());
+      return false;
+    }
   }
 
   private static int startupScriptRank(File script) {
@@ -511,14 +610,21 @@ public class ServerHandler {
       if (size == 0 || size > 1024 * 1024) return -1;
       String contents = Files.readString(candidate, StandardCharsets.UTF_8);
       String normalized = contents.toLowerCase(Locale.ROOT);
+      if (normalized.contains("net.minecraftforge.installer.simpleinstaller")
+          || normalized.contains("net.minecraftforge.installer.installerpanel")
+          || (normalized.contains("installer") && normalized.contains(".jar"))) {
+        diagnostic("[WARN] Ignoring installer arguments in " + candidate
+            + "; these launch the graphical Forge installer, not the server.");
+        return -1;
+      }
       boolean hasLaunchArgs = matchesArgumentLine(normalized,
-          "^\\s*(?:-cp|-classpath|--class-path|--module-path|-p|-jar)\\s+")
+          "(?:^|\\s)(?:-cp|-classpath|--class-path|--module-path|-p|-jar)\\s+")
           || normalized.matches("(?s).*(?:net\\.minecraft\\.server\\.main|net\\.minecraftforge\\.|net\\.neoforged\\.|cpw\\.mods\\.|bootstraplauncher).*");
       if (!hasLaunchArgs) return -1;
 
       int score = 0;
-      if (matchesArgumentLine(normalized, "^\\s*(?:-cp|-classpath|--class-path|--module-path|-p)\\s+")) score += 8;
-      if (matchesArgumentLine(normalized, "^\\s*-jar\\s+\\S+\\.jar(?:\\s|$)")) score += 8;
+      if (matchesArgumentLine(normalized, "(?:^|\\s)(?:-cp|-classpath|--class-path|--module-path|-p)\\s+")) score += 8;
+      if (matchesArgumentLine(normalized, "(?:^|\\s)-jar\\s+\\S+\\.jar(?:\\s|$)")) score += 8;
       if (normalized.matches("(?s).*(?:net\\.minecraft\\.server\\.main|net\\.minecraftforge\\.|net\\.neoforged\\.|cpw\\.mods\\.|bootstraplauncher).*")) score += 8;
       if (matchesArgumentLine(normalized, "^\\s*--launchtarget\\s+\\S+")) score += 3;
       if (matchesArgumentLine(normalized, "^\\s*--fml\\.[\\w.-]+")) score += 2;
