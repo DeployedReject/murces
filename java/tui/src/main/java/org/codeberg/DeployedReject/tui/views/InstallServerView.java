@@ -322,34 +322,31 @@ public class InstallServerView implements WorkspaceView {
                         .header("User-Agent", "MurCes/1.6")
                         .GET()
                         .build();
-                    zipFile = java.nio.file.Files.createTempFile("import_server_", ".zip").toFile();
                     java.net.http.HttpResponse<java.io.InputStream> dlResp = httpClient.send(
                         dlReq, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
-                    if (dlResp.statusCode() != 200) {
-                        throw new java.io.IOException("Download failed with HTTP " + dlResp.statusCode());
-                    }
-                    try (java.io.InputStream in = dlResp.body();
-                         java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile)) {
-                        byte[] buffer = new byte[65536];
-                        int len;
-                        while ((len = in.read(buffer)) != -1) {
-                            fos.write(buffer, 0, len);
+                    try (java.io.InputStream in = dlResp.body()) {
+                        if (dlResp.statusCode() != 200) {
+                            throw new java.io.IOException("Download failed with HTTP " + dlResp.statusCode());
                         }
+                        mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                            progressBar.setValue(50);
+                            progressLabel.setText("[BUSY] Extracting and configuring server...");
+                            ActivityLogger.info("Extracting server archive...");
+                        });
+                        OrchestratorBridge.installFromZip(in, true);
                     }
                 } else {
                     zipFile = new java.io.File(src);
                     if (!zipFile.exists()) {
                         throw new java.io.FileNotFoundException("File not found: " + src);
                     }
+                    mainWindow.getGui().getGUIThread().invokeLater(() -> {
+                        progressBar.setValue(50);
+                        progressLabel.setText("[BUSY] Extracting and configuring server...");
+                        ActivityLogger.info("Extracting server archive...");
+                    });
+                    OrchestratorBridge.installFromZip(zipFile, true);
                 }
-
-                mainWindow.getGui().getGUIThread().invokeLater(() -> {
-                    progressBar.setValue(50);
-                    progressLabel.setText("[BUSY] Extracting and configuring server...");
-                    ActivityLogger.info("Extracting server archive...");
-                });
-
-                OrchestratorBridge.installFromZip(zipFile, true);
 
                 mainWindow.getGui().getGUIThread().invokeLater(() -> {
                     progressBar.setValue(100);

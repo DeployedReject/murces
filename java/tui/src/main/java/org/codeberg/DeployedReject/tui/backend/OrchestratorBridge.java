@@ -1573,13 +1573,8 @@ public class OrchestratorBridge {
                   String name = ze.getName();
                   if (name.startsWith("overrides/") && !ze.isDirectory()) {
                     String relative = name.substring("overrides/".length());
-                    File targetFile = new File(targetBase, relative);
-                    if (targetFile.getCanonicalPath().startsWith(targetBase.getCanonicalPath())) {
-                      File parent = targetFile.getParentFile();
-                      if (parent != null && !parent.exists()) parent.mkdirs();
-                      try (InputStream zin = zf.getInputStream(ze); FileOutputStream fos = new FileOutputStream(targetFile)) {
-                        zin.transferTo(fos);
-                      }
+                    try (InputStream zin = zf.getInputStream(ze)) {
+                      extractModpackFile(zin, relative, targetBase);
                     }
                   } else if ("manifest.json".equalsIgnoreCase(name)) {
                     try (InputStream min = zf.getInputStream(ze)) {
@@ -1649,7 +1644,8 @@ public class OrchestratorBridge {
                 }
               }
             }
-          } catch (Exception ignored) {
+          } catch (Exception e) {
+            System.err.println("[WARN] Failed to process CurseForge modpack archive: " + e.getMessage());
           } finally {
             try { Files.deleteIfExists(zipTmp.toPath()); } catch (Exception ignored) {}
           }
@@ -1670,32 +1666,26 @@ public class OrchestratorBridge {
             if (resp != null && resp.statusCode() == 200) {
               try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(resp.body())) {
                 java.util.zip.ZipEntry ze;
-                File targetBase = new File(".");
+                File modsDirRef = getModsDir();
+                File targetBase = modsDirRef.getParentFile() != null ? modsDirRef.getParentFile() : new File(".");
                 while ((ze = zis.getNextEntry()) != null) {
                   String name = ze.getName();
-                  if (name.startsWith("overrides/") && !ze.isDirectory()) {
-                    String relative = name.substring("overrides/".length());
-                    File targetFile = new File(targetBase, relative);
-                    if (targetFile.getCanonicalPath().startsWith(targetBase.getCanonicalPath())) {
-                      File parent = targetFile.getParentFile();
-                      if (parent != null && !parent.exists()) {
-                        parent.mkdirs();
-                      }
-                      try (FileOutputStream fos = new FileOutputStream(targetFile)) {
-                        byte[] buffer = new byte[8192];
-                        int len;
-                        while ((len = zis.read(buffer)) > 0) {
-                          fos.write(buffer, 0, len);
-                        }
-                      }
-                    }
+                  String prefix = name.startsWith("server-overrides/") ? "server-overrides/"
+                      : name.startsWith("overrides/") ? "overrides/" : null;
+                  if (prefix != null && !ze.isDirectory()) {
+                    extractModpackFile(zis, name.substring(prefix.length()), targetBase);
                   }
                   zis.closeEntry();
                 }
               }
+              File modsDirRef = getModsDir();
+              File targetBase = modsDirRef.getParentFile() != null ? modsDirRef.getParentFile() : new File(".");
+              if (hasServerFiles(targetBase)) {
+                installBundledServerEngine(targetBase);
+              }
             }
           } catch (Exception e) {
-            // Non-fatal override extraction failure
+            System.err.println("[WARN] Failed to extract modpack overrides: " + e.getMessage());
           }
         }
 
@@ -2021,6 +2011,9 @@ public class OrchestratorBridge {
       try {
         java.nio.file.Path rel = sourceDir.toPath().relativize(srcPath);
         java.nio.file.Path destPath = targetDir.toPath().resolve(rel);
+        if (srcPath.toAbsolutePath().normalize().equals(destPath.toAbsolutePath().normalize())) {
+          return;
+        }
         if (java.nio.file.Files.isDirectory(srcPath)) {
           java.nio.file.Files.createDirectories(destPath);
         } else {
@@ -2079,28 +2072,62 @@ public class OrchestratorBridge {
    * Auto-unwraps single-subdirectory zips (e.g. GTNH, Forge packs that wrap everything in one folder).
    */
   public static void installFromZip(File zipFile, boolean force) throws IOException {
-    File tempDir = java.nio.file.Files.createTempDirectory("import_server_").toFile();
-    try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile)) {
-      java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-      while (entries.hasMoreElements()) {
-        java.util.zip.ZipEntry entry = entries.nextElement();
-        File outFile = new File(tempDir, entry.getName());
-        // Guard against zip-slip
-        if (!outFile.getCanonicalPath().startsWith(tempDir.getCanonicalPath() + File.separator)) continue;
-        if (entry.isDirectory()) {
-          outFile.mkdirs();
-        } else {
-          outFile.getParentFile().mkdirs();
-          try (java.io.InputStream in = zip.getInputStream(entry);
-               java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile)) {
-            byte[] buf = new byte[65536];
-            int len;
-            while ((len = in.read(buf)) != -1) fos.write(buf, 0, len);
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    File targetDir = cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty()
+        ? new File(cfg.getServerDir()) : new File(".");
+    Files.createDirectories(targetDir.toPath());
+    File tempDir = Files.createTempDirectory(targetDir.toPath(), ".import_server_").toFile();
+    try {
+      try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile)) {
+        java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+        while (entries.hasMoreElements()) {
+          java.util.zip.ZipEntry entry = entries.nextElement();
+          try (InputStream in = zip.getInputStream(entry)) {
+            extractImportEntry(in, entry.getName(), entry.isDirectory(), tempDir);
           }
         }
       }
+      installExtractedServer(tempDir, targetDir, force);
+    } finally {
+      cleanupImportDirectory(tempDir);
     }
+  }
 
+  public static void installFromZip(InputStream archive, boolean force) throws IOException {
+    TuiConfig cfg = ConfigManager.getInstance().getConfig();
+    File targetDir = cfg.getServerDir() != null && !cfg.getServerDir().trim().isEmpty()
+        ? new File(cfg.getServerDir()) : new File(".");
+    Files.createDirectories(targetDir.toPath());
+    File tempDir = Files.createTempDirectory(targetDir.toPath(), ".import_server_").toFile();
+    try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(archive)) {
+      java.util.zip.ZipEntry entry;
+      while ((entry = zip.getNextEntry()) != null) {
+        extractImportEntry(zip, entry.getName(), entry.isDirectory(), tempDir);
+        zip.closeEntry();
+      }
+      installExtractedServer(tempDir, targetDir, force);
+    } finally {
+      cleanupImportDirectory(tempDir);
+    }
+  }
+
+  private static void extractImportEntry(InputStream input, String entryName, boolean directory, File tempDir)
+      throws IOException {
+    Path root = tempDir.getCanonicalFile().toPath();
+    Path output = root.resolve(entryName).normalize();
+    if (!output.startsWith(root)) return;
+    if (directory) {
+      Files.createDirectories(output);
+      return;
+    }
+    Path parent = output.getParent();
+    if (parent != null) Files.createDirectories(parent);
+    try (OutputStream out = Files.newOutputStream(output)) {
+      input.transferTo(out);
+    }
+  }
+
+  private static void installExtractedServer(File tempDir, File targetDir, boolean force) throws IOException {
     // Auto-unwrap: if zip has a single top-level subdirectory and server files are inside it,
     // use that subdirectory as the source (common pattern for GTNH, Forge packs, etc.)
     File sourceDir = tempDir;
@@ -2111,28 +2138,56 @@ public class OrchestratorBridge {
         sourceDir = singleSubdir;
       }
     }
-
-    if (hasServerFiles(sourceDir)) {
-      installBundledServerEngine(sourceDir);
-    } else if (force) {
-      installBundledServerEngine(sourceDir);
-    } else {
-      // Cleanup before throwing
-      try {
-        java.nio.file.Files.walk(tempDir.toPath())
-            .sorted(java.util.Comparator.reverseOrder())
-            .map(java.nio.file.Path::toFile)
-            .forEach(java.io.File::delete);
-      } catch (Exception ignored) {}
+    if (!hasServerFiles(sourceDir) && !force) {
       throw new IOException("No server files detected in zip. Use --force to install anyway.");
     }
-    // Cleanup
-    try {
-      java.nio.file.Files.walk(tempDir.toPath())
-          .sorted(java.util.Comparator.reverseOrder())
-          .map(java.nio.file.Path::toFile)
-          .forEach(java.io.File::delete);
-    } catch (Exception ignored) {}
+    moveImportedFiles(sourceDir, targetDir);
+    installBundledServerEngine(targetDir);
+  }
+
+  private static void cleanupImportDirectory(File tempDir) {
+    try (var paths = Files.walk(tempDir.toPath())) {
+      paths.sorted(java.util.Comparator.reverseOrder())
+          .forEach(path -> {
+            try {
+              Files.deleteIfExists(path);
+            } catch (IOException e) {
+              System.err.println("[WARN] Failed to remove import temporary file " + path + ": " + e.getMessage());
+            }
+          });
+    } catch (IOException e) {
+      System.err.println("[WARN] Failed to clean import temporary directory " + tempDir + ": " + e.getMessage());
+    }
+  }
+
+  private static void moveImportedFiles(File sourceDir, File targetDir) throws IOException {
+    Files.createDirectories(targetDir.toPath());
+    try (var paths = Files.walk(sourceDir.toPath())) {
+      for (Path source : (Iterable<Path>) paths::iterator) {
+        Path relative = sourceDir.toPath().relativize(source);
+        Path destination = targetDir.toPath().resolve(relative);
+        if (Files.isDirectory(source)) {
+          Files.createDirectories(destination);
+        } else {
+          Path parent = destination.getParent();
+          if (parent != null) Files.createDirectories(parent);
+          Files.move(source, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+      }
+    }
+  }
+
+  private static void extractModpackFile(InputStream input, String relativePath, File targetBase) throws IOException {
+    Path root = targetBase.getCanonicalFile().toPath();
+    Path output = new File(root.toFile(), relativePath).getCanonicalFile().toPath();
+    if (!output.startsWith(root)) {
+      throw new IOException("Modpack archive contains an invalid path: " + relativePath);
+    }
+    Path parent = output.getParent();
+    if (parent != null) Files.createDirectories(parent);
+    try (OutputStream out = Files.newOutputStream(output)) {
+      input.transferTo(out);
+    }
   }
 
 
