@@ -120,28 +120,16 @@ public class PlayerAccessManager {
         nameOrUuid = nameOrUuid.trim();
 
         List<Entry> list = getWhitelist();
-        String name = "";
-        String uuid = "";
+        boolean online = "true".equalsIgnoreCase(new ServerPropertiesManager(
+            getServerDirectory().getAbsolutePath()).get("online-mode", "true"));
+        Entry player = PlayerIdentityResolver.resolve(getServerDirectory(), nameOrUuid, online);
 
-        if (isUuid(nameOrUuid)) {
-            uuid = nameOrUuid;
-            name = nameOrUuid;
-        } else {
-            name = nameOrUuid;
-            // Generate offline UUID as default fallback
-            uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
-        }
-
-        // Avoid duplicate
-        for (Entry e : list) {
-            if (e.name.equalsIgnoreCase(name) || (!uuid.isEmpty() && e.uuid.equalsIgnoreCase(uuid))) {
-                return;
-            }
-        }
-
-        list.add(new Entry(name, uuid));
+        // Re-adding a name repairs entries created with the wrong authentication mode.
+        list.removeIf(e -> e.name.equalsIgnoreCase(player.name) || e.uuid.equalsIgnoreCase(player.uuid));
+        list.add(player);
         saveWhitelist(list);
-        dispatchConsoleCommand("whitelist add " + name);
+        // Reload the resolved UUID directly. 'whitelist add' can resolve a different
+        // identity (especially on offline servers) and overwrite the file.
         dispatchConsoleCommand("whitelist reload");
     }
 

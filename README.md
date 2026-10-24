@@ -176,6 +176,7 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 - **One-Key Bulk Updates**: Press `[U]` (`Update All Mods`) to query Modrinth/CurseForge for every installed mod, compare versions, install latest compatible jars, and prune obsolete versions.
 - **Inspect Installed Mods**: View all `.jar` files present in `mods/` with parsed slug and version info.
+- **Repair Existing Entries**: Re-add a player to replace an incorrect UUID. Offline names must match the client’s capitalization; proxy/Bedrock users can supply their server UUID directly.
 - **Instant Removal**: Instant single-key mod removal (`[D]elete Mod`) with confirmation safety.
 - **Live Re-indexing**: Live file system re-indexing (`[R]efresh`).
 
@@ -191,7 +192,8 @@ Managing dedicated Minecraft servers on budget VPS nodes or homelabs often force
 
 - **Three-Tab Layout**: `[1] Whitelist`, `[2] Blacklist / Bans`, and `[3] UUID Migration` share a single workspace.
 - **Whitelist Toggle**: Flip `white-list` in `server.properties` and MurCes immediately dispatches `whitelist on` / `whitelist off` plus a `whitelist reload` into the live server console.
-- **1-Key Membership**: `[A]dd Player` accepts a username or UUID, resolves the offline-mode UUID automatically, and writes a canonical `whitelist.json` entry.
+- **1-Key Membership**: `[A]dd Player` accepts a username or UUID, resolves the server-cached UUID first, uses Mojang profiles for online-mode servers, and generates case-sensitive offline UUIDs for offline-mode servers, and writes a canonical `whitelist.json` entry.
+- **Repair Existing Entries**: Re-add a player to replace an incorrect UUID. Offline names must match the client’s capitalization; proxy/Bedrock users can supply their server UUID directly.
 - **Instant Removal**: `[R]emove Player` drops the selected entry (or prompts for a name) and syncs the running server with `whitelist remove`.
 - **Duplicate Safe**: Adds are idempotent — re-adding an existing player is a no-op instead of a corrupt file.
 

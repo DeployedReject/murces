@@ -15,6 +15,7 @@ jobs:
     outputs:
       tag_name: ${{ steps.notes.outputs.tag_name }}
       pom_version: ${{ steps.notes.outputs.pom_version }}
+      prerelease: ${{ steps.classify.outputs.prerelease }}
 
     steps:
       # Pinned to actions/checkout v4.2.2
@@ -22,6 +23,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+
+      - name: Classify pushed commits
+        id: classify
+        run: |
+          python3 .github/scripts/test_classify_release.py
+          python3 .github/scripts/classify-release.py
 
       - name: Verify Required Secrets
         run: |
@@ -115,6 +122,15 @@ jobs:
           cd java/tui
           mvn clean package -Pnative -DskipTests
 
+      - name: Verify Player Identity and Whitelist Regression Tests
+        env:
+          TUI_VERSION: ${{ needs.prepare.outputs.pom_version }}
+        run: |
+          # ConfigManager uses the working directory; isolate test configuration.
+          cd "$(mktemp -d)"
+          java -ea -cp "$GITHUB_WORKSPACE/java/tui/target/test-classes:$GITHUB_WORKSPACE/java/tui/target/murces-tui-${TUI_VERSION}.jar" \
+            org.codeberg.DeployedReject.tui.backend.PlayerIdentityResolverTest
+
       - name: Verify Binary with Headless Self-Test (Unix)
         run: |
           chmod +x java/tui/target/${{ matrix.target_binary }}
@@ -173,8 +189,13 @@ jobs:
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         run: |
+          release_flags=()
+          if [ "$PRERELEASE" != "false" ]; then
+            release_flags+=(--prerelease)
+          fi
           gh release create "${{ needs.prepare.outputs.tag_name }}" \
             murces-* \
             --title "MurCes ${{ needs.prepare.outputs.tag_name }}" \
-            --notes-file release_notes.md
+            --notes-file release_notes.md "${release_flags[@]}"
