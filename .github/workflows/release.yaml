@@ -99,7 +99,7 @@ jobs:
 
       # Pinned to your specified graalvm/setup-graalvm commit SHA
       - name: Set up GraalVM JDK 21
-        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173
+        uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc
         with:
           java-version: "21"
           distribution: "graalvm"
